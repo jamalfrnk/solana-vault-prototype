@@ -2,10 +2,12 @@
 
 ## Status
 
-**Planned — not yet implemented.** This repository currently contains only its execution
-framework and documentation. There is no Anchor workspace and no program code yet. The
-architecture described below is **proposed** and subject to an Architecture Decision
-Record before any implementation begins.
+**Milestone 2 in progress — Anchor workspace scaffolded, build and test pending.**
+
+The repository contains the full execution framework, documentation, and a default
+Anchor 1.0.2 baseline workspace. No vault accounts or custom instructions have been
+added yet. The architecture described below is **proposed** and subject to an
+Architecture Decision Record before implementation begins.
 
 This is an interview-grade educational prototype. It is **not** audited, **not**
 production-safe, **not** mainnet-ready, and **not** formally verified.
@@ -86,7 +88,11 @@ SECURITY_CHECKLIST.md     Security checklist (implementation items unchecked)
 TEST_PLAN.md              Planned test matrix
 ROADMAP.md                Milestone order and status
 LEARNING_LOG.md           Per-milestone reflection and interview prep notes
-rust-toolchain.toml       Pinned Rust toolchain (1.79.0)
+rust-toolchain.toml       Pinned Rust toolchain (1.89.0)
+Anchor.toml               Anchor workspace configuration
+Cargo.toml                Rust workspace manifest
+package.json              JS/TS dev dependencies (prettier, mocha, ts-node)
+tsconfig.json             TypeScript configuration
 .devcontainer/
   devcontainer.json       Codespaces / VS Code devcontainer configuration
   post-create.sh          Idempotent install script (Agave CLI, avm, Anchor CLI)
@@ -95,11 +101,25 @@ rust-toolchain.toml       Pinned Rust toolchain (1.79.0)
 docs/
   decisions/              Architecture Decision Records
     0001-toolchain-version-pinning.md
+migrations/
+  deploy.ts               Anchor deploy migration stub
+programs/
+  solana-vault-prototype/ Default Anchor program (untouched baseline)
+    src/
+      lib.rs              Program entry point and declare_id!
+      instructions.rs     Instruction module re-exports
+      instructions/
+        initialize.rs     Default initialize handler (no-op baseline)
+      state.rs            State module (empty baseline)
+      constants.rs        Constants module (empty baseline)
+      error.rs            Error module (empty baseline)
+    tests/
+      test_initialize.rs  Baseline LiteSVM test (default passing test)
 prompts/                  Milestone and operating prompts (00–11)
 .gitignore
 ```
 
-## Codespaces setup (Milestone 1 — pending validation)
+## Codespaces setup (Milestone 1 — complete)
 
 A devcontainer is configured. To start a reproducible environment:
 
@@ -108,29 +128,43 @@ A devcontainer is configured. To start a reproducible environment:
 3. Wait for `post-create.sh` to finish — it installs the Agave CLI and Anchor CLI
    and prints all installed versions.
 
-**Pinned versions** (source: `docs/decisions/0001-toolchain-version-pinning.md`):
+**Observed versions** (Codespace, 2026-06-25):
 
-| Tool | Pinned version |
-|---|---|
-| Rust | 1.85.0 |
-| Agave (Solana) CLI | v3.1.10 |
-| Anchor CLI | 1.0.2 |
-| Node.js | 22 LTS |
+| Tool | Pinned version | Observed |
+|---|---|---|
+| Rust | 1.89.0 | rustc 1.89.0 (29483883e 2025-08-04) |
+| Agave (Solana) CLI | v3.1.10 | solana-cli 3.1.10 |
+| Anchor CLI | 1.0.2 | anchor-cli 1.0.2 |
+| Node.js | 22 LTS | v22.23.1 |
+| npm | bundled | 10.9.8 |
 
-> ⚠️ Validation is pending a live Codespace run. The version table above will be
-> updated with **observed** output after that run.
+> Note: Rust was upgraded from 1.85.0 (M1 pin) to 1.89.0 during M2 scaffold
+> because `anchor init` 1.0.2 generates a `rust-toolchain.toml` pinning 1.89.0
+> and the litesvm/solana-3.x dev-dependencies require it.
+> See `docs/decisions/0001-toolchain-version-pinning.md`.
 
 ## Testing strategy
 
-> Planned — see `TEST_PLAN.md`. Only repository-hygiene checks exist today.
+> See `TEST_PLAN.md`. Baseline LiteSVM scaffold test added in Milestone 2.
+
+The generated scaffold includes one default LiteSVM test (`test_initialize`) which
+loads the compiled program into an in-process SVM, airdrops lamports to a payer,
+and invokes the no-op `initialize` instruction. This test runs entirely locally via
+`anchor test` (no network, no devnet, no mainnet).
 
 Planned coverage spans unit (arithmetic), integration (instructions), happy-path,
 negative, account-substitution, arithmetic-boundary, and clean-environment tests.
 
 ## Roadmap
 
-See `ROADMAP.md`. Milestone 0 (repository bootstrap) is in progress; all later
-milestones are not started.
+See `ROADMAP.md`.
+
+| Milestone | Status |
+|---|---|
+| 0 — Repository bootstrap | complete |
+| 1 — Codespaces / toolchain | complete |
+| 2 — Default Anchor scaffold | in progress |
+| 3+ — Vault implementation | not started |
 
 ## Interview walkthrough
 

@@ -103,21 +103,57 @@ alternatives were rejected."
 ## Milestone 2 — Default Anchor Scaffold
 
 **What I built:**
-
+The smallest possible default Anchor 1.0.2 workspace inside the existing repository:
+`Anchor.toml`, `Cargo.toml`, `package.json`, `tsconfig.json`, `migrations/deploy.ts`,
+the `programs/solana-vault-prototype/` program tree (lib.rs, instructions/initialize.rs,
+state.rs, error.rs, constants.rs), and a LiteSVM integration test
+(`tests/test_initialize.rs`). The program contains only the generated `Initialize`
+instruction that logs the program ID and returns `Ok(())`. No vault state, no accounts
+beyond the empty context struct.
 
 **What problem it solves:**
-
+Establishes a known-good compile baseline before any vault logic is written. Every
+future milestone's tests will run against this same workspace structure. If a future
+change breaks the build, the baseline commit is the diff target.
 
 **What command or concept I learned:**
-
+LiteSVM — a fully in-process Solana VM that loads a compiled `.so` directly from the
+filesystem (`include_bytes!`), airdrops SOL to a keypair, and processes transactions
+without starting any external validator process. The test runs in under one second.
+This is distinct from `solana-test-validator` (which is a full process you start and
+stop) and from TypeScript Mocha tests (which use `@solana/web3.js` against a running
+validator). For pure Rust unit/integration tests, LiteSVM gives the fastest feedback
+loop and the cleanest CI setup.
 
 **What confused me:**
-
+Anchor 1.0.2 changed the default local validator from `solana-test-validator` to
+`surfpool`. Running plain `anchor test` fails with "Failed to spawn surfpool: No such
+file or directory" because surfpool is not installed in the Codespace. The fix is
+`--skip-local-validator --skip-deploy`: these flags tell Anchor to skip spinning up
+any validator and skip the program-deploy transaction, then run the `[scripts] test`
+command directly. Since the tests use LiteSVM (no external validator needed), this
+works perfectly. For future milestones that stay on LiteSVM, the same flags apply.
 
 **How I verified it:**
-
+```
+cargo fmt --all -- --check          → exit 0, no formatting violations
+anchor build                        → exit 0, program compiled to .so
+anchor test --skip-local-validator --skip-deploy
+  test test_id ... ok
+  test test_initialize ... ok       → 2 passed, 0 failed
+git diff --check                    → exit 0, no whitespace errors
+```
+Observed versions (Codespace, 2026-06-25):
+  rustc 1.89.0 · cargo 1.89.0 · solana-cli 3.1.10 · anchor-cli 1.0.2
+  node v22.23.1 · npm 10.9.8
 
 **How I would explain it in an interview:**
+"Before writing any vault logic I scaffolded the Anchor workspace, ran the default
+generated test against LiteSVM, and committed that as a clean baseline. LiteSVM is an
+in-process Solana VM — I load the compiled BPF bytecode directly in Rust, airdrop some
+lamports, send a transaction, and assert the result. No external validator process
+needed. It runs in 200 ms and is deterministic. Every subsequent milestone adds tests
+to this same harness, so regressions are caught without spinning up infrastructure."
 
 
 ---

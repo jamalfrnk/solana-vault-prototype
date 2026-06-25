@@ -57,9 +57,24 @@ each milestone is implemented. Only repository-hygiene checks are marked complet
 - [ ] Zero-amount handling.
 - [ ] First-deposit edge case for share issuance.
 
+## Anchor scaffold baseline (complete — M2)
+
+- [x] `cargo fmt --all -- --check` passes clean (no formatting violations).
+- [x] `anchor build` compiles the default scaffold program (exit 0).
+- [x] `anchor test --skip-local-validator --skip-deploy` passes:
+  - `test test_id ... ok` (unit test — program ID is correctly declared)
+  - `test test_initialize ... ok` (LiteSVM integration test — Initialize instruction returns Ok)
+- [x] No compiler warnings in release build.
+- [x] `git diff --check` passes (no trailing whitespace or conflict markers).
+- [x] `target/` is absent from staging; no keypair files tracked.
+
+Note: `--skip-local-validator --skip-deploy` is required because the Rust/LiteSVM test
+suite is fully in-process and does not need an external Solana validator. Anchor 1.0.2
+defaults to `surfpool` (not installed); the flags bypass that dependency.
+
 ## Clean-environment tests (in progress)
 
 - [~] Devcontainer builds without errors from a fresh Codespace (pending live run).
 - [~] `post-create.sh` runs to completion and prints all version strings (pending live run).
 - [ ] Full suite passes from a fresh Codespace / clean checkout.
-- [ ] `anchor build` and `anchor test` succeed from clean state (once scaffolded).
+- [x] `anchor build` and `anchor test --skip-local-validator --skip-deploy` succeed from clean state (M2 complete).
