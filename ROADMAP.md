@@ -8,8 +8,8 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 | # | Milestone | Status |
 |---|-----------|--------|
 | 0 | Repository bootstrap | `[x]` complete |
-| 1 | Codespaces / toolchain | `[~]` in progress |
-| 2 | Default Anchor scaffold | `[ ]` not started |
+| 1 | Codespaces / toolchain | `[x]` complete |
+| 2 | Default Anchor scaffold | `[~]` in progress |
 | 3 | Architecture decision record | `[ ]` not started |
 | 4 | Vault initialization | `[ ]` not started |
 | 5 | Deposit | `[ ]` not started |
@@ -25,11 +25,17 @@ Established the local repository, private GitHub remote, baseline `main` commit,
 `feature/setup` documentation branch, and merged the draft pull request. No Anchor
 toolchain and no program logic are installed or implemented in this milestone.
 
-## Milestone 1 — Codespaces / Toolchain (in progress)
+## Milestone 1 — Codespaces / Toolchain (complete)
 
-Creating a reproducible Codespaces devcontainer: pinned Rust (1.79.0), Agave CLI
-(v3.1.10), Anchor CLI (1.0.2 via avm), and Node 22 LTS. No Anchor workspace or vault
-code. Validation is pending a live Codespace run to record observed versions.
+Reproducible Codespaces devcontainer: pinned Rust (1.85.0 — required for Anchor 1.0.2
+edition2024 support), Agave CLI (v3.1.10), Anchor CLI (1.0.2 via avm), and Node 22 LTS.
+No Anchor workspace or vault code.
+
+## Milestone 2 — Default Anchor Scaffold (in progress)
+
+Scaffold the smallest default Anchor workspace on `feature/anchor-scaffold`, prove
+`anchor build` and `anchor test` pass on the untouched baseline, and record exact
+observed versions. No vault accounts or instructions.
 
 ## Notes
 
