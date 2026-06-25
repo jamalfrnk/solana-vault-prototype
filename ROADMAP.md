@@ -7,8 +7,8 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 
 | # | Milestone | Status |
 |---|-----------|--------|
-| 0 | Repository bootstrap | `[~]` in progress |
-| 1 | Codespaces / toolchain | `[ ]` not started |
+| 0 | Repository bootstrap | `[x]` complete |
+| 1 | Codespaces / toolchain | `[~]` in progress |
 | 2 | Default Anchor scaffold | `[ ]` not started |
 | 3 | Architecture decision record | `[ ]` not started |
 | 4 | Vault initialization | `[ ]` not started |
@@ -19,11 +19,17 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 | 9 | Documentation and interview walkthrough | `[ ]` not started |
 | 10 | Optional devnet demonstration | `[ ]` not started |
 
-## Milestone 0 — Repository bootstrap (in progress)
+## Milestone 0 — Repository bootstrap (complete)
 
-Establish the local repository, private GitHub remote, baseline `main` commit, the
-`feature/setup` documentation branch, and a draft pull request. No Anchor toolchain and
-no program logic are installed or implemented in this milestone.
+Established the local repository, private GitHub remote, baseline `main` commit, the
+`feature/setup` documentation branch, and merged the draft pull request. No Anchor
+toolchain and no program logic are installed or implemented in this milestone.
+
+## Milestone 1 — Codespaces / Toolchain (in progress)
+
+Creating a reproducible Codespaces devcontainer: pinned Rust (1.79.0), Agave CLI
+(v3.1.10), Anchor CLI (1.0.2 via avm), and Node 22 LTS. No Anchor workspace or vault
+code. Validation is pending a live Codespace run to record observed versions.
 
 ## Notes
 
