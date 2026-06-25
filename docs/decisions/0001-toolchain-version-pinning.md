@@ -20,7 +20,7 @@ Pin the following versions:
 
 | Tool | Pinned version | Rationale |
 |---|---|---|
-| Rust | 1.79.0 | Above Solana's 1.76.0 MSRV; stable and tested with the Agave/Anchor ecosystem at time of milestone |
+| Rust | 1.85.0 | Minimum version that stabilizes `edition = "2024"`, required by Anchor 1.0.2's CLI crate. 1.79.0 was tried first and rejected — see below. |
 | Agave (Solana) CLI | v3.1.10 | Version pinned in Anchor 1.0.2's own CI and Docker builds |
 | Anchor CLI | 1.0.2 | Latest stable release at milestone date; installed via `avm` so upgrades are explicit |
 | Node.js | 22 LTS | Version used in Anchor's own Docker image (22.22.3); LTS guarantees support lifecycle |
@@ -36,6 +36,19 @@ directly. This allows future milestones to change the Anchor version with a sing
 **Use `stable` channel for Rust instead of pinning a version.**
 Rejected: `stable` drifts over time. A `rust-toolchain.toml` with a pinned version
 ensures every contributor and every Codespace instance compiles against identical code.
+
+**Use Rust 1.79.0 (first attempt).**
+Rejected: Anchor 1.0.2's CLI crate declares `edition = "2024"` in its `Cargo.toml`.
+Cargo stabilized edition 2024 support in Rust 1.85.0 (released February 2025). Running
+`cargo install ... avm` against the anchor repository on Rust 1.79.0 produced:
+
+```
+feature `edition2024` is required
+The package requires the Cargo feature called `edition2024`, but that feature is
+not stabilized in this version of Cargo (1.79.0).
+```
+
+1.85.0 is the minimum version that passes this constraint.
 
 **Use the Solana Labs CLI (1.18.x) instead of Agave (3.1.x).**
 Rejected: Solana Labs handed maintenance to Anza, which continues development under the

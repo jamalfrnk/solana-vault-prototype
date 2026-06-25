@@ -112,7 +112,7 @@ A devcontainer is configured. To start a reproducible environment:
 
 | Tool | Pinned version |
 |---|---|
-| Rust | 1.79.0 |
+| Rust | 1.85.0 |
 | Agave (Solana) CLI | v3.1.10 |
 | Anchor CLI | 1.0.2 |
 | Node.js | 22 LTS |

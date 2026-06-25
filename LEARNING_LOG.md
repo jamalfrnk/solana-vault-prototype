@@ -72,7 +72,12 @@ you need a different version, you run `avm install X.Y.Z && avm use X.Y.Z`. The
 downloads the pinned channel when you enter the project directory.
 
 **What confused me:**
-
+Why the first Rust version (1.79.0) failed even though it was above Solana's stated 1.76.0
+minimum. The error was `feature edition2024 is required` — Anchor 1.0.2 uses Rust's 2024
+edition in its CLI crate, and that edition wasn't stabilized until Rust 1.85.0 (Feb 2025).
+The MSRV floor and the edition requirement are two separate constraints, and only one of
+them showed up in the documentation I checked first. Lesson: always validate pinned versions
+against a live build, not just release notes.
 
 **How I verified it:**
 ⚠️ Pending — validation must run inside a live Codespace. Open the repository on
