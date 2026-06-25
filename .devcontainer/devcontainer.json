@@ -22,6 +22,6 @@
     }
   },
   "remoteEnv": {
-    "PATH": "${containerEnv:PATH}:${containerEnv:HOME}/.local/share/solana/install/active_release/bin:${containerEnv:HOME}/.avm/bin"
+    "PATH": "${containerEnv:PATH}:/home/vscode/.local/share/solana/install/active_release/bin:/home/vscode/.avm/bin"
   }
 }

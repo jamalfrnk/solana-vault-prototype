@@ -37,6 +37,13 @@ directly. This allows future milestones to change the Anchor version with a sing
 Rejected: `stable` drifts over time. A `rust-toolchain.toml` with a pinned version
 ensures every contributor and every Codespace instance compiles against identical code.
 
+**Use `${containerEnv:HOME}` in devcontainer.json `remoteEnv` PATH.**
+Rejected: `${containerEnv:HOME}` expanded to an empty string at container startup,
+producing paths like `/.local/share/solana/...` instead of
+`/home/vscode/.local/share/solana/...`. The Agave and avm binaries were installed
+correctly but were never on PATH in terminal sessions. Fixed by hardcoding `/home/vscode`
+— the known default user path for `mcr.microsoft.com/devcontainers/rust:1`.
+
 **Use Rust 1.79.0 (first attempt).**
 Rejected: Anchor 1.0.2's CLI crate declares `edition = "2024"` in its `Cargo.toml`.
 Cargo stabilized edition 2024 support in Rust 1.85.0 (released February 2025). Running
