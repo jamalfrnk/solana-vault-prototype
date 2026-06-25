@@ -44,8 +44,8 @@ Use one concise Conventional Commit-style title.
 ```markdown
 ## Summary
 
-- 
-- 
+-
+-
 
 ## Milestone
 
@@ -89,17 +89,17 @@ Commands actually run:
 
 ## Known limitations
 
-- 
+-
 
 ## Out of scope
 
-- 
+-
 
 ## Reviewer walkthrough
 
-1. 
-2. 
-3. 
+1.
+2.
+3.
 ```
 
 ## Push and PR policy
