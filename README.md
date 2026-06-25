@@ -85,22 +85,40 @@ ARCHITECTURE.md           Proposed design and open decisions (not implemented)
 SECURITY_CHECKLIST.md     Security checklist (implementation items unchecked)
 TEST_PLAN.md              Planned test matrix
 ROADMAP.md                Milestone order and status
+LEARNING_LOG.md           Per-milestone reflection and interview prep notes
+rust-toolchain.toml       Pinned Rust toolchain (1.79.0)
+.devcontainer/
+  devcontainer.json       Codespaces / VS Code devcontainer configuration
+  post-create.sh          Idempotent install script (Agave CLI, avm, Anchor CLI)
 .github/
   pull_request_template.md
 docs/
   decisions/              Architecture Decision Records
+    0001-toolchain-version-pinning.md
 prompts/                  Milestone and operating prompts (00–11)
 .gitignore
 ```
 
-## Planned local / Codespaces setup
+## Codespaces setup (Milestone 1 — pending validation)
 
-> Planned — not yet implemented (Milestone 1). No toolchain is installed in this
-> repository yet.
+A devcontainer is configured. To start a reproducible environment:
 
-Future setup is expected to provide a reproducible Rust + Solana + Anchor + Node
-toolchain via Codespaces / devcontainer, with instructions to build and run the test
-suite from a clean environment.
+1. Open this repository on GitHub.
+2. Click **Code → Codespaces → Create codespace on main**.
+3. Wait for `post-create.sh` to finish — it installs the Agave CLI and Anchor CLI
+   and prints all installed versions.
+
+**Pinned versions** (source: `docs/decisions/0001-toolchain-version-pinning.md`):
+
+| Tool | Pinned version |
+|---|---|
+| Rust | 1.79.0 |
+| Agave (Solana) CLI | v3.1.10 |
+| Anchor CLI | 1.0.2 |
+| Node.js | 22 LTS |
+
+> ⚠️ Validation is pending a live Codespace run. The version table above will be
+> updated with **observed** output after that run.
 
 ## Testing strategy
 

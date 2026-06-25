@@ -57,7 +57,9 @@ each milestone is implemented. Only repository-hygiene checks are marked complet
 - [ ] Zero-amount handling.
 - [ ] First-deposit edge case for share issuance.
 
-## Clean-environment tests (planned)
+## Clean-environment tests (in progress)
 
+- [~] Devcontainer builds without errors from a fresh Codespace (pending live run).
+- [~] `post-create.sh` runs to completion and prints all version strings (pending live run).
 - [ ] Full suite passes from a fresh Codespace / clean checkout.
 - [ ] `anchor build` and `anchor test` succeed from clean state (once scaffolded).
