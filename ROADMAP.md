@@ -9,7 +9,7 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 |---|-----------|--------|
 | 0 | Repository bootstrap | `[x]` complete |
 | 1 | Codespaces / toolchain | `[x]` complete |
-| 2 | Default Anchor scaffold | `[~]` in progress |
+| 2 | Default Anchor scaffold | `[x]` complete |
 | 3 | Architecture decision record | `[ ]` not started |
 | 4 | Vault initialization | `[ ]` not started |
 | 5 | Deposit | `[ ]` not started |
@@ -31,11 +31,14 @@ Reproducible Codespaces devcontainer: pinned Rust (1.85.0 — required for Ancho
 edition2024 support), Agave CLI (v3.1.10), Anchor CLI (1.0.2 via avm), and Node 22 LTS.
 No Anchor workspace or vault code.
 
-## Milestone 2 — Default Anchor Scaffold (in progress)
+## Milestone 2 — Default Anchor Scaffold (complete)
 
-Scaffold the smallest default Anchor workspace on `feature/anchor-scaffold`, prove
-`anchor build` and `anchor test` pass on the untouched baseline, and record exact
-observed versions. No vault accounts or instructions.
+Scaffold the smallest default Anchor workspace on `feature/anchor-scaffold-impl`, proved
+`anchor build` and `anchor test --skip-local-validator --skip-deploy` pass on the baseline.
+Recorded exact observed versions. No vault accounts or instructions.
+
+Observed versions: rustc 1.89.0, cargo 1.89.0, solana-cli 3.1.10, anchor-cli 1.0.2,
+node v22.23.1, npm 10.9.8. Tests: `test_id` and `test_initialize` — both pass via LiteSVM.
 
 ## Notes
 

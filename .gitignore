@@ -5,6 +5,11 @@ test-ledger/
 node_modules/
 coverage/
 
+# Anchor / Solana tooling artifacts
+**/*.rs.bk
+.yarn
+.surfpool
+
 # Environment files (keep the example)
 .env
 .env.*

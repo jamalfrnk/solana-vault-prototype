@@ -1,5 +1,7 @@
 [toolchain]
-# Minimum version that stabilizes `edition = "2024"`, required by Anchor 1.0.2.
-# 1.79.0 was tried first but rejected — see docs/decisions/0001-toolchain-version-pinning.md.
-channel  = "1.85.0"
+# 1.89.0 is what `anchor init` (Anchor 1.0.2) generates and the minimum that satisfies
+# litesvm 0.10.0 and the solana-3.x dev-dependency crates.
+# 1.85.0 was our prior pin; updated during M2 scaffold — see docs/decisions/0001.
+channel  = "1.89.0"
 components = ["rustfmt", "clippy"]
+profile = "minimal"
