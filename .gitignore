@@ -1,0 +1,28 @@
+# Build artifacts
+target/
+.anchor/
+test-ledger/
+node_modules/
+coverage/
+
+# Environment files (keep the example)
+.env
+.env.*
+!.env.example
+
+# Wallets and keypairs — narrow patterns only; never use a broad *.json rule,
+# which would hide legitimate Anchor/Node/project configuration.
+*-keypair.json
+wallet.json
+id.json
+keys/
+keypairs/
+
+# Logs
+*.log
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
