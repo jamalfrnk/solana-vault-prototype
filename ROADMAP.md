@@ -10,7 +10,7 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 | 0 | Repository bootstrap | `[x]` complete |
 | 1 | Codespaces / toolchain | `[x]` complete |
 | 2 | Default Anchor scaffold | `[x]` complete |
-| 3 | Architecture decision record | `[ ]` not started |
+| 3 | Architecture decision record | `[x]` complete |
 | 4 | Vault initialization | `[ ]` not started |
 | 5 | Deposit | `[ ]` not started |
 | 6 | Withdrawal | `[ ]` not started |
@@ -39,6 +39,14 @@ Recorded exact observed versions. No vault accounts or instructions.
 
 Observed versions: rustc 1.89.0, cargo 1.89.0, solana-cli 3.1.10, anchor-cli 1.0.2,
 node v22.23.1, npm 10.9.8. Tests: `test_id` and `test_initialize` — both pass via LiteSVM.
+
+## Milestone 3 — Architecture Decision Record (complete)
+
+All structural decisions locked in `docs/decisions/0002-vault-architecture.md` and reflected
+in `ARCHITECTURE.md` (status: ACCEPTED). Account layouts (`VaultState`, `UserPosition`), PDA
+seeds, share accounting formulas, error codes, and naming conventions defined. Source files
+`state.rs`, `constants.rs`, and `error.rs` updated with vault-specific types. Regression:
+`cargo build-sbf && cargo test` — 2/2 pass.
 
 ## Notes
 
