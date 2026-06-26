@@ -2,13 +2,11 @@
 
 ## Status
 
-**Milestone 4 complete — `initialize` instruction live, 4 tests passing.**
+**Milestone 9 complete — all instructions live, 29 tests passing.**
 
-M0–M4 are merged. The vault can be initialized on-chain: `initialize` creates the
-`VaultState` PDA, the `vault_authority` PDA, and the custody ATA in one atomic
-transaction. Architecture is ACCEPTED and locked in `ARCHITECTURE.md` and
-`docs/decisions/0002-vault-architecture.md`. Deposit, withdraw, and pause/unpause
-instructions are next (M5–M7).
+M0–M9 are merged. The vault is fully implemented: `initialize`, `deposit`, `withdraw`,
+`pause`, and `unpause` are all live, tested, and documented. Architecture is ACCEPTED
+in `ARCHITECTURE.md`. Interview walkthrough is at `docs/INTERVIEW_WALKTHROUGH.md`.
 
 This is an interview-grade educational prototype. It is **not** audited, **not**
 production-safe, **not** mainnet-ready, and **not** formally verified.
@@ -47,10 +45,10 @@ A single vault custodies one SPL token mint:
 
 ## Instruction set
 
-- [x] `initialize` — create the vault state PDA and custody ATA bound to one mint.
-- [ ] `deposit` — transfer tokens into custody and credit shares. *(M5)*
-- [ ] `withdraw` — redeem shares and transfer tokens out via PDA-signed CPI. *(M6)*
-- [ ] `pause` / `unpause` — toggle blocked instructions under an explicit authority. *(M7)*
+- [x] `initialize` — create the vault state PDA and custody ATA bound to one mint. *(M4)*
+- [x] `deposit` — transfer tokens into custody and credit shares. *(M5)*
+- [x] `withdraw` — redeem shares and transfer tokens out via PDA-signed CPI. *(M6)*
+- [x] `pause` / `unpause` — toggle blocked instructions under an explicit authority. *(M7)*
 
 ## Security goals
 
@@ -75,41 +73,50 @@ production custody.
 ## Repository structure
 
 ```text
-README.md                 This file
-CLAUDE.md                 Operating rules for Claude Code
-PROJECT_CONTEXT.md        Goals, scope, anti-goals, success criteria
-ARCHITECTURE.md           Proposed design and open decisions (not implemented)
-SECURITY_CHECKLIST.md     Security checklist (implementation items unchecked)
-TEST_PLAN.md              Planned test matrix
-ROADMAP.md                Milestone order and status
-LEARNING_LOG.md           Per-milestone reflection and interview prep notes
-rust-toolchain.toml       Pinned Rust toolchain (1.89.0)
-Anchor.toml               Anchor workspace configuration
-Cargo.toml                Rust workspace manifest
-package.json              JS/TS dev dependencies (prettier, mocha, ts-node)
-tsconfig.json             TypeScript configuration
+README.md                   This file
+CLAUDE.md                   Operating rules for Claude Code
+PROJECT_CONTEXT.md          Goals, scope, anti-goals, success criteria
+ARCHITECTURE.md             Vault architecture (ACCEPTED)
+SECURITY_CHECKLIST.md       Security checklist (M4–M8 complete)
+TEST_PLAN.md                Test matrix (29 tests, all passing)
+ROADMAP.md                  Milestone order and status
+LEARNING_LOG.md             Per-milestone reflection and interview prep notes
+rust-toolchain.toml         Pinned Rust toolchain (1.89.0)
+Anchor.toml                 Anchor workspace configuration
+Cargo.toml                  Rust workspace manifest
+package.json                JS/TS dev dependencies (prettier, mocha, ts-node)
+tsconfig.json               TypeScript configuration
 .devcontainer/
-  devcontainer.json       Codespaces / VS Code devcontainer configuration
-  post-create.sh          Idempotent install script (Agave CLI, avm, Anchor CLI)
+  devcontainer.json         Codespaces / VS Code devcontainer configuration
+  post-create.sh            Idempotent install script (Agave CLI, avm, Anchor CLI)
 .github/
   pull_request_template.md
 docs/
-  decisions/              Architecture Decision Records
+  INTERVIEW_WALKTHROUGH.md  Guided tour of the vault for technical interviews (M9)
+  decisions/                Architecture Decision Records
     0001-toolchain-version-pinning.md
+    0002-vault-architecture.md
 migrations/
-  deploy.ts               Anchor deploy migration stub
+  deploy.ts                 Anchor deploy migration stub
 programs/
   solana-vault-prototype/
     src/
-      lib.rs              Program entry point and declare_id!
+      lib.rs                Program entry point and declare_id!
       instructions/
-        initialize.rs     initialize instruction (M4 — complete)
-      state.rs            VaultState + UserPosition account structs
-      constants.rs        PDA seed constants
-      error.rs            VaultError codes
+        initialize.rs       initialize instruction (M4)
+        deposit.rs          deposit instruction (M5)
+        withdraw.rs         withdraw instruction (M6)
+        pause.rs            pause/unpause instructions (M7)
+      state.rs              VaultState + UserPosition account structs
+      constants.rs          PDA seed constants
+      error.rs              VaultError codes
     tests/
-      test_initialize.rs  LiteSVM integration tests (4 passing)
-prompts/                  Milestone and operating prompts (00–11)
+      test_initialize.rs    LiteSVM integration tests — initialize (3 tests)
+      test_deposit.rs       LiteSVM integration tests — deposit (5 tests)
+      test_withdraw.rs      LiteSVM integration tests — withdraw (7 tests)
+      test_pause.rs         LiteSVM integration tests — pause (5 tests)
+      test_adversarial.rs   LiteSVM adversarial tests (8 tests)
+prompts/                    Milestone and operating prompts (00–11)
 .gitignore
 ```
 
@@ -157,14 +164,21 @@ See `ROADMAP.md`.
 |---|---|
 | 0 — Repository bootstrap | complete |
 | 1 — Codespaces / toolchain | complete |
-| 2 — Default Anchor scaffold | in progress |
-| 3+ — Vault implementation | not started |
+| 2 — Default Anchor scaffold | complete |
+| 3 — Architecture decision record | complete |
+| 4 — Vault initialization | complete |
+| 5 — Deposit | complete |
+| 6 — Withdrawal | complete |
+| 7 — Pause controls | complete |
+| 8 — Security / adversarial test expansion | complete |
+| 9 — Documentation and interview walkthrough | complete |
+| 10 — Optional devnet demonstration | not started |
 
 ## Interview walkthrough
 
-> Placeholder — to be written in Milestone 9. Will provide a guided tour of each
-> account, constraint, CPI, invariant, and negative test so the design can be explained
-> end to end.
+See [`docs/INTERVIEW_WALKTHROUGH.md`](docs/INTERVIEW_WALKTHROUGH.md) — a guided tour
+of every account, constraint, CPI, arithmetic formula, test, and production gap.
+Structured as what / why / gotcha for each layer of the vault.
 
 ## Non-production disclaimer
 

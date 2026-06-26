@@ -12,11 +12,11 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 | 2 | Default Anchor scaffold | `[x]` complete |
 | 3 | Architecture decision record | `[x]` complete |
 | 4 | Vault initialization | `[x]` complete |
-| 5 | Deposit | `[ ]` not started |
-| 6 | Withdrawal | `[ ]` not started |
-| 7 | Pause controls | `[ ]` not started |
-| 8 | Security / adversarial test expansion | `[ ]` not started |
-| 9 | Documentation and interview walkthrough | `[ ]` not started |
+| 5 | Deposit | `[x]` complete |
+| 6 | Withdrawal | `[x]` complete |
+| 7 | Pause controls | `[x]` complete |
+| 8 | Security / adversarial test expansion | `[x]` complete |
+| 9 | Documentation and interview walkthrough | `[x]` complete |
 | 10 | Optional devnet demonstration | `[ ]` not started |
 
 ## Milestone 0 — Repository bootstrap (complete)
@@ -58,6 +58,53 @@ commit (bump assertions, dead test, role-separation constraint, architecture doc
 
 Observed: `cargo build-sbf && cargo test` — 4/4 pass (test_id, test_initialize_rejects_bad_accounts,
 test_vault_initialize_creates_correct_state, test_vault_initialize_duplicate_fails).
+
+## Milestone 5 — Deposit (complete)
+
+`deposit` instruction implemented on `feature/vault-deposit`. Accepts an `amount` of
+the vault's accepted mint, performs `transfer_checked` CPI into custody, credits shares
+to the user's `UserPosition` PDA (`init_if_needed` on first deposit). Share formula:
+1:1 on first deposit; `floor(amount * total_shares / total_assets)` (u128) thereafter.
+
+Observed: `cargo test` — 10/10 pass.
+
+## Milestone 6 — Withdrawal (complete)
+
+`withdraw` instruction implemented on `feature/vault-withdraw`. Burns `shares_in` from
+user position, issues `transfer_checked` CPI from custody via `vault_authority` PDA-
+signed CPI. Withdrawal formula: `floor(shares_in * total_assets / total_shares)` (u128).
+Six on-chain validation checks guard position theft, cross-vault confusion, over-
+withdrawal, paused state, and wrong-destination accounts.
+
+Observed: `cargo test` — 17/17 pass.
+
+## Milestone 7 — Pause Controls (complete)
+
+`pause` and `unpause` instructions implemented on `feature/vault-pause`. Separate
+`Accounts` structs (`Pause`/`Unpause`) and handler functions (`pause_handler`/
+`unpause_handler`) to avoid `ambiguous_glob_reexports` warning. Five tests including
+idempotent double-pause and wrong-authority rejection.
+
+Observed: `cargo test` — 22/22 pass.
+
+## Milestone 8 — Security / Adversarial Test Expansion (complete)
+
+`test_adversarial.rs` created on `feature/security-tests`. Eight adversarial tests:
+missing signer × 2, wrong vault PDA, wrong token-account owner, cross-user position
+substitution, wrong token program, near-u64::MAX deposit (no overflow), multi-user
+accounting cycle (two users deposit+withdraw, vault ends at zero).
+
+Observed: `cargo test` — 29/29 pass.
+
+## Milestone 9 — Documentation and Interview Walkthrough (complete)
+
+`docs/INTERVIEW_WALKTHROUGH.md` created on `feature/interview-walkthrough`. Covers
+account model, all 5 instructions, test architecture, production gap analysis, and 5
+common interview Q&As. `LEARNING_LOG.md` filled in for M5–M9. `SECURITY_CHECKLIST.md`
+updated with all adversarial items checked. `TEST_PLAN.md` updated with full 29-test
+matrix. `README.md` updated to reflect complete status.
+
+Observed: `cargo test` — 29/29 pass (doc-only changes; no regressions).
 
 ## Notes
 
