@@ -11,7 +11,7 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 | 1 | Codespaces / toolchain | `[x]` complete |
 | 2 | Default Anchor scaffold | `[x]` complete |
 | 3 | Architecture decision record | `[x]` complete |
-| 4 | Vault initialization | `[ ]` not started |
+| 4 | Vault initialization | `[x]` complete |
 | 5 | Deposit | `[ ]` not started |
 | 6 | Withdrawal | `[ ]` not started |
 | 7 | Pause controls | `[ ]` not started |
@@ -47,6 +47,17 @@ in `ARCHITECTURE.md` (status: ACCEPTED). Account layouts (`VaultState`, `UserPos
 seeds, share accounting formulas, error codes, and naming conventions defined. Source files
 `state.rs`, `constants.rs`, and `error.rs` updated with vault-specific types. Regression:
 `cargo build-sbf && cargo test` — 2/2 pass.
+
+## Milestone 4 — Vault Initialization (complete)
+
+`initialize` instruction implemented on `feature/vault-init`. Allocates `VaultState` PDA
+(`["vault", mint]`), `vault_authority` PDA (`["vault_authority", vault_state]`), and the
+custody ATA. Stores both bumps and `pause_authority`. On-chain constraint enforces
+`pause_authority != payer`. Code review (8 angles) produced 10 findings; 4 fixed before
+commit (bump assertions, dead test, role-separation constraint, architecture doc alignment).
+
+Observed: `cargo build-sbf && cargo test` — 4/4 pass (test_id, test_initialize_rejects_bad_accounts,
+test_vault_initialize_creates_correct_state, test_vault_initialize_duplicate_fails).
 
 ## Notes
 

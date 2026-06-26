@@ -2,12 +2,13 @@
 
 ## Status
 
-**Milestone 2 in progress — Anchor workspace scaffolded, build and test pending.**
+**Milestone 4 complete — `initialize` instruction live, 4 tests passing.**
 
-The repository contains the full execution framework, documentation, and a default
-Anchor 1.0.2 baseline workspace. No vault accounts or custom instructions have been
-added yet. The architecture described below is **proposed** and subject to an
-Architecture Decision Record before implementation begins.
+M0–M4 are merged. The vault can be initialized on-chain: `initialize` creates the
+`VaultState` PDA, the `vault_authority` PDA, and the custody ATA in one atomic
+transaction. Architecture is ACCEPTED and locked in `ARCHITECTURE.md` and
+`docs/decisions/0002-vault-architecture.md`. Deposit, withdraw, and pause/unpause
+instructions are next (M5–M7).
 
 This is an interview-grade educational prototype. It is **not** audited, **not**
 production-safe, **not** mainnet-ready, and **not** formally verified.
@@ -31,31 +32,25 @@ to explain line by line in an interview.
 - Negative-path and adversarial testing
 - Disciplined Git and pull-request workflow
 
-## Planned architecture
+## Architecture
 
-> Proposed — not yet implemented. See `ARCHITECTURE.md` for detail and open decisions.
+> Accepted — see `ARCHITECTURE.md` and `docs/decisions/0002-vault-architecture.md`.
 
 A single vault custodies one SPL token mint:
 
-- a deterministic **vault state PDA** holds vault configuration and accounting;
-- a deterministic **vault authority PDA** owns the custody token account and signs
-  outbound transfers via CPI;
-- users deposit the accepted mint and receive accounting credit ("shares");
+- a deterministic **vault state PDA** (`["vault", mint]`) holds vault configuration and accounting;
+- a deterministic **vault authority PDA** (`["vault_authority", vault_state]`) owns the custody
+  ATA and signs outbound transfers via CPI;
+- users deposit the accepted mint and receive share credits tracked in `UserPosition` PDAs;
 - users redeem shares to withdraw the underlying token;
-- an explicit authority can pause/unpause privileged instructions.
+- an explicit `pause_authority` (enforced separate from the payer) can pause/unpause the vault.
 
-Open decisions (share representation, PDA seeds, bump handling, token program,
-conversion formula, rounding, pause semantics) are tracked in `ARCHITECTURE.md` and will
-be settled via records under `docs/decisions/`.
+## Instruction set
 
-## Planned instruction set
-
-> Proposed — not yet implemented.
-
-- `initialize` — create the vault state PDA and custody account bound to one mint.
-- `deposit` — transfer tokens into custody and credit shares.
-- `withdraw` — redeem shares and transfer tokens out via PDA-signed CPI.
-- `pause` / `unpause` — toggle blocked instructions under an explicit authority.
+- [x] `initialize` — create the vault state PDA and custody ATA bound to one mint.
+- [ ] `deposit` — transfer tokens into custody and credit shares. *(M5)*
+- [ ] `withdraw` — redeem shares and transfer tokens out via PDA-signed CPI. *(M6)*
+- [ ] `pause` / `unpause` — toggle blocked instructions under an explicit authority. *(M7)*
 
 ## Security goals
 
@@ -104,17 +99,16 @@ docs/
 migrations/
   deploy.ts               Anchor deploy migration stub
 programs/
-  solana-vault-prototype/ Default Anchor program (untouched baseline)
+  solana-vault-prototype/
     src/
       lib.rs              Program entry point and declare_id!
-      instructions.rs     Instruction module re-exports
       instructions/
-        initialize.rs     Default initialize handler (no-op baseline)
-      state.rs            State module (empty baseline)
-      constants.rs        Constants module (empty baseline)
-      error.rs            Error module (empty baseline)
+        initialize.rs     initialize instruction (M4 — complete)
+      state.rs            VaultState + UserPosition account structs
+      constants.rs        PDA seed constants
+      error.rs            VaultError codes
     tests/
-      test_initialize.rs  Baseline LiteSVM test (default passing test)
+      test_initialize.rs  LiteSVM integration tests (4 passing)
 prompts/                  Milestone and operating prompts (00–11)
 .gitignore
 ```
