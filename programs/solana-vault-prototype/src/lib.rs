@@ -23,4 +23,8 @@ pub mod solana_vault_prototype {
     pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
         deposit::handler(ctx, amount)
     }
+
+    pub fn withdraw(ctx: Context<Withdraw>, shares_in: u64) -> Result<()> {
+        withdraw::handler(ctx, shares_in)
+    }
 }
