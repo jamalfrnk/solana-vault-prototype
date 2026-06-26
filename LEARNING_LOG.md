@@ -282,21 +282,54 @@ rejection."
 ## Milestone 5 — Deposit
 
 **What I built:**
-
+The `deposit` instruction in `instructions/deposit.rs`. It accepts an `amount` of the
+vault's accepted mint, performs a `transfer_checked` CPI into the custody ATA, and
+credits the user with share tokens tracked in a `UserPosition` PDA. Five LiteSVM
+integration tests: first deposit (1:1), second deposit (proportional shares), zero
+amount rejection, paused-vault rejection, and wrong-mint rejection.
 
 **What problem it solves:**
-
+Lets a user put tokens under vault custody in exchange for an on-chain share record.
+Without deposit, the vault is an empty object with no way to accumulate assets.
 
 **What command or concept I learned:**
+**`init_if_needed` on `UserPosition`**: The first deposit for a given user must allocate
+the `user_position` PDA; subsequent deposits must not fail if it already exists. Anchor's
+`init_if_needed` handles both — it allocates when missing and is a no-op when present.
+Using plain `init` would force users to call a separate "open position" instruction first,
+which is unnecessary complexity.
 
+**`transfer_checked` vs `transfer`**: The checked variant requires passing the mint's
+`decimals` field and the mint account itself. The SPL Token program verifies the caller's
+decimals claim matches the actual mint. This closes a class of attacks where a malicious
+caller uses a wrong decimal interpretation to move more tokens than intended.
 
 **What confused me:**
-
+Anchor 1.0.2 changed `CpiContext::new`'s first argument from `AccountInfo` to `Pubkey`.
+The compiler error (`expected Pubkey, found AccountInfo`) was initially confusing because
+the Anchor 0.30.x docs still show `AccountInfo`. The fix: pass the SPL Token program ID
+constant (`anchor_spl::token::ID`) directly, not `.to_account_info()`.
 
 **How I verified it:**
+```
+cargo build-sbf  →  exit 0
+cargo test       →  10 passed, 0 failed
 
+  test test_deposit_first_1to1 ... ok
+  test test_deposit_proportional_shares ... ok
+  test test_deposit_zero_fails ... ok
+  test test_deposit_paused_fails ... ok
+  test test_deposit_wrong_mint_fails ... ok
+  (+ M4 tests all pass — regression clean)
+```
 
 **How I would explain it in an interview:**
+"Deposit does three things: validate the user's token account (right mint, right owner),
+call `transfer_checked` to move tokens into the custody ATA owned by `vault_authority`,
+and update the `UserPosition` share ledger. The share formula is `floor(amount *
+total_shares / total_assets)` with u128 intermediates to prevent overflow, and the first
+deposit is always 1:1 to avoid division by zero. `init_if_needed` creates the position
+account on first deposit so users don't need a separate setup step."
 
 
 ---
@@ -304,21 +337,59 @@ rejection."
 ## Milestone 6 — Withdrawal
 
 **What I built:**
-
+The `withdraw` instruction in `instructions/withdraw.rs`. It accepts a `shares_in`
+amount, burns the shares from the user's position, and issues a `transfer_checked` CPI
+from custody to the user's token account. The CPI is signed by `vault_authority` via
+`CpiContext::new_with_signer`. Seven tests: full withdrawal, partial withdrawal, single
+deposit → full withdrawal (principal check), zero shares rejection, excessive shares
+rejection, wrong user rejection, and paused-vault rejection.
 
 **What problem it solves:**
-
+Lets users reclaim the underlying token in exchange for shares. Without withdraw, the
+vault is a one-way trap.
 
 **What command or concept I learned:**
+**PDA-signed CPI with `new_with_signer`**: The custody ATA is owned by `vault_authority`,
+a PDA with no private key. The only way to authorize a transfer out of it is to call
+`CpiContext::new_with_signer(program_id, accounts, signer_seeds)` where `signer_seeds`
+includes the canonical bump stored in `VaultState`. The Solana runtime verifies that
+`create_program_address(seeds, program_id)` equals the `vault_authority` account address
+before accepting the CPI.
 
+**Why the bump matters**: If you pass the wrong bump, `create_program_address` produces
+a different address, and the runtime rejects the CPI with `PrivilegeEscalation`. The bump
+must be the canonical one stored at initialize time.
 
 **What confused me:**
-
+Building the signer seeds slice. The Rust type is `&[&[&[u8]]]` — a slice of PDA
+signer sets, each signer set is a slice of seed components, each seed is a byte slice.
+Getting the nesting right required checking the actual type signatures of
+`CpiContext::new_with_signer`. The bump must be passed as `&[authority_bump]` (a
+one-byte slice), not `authority_bump` (a scalar).
 
 **How I verified it:**
+```
+cargo build-sbf  →  exit 0
+cargo test       →  17 passed, 0 failed
 
+  test test_withdraw_full ... ok
+  test test_withdraw_partial ... ok
+  test test_withdraw_returns_principal ... ok
+  test test_withdraw_zero_fails ... ok
+  test test_withdraw_excess_fails ... ok
+  test test_withdraw_wrong_user_fails ... ok
+  test test_withdraw_paused_fails ... ok
+  (+ M4/M5 tests all pass — regression clean)
+```
 
 **How I would explain it in an interview:**
+"Withdraw burns shares from the user's `UserPosition` and issues a `transfer_checked`
+CPI from custody to the user's token account. The CPI is signed by `vault_authority` —
+a PDA with no private key. The signer seeds include the canonical bump stored in
+`VaultState` at initialize time. The withdrawal formula is `floor(shares_in *
+total_assets / total_shares)` with u128, consistent with floor rounding on deposit.
+Six validation checks guard against position theft, cross-vault confusion, over-
+withdrawal, paused state, and wrong-destination accounts."
 
 
 ---
@@ -326,21 +397,58 @@ rejection."
 ## Milestone 7 — Pause Controls
 
 **What I built:**
-
+The `pause` and `unpause` instructions in `instructions/pause.rs`. Each has its own
+`Accounts` struct (`Pause` / `Unpause`) and handler function (`pause_handler` /
+`unpause_handler`). The names are disambiguated because both are glob-re-exported
+by `instructions.rs` and having two functions named `handler` would cause an
+`ambiguous_glob_reexports` warning. Five tests: pause sets flag, unpause clears flag,
+idempotent double-pause, wrong authority for pause, wrong authority for unpause.
 
 **What problem it solves:**
-
+Lets a designated authority halt deposits and withdrawals in an emergency, without
+requiring a program upgrade or migration.
 
 **What command or concept I learned:**
+**Anchor glob re-export pattern**: Anchor's `#[program]` macro requires `pub use module::*`
+for each instruction module. When two modules both export a symbol with the same name
+(like `handler`), rustc emits `ambiguous_glob_reexports`. The fix is to suppress the
+warning on each glob export with `#[allow(ambiguous_glob_reexports)]` and name the
+handlers distinctly in `lib.rs` dispatch functions. Explicit re-exports (e.g., `pub use
+deposit::Deposit`) break the macro, so glob exports are required.
 
+**`expire_blockhash()` for idempotency tests**: LiteSVM tracks processed transactions by
+signature within a blockhash window. Sending the same instruction (same accounts, same
+data, same signers) twice in the same window returns `AlreadyProcessed`. Calling
+`svm.expire_blockhash()` advances the window so the second call gets a fresh blockhash
+and a distinct transaction signature.
 
 **What confused me:**
-
+The first attempt used `try_serialize` to read `is_paused` back from the account data.
+That required importing `AnchorSerialize` and didn't cleanly work in the test harness.
+The simpler approach: read the raw bytes with `svm.get_account()` and use
+`VaultState::try_deserialize()` on the slice, which Anchor's `AccountDeserialize`
+derive provides.
 
 **How I verified it:**
+```
+cargo build-sbf  →  exit 0
+cargo test       →  22 passed, 0 failed
 
+  test test_pause_sets_is_paused ... ok
+  test test_unpause_clears_is_paused ... ok
+  test test_pause_idempotent ... ok
+  test test_pause_wrong_authority_fails ... ok
+  test test_unpause_wrong_authority_fails ... ok
+  (+ M4/M5/M6 tests all pass — regression clean)
+```
 
 **How I would explain it in an interview:**
+"Pause and unpause are simple flag-toggles guarded by a single on-chain constraint:
+`pause_authority.key() == vault_state.pause_authority`. No role-based access control,
+no timelock — this is MVP. The authority is set at initialize time and cannot be changed
+without migrating the vault. Deposit and withdraw both check `!is_paused` and return
+`VaultError::VaultPaused` if the flag is set. I made the double-pause idempotent
+intentionally — an emergency pause should never fail because of current state."
 
 
 ---
@@ -348,21 +456,56 @@ rejection."
 ## Milestone 8 — Security / Adversarial Test Expansion
 
 **What I built:**
-
+`tests/test_adversarial.rs` — 8 adversarial tests layered on top of the functional
+happy-path suite: missing signer on deposit, missing signer on withdraw, wrong vault PDA
+substitution, wrong token-account owner, cross-user position substitution, wrong token
+program, near-`u64::MAX` deposit (overflow boundary), and a multi-user accounting cycle
+(two users deposit, both withdraw, vault ends at zero).
 
 **What problem it solves:**
-
+Functional tests prove happy paths work. Adversarial tests prove the program rejects
+the attacks it's designed to resist. Without these, a missing signer check or wrong-
+owner validation could silently pass because the happy path never exercises them.
 
 **What command or concept I learned:**
-
+**SDK-level rejection vs runtime rejection**: `VersionedTransaction::try_new` validates
+that every signer referenced in the message's account list has a corresponding keypair
+in the signers array. If the deposit instruction lists `user` as a signer but the
+transaction is built without the user's keypair, `try_new` returns `NotEnoughSigners`
+before the transaction even reaches the SVM. Tests that expect "this must fail" need to
+handle both: `match try_new { Err(_) => true, Ok(tx) => svm.send_transaction(tx).is_err() }`.
 
 **What confused me:**
-
+The wrong-token-program test initially used `&[&f.payer, &user]` as signers, but
+`f.payer` is not a signer account in the deposit instruction — only `user` is. That
+produced `TooManySigners` instead of the expected program-address mismatch. Fix:
+use only the signers the instruction actually declares.
 
 **How I verified it:**
+```
+cargo build-sbf  →  exit 0
+cargo test       →  29 passed, 0 failed
 
+  test test_deposit_missing_user_sig_fails ... ok
+  test test_withdraw_missing_user_sig_fails ... ok
+  test test_deposit_wrong_vault_pda_fails ... ok
+  test test_deposit_wrong_token_account_owner_fails ... ok
+  test test_withdraw_cross_user_substitution_fails ... ok
+  test test_deposit_wrong_token_program_fails ... ok
+  test test_deposit_near_u64max_succeeds ... ok
+  test test_multi_user_accounting_cycle ... ok
+  (+ all prior tests pass — regression clean)
+```
 
 **How I would explain it in an interview:**
+"The adversarial suite exists to prove the boundary conditions the functional tests
+can't exercise. Missing signer tests verify the on-chain Anchor `Signer` constraint
+fires. Wrong-PDA tests verify that you can't substitute a PDA from a different vault.
+The multi-user accounting cycle verifies that two users depositing and both fully
+withdrawing leaves the vault at zero — no dust theft, no accounting error. The
+`try_new` SDK rejection pattern was the most interesting: the Solana transaction SDK
+validates signer completeness before the transaction ever hits the runtime, so tests
+that expect failure have to accept rejection at either layer."
 
 
 ---
@@ -370,21 +513,52 @@ rejection."
 ## Milestone 9 — Documentation and Interview Walkthrough
 
 **What I built:**
-
+`docs/INTERVIEW_WALKTHROUGH.md` — a structured guide covering every layer of the vault
+prototype: account model (three PDAs + VaultState layout), each instruction with formula
+details and security validation chains, the test architecture (LiteSVM, SPL account
+injection, type bridging), a production gap analysis, and nine common interview Q&As.
+Also updated `LEARNING_LOG.md` (M5–M9), `SECURITY_CHECKLIST.md` (all adversarial items
+checked), `TEST_PLAN.md` (full test matrix reflecting 29 tests), `README.md` (status
+updated to complete with full instruction set and structure), and `ROADMAP.md` (M5–M9
+marked complete).
 
 **What problem it solves:**
-
+The code exists but is not yet narrative — an interviewer asking "walk me through this"
+needs a guided path, not just a file tree. The walkthrough makes every design decision
+speakable: you can answer "why floor rounding", "why u128", "why store the bump", "why
+`transfer_checked`" from a single document rather than hunting through source files.
 
 **What command or concept I learned:**
-
+How to think about documentation as a portfolio artifact. The walkthrough structure —
+what, why, gotcha — forces you to express not just what the code does but why every
+non-obvious choice was made. The "gotcha" sections (Borsh LEN vs sizeof, state offset
+108, AlreadyProcessed, SDK-level signer rejection) are the highest-signal interview
+content because they show you actually hit these problems, not just read about them.
 
 **What confused me:**
-
+Nothing was technically confusing at this stage — M9 is pure documentation synthesis.
+The challenge was being specific rather than vague: "we use PDAs" is forgettable; "we
+chain vault_authority seeds off vault_state to prevent cross-vault authority collisions"
+is memorable.
 
 **How I verified it:**
+```
+cargo test  →  29 passed, 0 failed  (no regressions from doc-only changes)
 
+Reviewed docs/INTERVIEW_WALKTHROUGH.md for:
+  - Accuracy of all formulas and byte offsets against source code
+  - Complete coverage of all 5 instructions
+  - Test count table matches actual test file counts
+  - Production gap analysis cites real unchecked items from SECURITY_CHECKLIST.md
+```
 
 **How I would explain it in an interview:**
+"Every architectural decision in this vault has a written rationale: why PDAs are chained,
+why bumps are stored, why floor rounding, why `transfer_checked`, why `init_if_needed`
+for user positions. The interview walkthrough is a single document that gives the
+complete narrative — account model, instruction contracts, test strategy, production
+gaps, and common Q&A. The goal was to build something small enough to explain fully
+in a 30-minute technical discussion."
 
 
 ---

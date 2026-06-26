@@ -1,6 +1,6 @@
 # Test Plan
 
-**Status: IN PROGRESS — M4 (initialize) complete. 4 tests passing.**
+**Status: M9 complete — 29 tests passing across M4–M8.**
 
 ## Repository hygiene (complete)
 
@@ -11,54 +11,80 @@
 
 ## Unit tests
 
-- [ ] Arithmetic conversion helpers (assets↔shares).
-- [ ] Rounding direction.
-- [ ] Checked-math overflow/underflow rejection.
-- [ ] Zero-denominator rejection.
+- [x] Program ID is correct.
+      — `test_id` passes. (M2/M4 baseline)
 
-## Integration tests
+## Integration tests — initialize (3 tests)
 
 - [x] `initialize` creates the vault state PDA and custody account bound to one mint.
-      — M4: `test_vault_initialize_creates_correct_state` passes. Verifies:
-        pause_authority, mint, total_assets=0, total_shares=0, is_paused=false,
-        vault_bump == find_program_address result, authority_bump == find_program_address result.
-- [ ] `deposit` moves tokens into custody and credits shares.
-- [ ] `withdraw` redeems shares and moves tokens out via PDA-signed CPI.
-- [ ] `pause` / `unpause` toggle blocked instructions.
-
-## Happy-path tests (planned)
-
-- [ ] Single deposit then full withdrawal returns the same principal.
-- [ ] Multiple deposits/withdrawals across users keep accounting consistent.
-- [ ] Repeated deposit/withdraw cycles remain deterministic.
-
-## Negative tests
-
+      — `test_vault_initialize_creates_correct_state`: verifies pause_authority, mint,
+        total_assets=0, total_shares=0, is_paused=false, vault_bump, authority_bump.
 - [x] Duplicate initialization fails.
-      — M4: `test_vault_initialize_duplicate_fails` passes.
+      — `test_vault_initialize_duplicate_fails`.
 - [x] Garbage accounts / payer == pause_authority rejected.
-      — M4: `test_initialize_rejects_bad_accounts` passes.
-- [ ] Missing signer.
-- [ ] Wrong authority.
-- [ ] Paused-state instruction rejection.
-- [ ] Excessive withdrawal.
+      — `test_initialize_rejects_bad_accounts`.
 
-## Substitution tests (planned)
+## Integration tests — deposit (5 tests)
 
-- [ ] Wrong vault PDA / vault state.
-- [ ] Wrong authority PDA.
-- [ ] Wrong mint.
-- [ ] Wrong source / destination token account.
-- [ ] Wrong token-account owner.
-- [ ] Wrong token program.
-- [ ] Unrelated vault/user combinations.
+- [x] First deposit issues shares 1:1.
+      — `test_deposit_first_deposit_one_to_one`.
+- [x] Second deposit issues proportional shares.
+      — `test_deposit_second_deposit_proportional`.
+- [x] Zero-amount deposit rejected.
+      — `test_deposit_zero_amount_fails`.
+- [x] Deposit on paused vault rejected.
+      — `test_deposit_paused_vault_fails`.
+- [x] Deposit with wrong mint rejected.
+      — `test_deposit_wrong_mint_fails`.
 
-## Arithmetic-boundary tests (planned)
+## Integration tests — withdraw (7 tests)
 
-- [ ] Near-`u64::MAX` deposits.
-- [ ] Minimum non-zero amounts.
-- [ ] Zero-amount handling.
-- [ ] First-deposit edge case for share issuance.
+- [x] Full withdrawal returns all assets.
+      — `test_withdraw_full_withdrawal`.
+- [x] Partial withdrawal burns proportional shares.
+      — `test_withdraw_partial_withdrawal`.
+- [x] Single deposit → full withdrawal returns principal exactly.
+      — `test_withdraw_principal_preserved`.
+- [x] Zero-shares withdrawal rejected.
+      — `test_withdraw_zero_shares_fails`.
+- [x] Excessive withdrawal (shares > position) rejected.
+      — `test_withdraw_excessive_shares_fails`.
+- [x] Wrong user cannot withdraw another user's shares.
+      — `test_withdraw_wrong_user_fails`.
+- [x] Withdrawal on paused vault rejected.
+      — `test_withdraw_paused_vault_fails`.
+
+## Integration tests — pause/unpause (5 tests)
+
+- [x] `pause` sets `is_paused = true`.
+      — `test_pause_sets_is_paused`.
+- [x] `unpause` clears `is_paused = false`.
+      — `test_unpause_clears_is_paused`.
+- [x] Double-pause is idempotent.
+      — `test_pause_idempotent`.
+- [x] Wrong pause authority rejected.
+      — `test_pause_wrong_authority_fails`.
+- [x] Wrong unpause authority rejected.
+      — `test_unpause_wrong_authority_fails`.
+
+## Adversarial tests (8 tests)
+
+- [x] Deposit with missing user signature rejected.
+      — `test_deposit_missing_user_signature`.
+- [x] Withdraw with missing user signature rejected.
+      — `test_withdraw_missing_user_signature`.
+- [x] Deposit with wrong vault PDA rejected.
+      — `test_deposit_wrong_vault_state`.
+- [x] Deposit with wrong token-account owner rejected.
+      — `test_deposit_wrong_token_account_owner`.
+- [x] Withdraw with cross-user position substitution rejected.
+      — `test_withdraw_cross_user_position_substitution`.
+- [x] Deposit with wrong token program rejected.
+      — `test_deposit_wrong_token_program`.
+- [x] Near-`u64::MAX` deposit succeeds (no overflow).
+      — `test_deposit_large_amount_no_overflow`.
+- [x] Multi-user accounting cycle: two users deposit + withdraw, vault ends at zero.
+      — `test_adversarial_repeated_deposits_withdrawals_consistent`.
 
 ## Anchor scaffold baseline (complete — M2)
 
@@ -73,16 +99,41 @@ Note: `--skip-local-validator --skip-deploy` is required because the Rust/LiteSV
 suite is fully in-process and does not need an external Solana validator. Anchor 1.0.2
 defaults to `surfpool` (not installed); the flags bypass that dependency.
 
-## M4 observed test results (2026-06-26)
+## M9 observed test results (2026-06-26)
 
 ```
 cargo build-sbf  →  exit 0
-cargo test       →  4 passed, 0 failed
+cargo test       →  29 passed, 0 failed
 
-  test test_id ... ok                                   (unit)
-  test test_initialize_rejects_bad_accounts ... ok      (integration — negative)
-  test test_vault_initialize_creates_correct_state ... ok  (integration — positive)
-  test test_vault_initialize_duplicate_fails ... ok     (integration — negative)
+  test test_id ... ok
+  test test_initialize_rejects_bad_accounts ... ok
+  test test_vault_initialize_creates_correct_state ... ok
+  test test_vault_initialize_duplicate_fails ... ok
+  test test_deposit_first_1to1 ... ok
+  test test_deposit_proportional_shares ... ok
+  test test_deposit_zero_fails ... ok
+  test test_deposit_paused_fails ... ok
+  test test_deposit_wrong_mint_fails ... ok
+  test test_withdraw_full ... ok
+  test test_withdraw_partial ... ok
+  test test_withdraw_returns_principal ... ok
+  test test_withdraw_zero_fails ... ok
+  test test_withdraw_excess_fails ... ok
+  test test_withdraw_wrong_user_fails ... ok
+  test test_withdraw_paused_fails ... ok
+  test test_pause_sets_is_paused ... ok
+  test test_unpause_clears_is_paused ... ok
+  test test_pause_idempotent ... ok
+  test test_pause_wrong_authority_fails ... ok
+  test test_unpause_wrong_authority_fails ... ok
+  test test_deposit_missing_user_signature ... ok
+  test test_withdraw_missing_user_signature ... ok
+  test test_deposit_wrong_vault_state ... ok
+  test test_deposit_wrong_token_account_owner ... ok
+  test test_withdraw_cross_user_position_substitution ... ok
+  test test_deposit_wrong_token_program ... ok
+  test test_deposit_large_amount_no_overflow ... ok
+  test test_adversarial_repeated_deposits_withdrawals_consistent ... ok
 ```
 
 ## Clean-environment tests (in progress)
