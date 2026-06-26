@@ -161,21 +161,46 @@ to this same harness, so regressions are caught without spinning up infrastructu
 ## Milestone 3 — Architecture Decision Record
 
 **What I built:**
-
+`docs/decisions/0002-vault-architecture.md` — an Architecture Decision Record locking
+every structural choice for the vault: account layout (VaultState and UserPosition PDAs),
+seed schemes, bump-storage strategy, ATA custody pattern, share arithmetic formulas
+(u128 intermediates, floor rounding), and instruction contracts. `ARCHITECTURE.md` was
+promoted from PROPOSED to ACCEPTED status with full tables for PDAs, accounts,
+instruction contracts, CPI flows, arithmetic formulas, state-transition diagram, and
+invariants. Also filled in `ROADMAP.md` marking M3 complete.
 
 **What problem it solves:**
-
+Writing the architecture before the code forces the design trade-offs to be explicit and
+reviewable before they are cast in Rust. For an interview, it demonstrates that
+engineering decisions are deliberate — not just "whatever compiled first."
 
 **What command or concept I learned:**
-
+The PDA seed collision problem: if `vault_state` and `vault_authority` both used only
+`["vault", mint]`, two different vaults could be given the same authority. By chaining
+authority seeds off vault_state (`["vault_authority", vault_state]`), the authority is
+uniquely tied to a specific vault instance.
 
 **What confused me:**
-
+Deciding where to store bumps. Anchor re-derives bumps on every instruction using its own
+internal canonical-bump cache. But for PDA-signed CPIs (withdraw), you must supply the
+signer seeds explicitly — and those seeds include the bump. The canonical approach is to
+store the PDA's own bump in its account so future instructions can read it out without
+calling `find_program_address` (which is expensive on-chain). This is why `vault_bump`
+and `authority_bump` are both stored in `VaultState`.
 
 **How I verified it:**
-
+- `ARCHITECTURE.md` updated to ACCEPTED status with all tables.
+- `docs/decisions/0002-vault-architecture.md` created with context, decision, and
+  consequences sections covering all structural choices.
+- `ROADMAP.md` updated: M3 marked complete with observed results.
 
 **How I would explain it in an interview:**
+"Before writing a single Rust instruction I wrote an ADR that locked the account layout,
+PDA seed scheme, bump-storage strategy, ATA custody model, and share arithmetic formula.
+The ADR is a permanent record — if someone asks why `authority_bump` is stored in
+`VaultState` instead of re-derived on every call, the answer is in the ADR: on-chain
+PDA signing needs the bump in the seeds, and re-deriving it burns compute. The vault
+design is fully documented and reviewable before any code could break it."
 
 
 ---
@@ -183,21 +208,73 @@ to this same harness, so regressions are caught without spinning up infrastructu
 ## Milestone 4 — Vault Initialization
 
 **What I built:**
-
+The `initialize` instruction in `programs/solana-vault-prototype/src/instructions/initialize.rs`.
+It allocates `VaultState` (113 bytes, two PDAs: `["vault", mint]` and `["vault_authority",
+vault_state]`), creates the custody ATA (owned by `vault_authority`), stores both bumps and
+the `pause_authority` pubkey, and enforces that `pause_authority != payer` on-chain. Three
+LiteSVM integration tests cover the happy path (field assertions + exact bump comparison),
+duplicate-init rejection, and garbage-account rejection. `VaultState` and `UserPosition`
+account structs in `state.rs`, error codes in `error.rs`, and seed constants in
+`constants.rs` were all implemented as part of this milestone.
 
 **What problem it solves:**
-
+Without `initialize`, there is no on-chain object to anchor deposits or track share
+accounting. This instruction is the single creation point for a vault instance — it ties a
+specific mint to a deterministic PDA and establishes the custody ATA that all subsequent
+instructions will read from or write to.
 
 **What command or concept I learned:**
+**Anchor bump storage**: `ctx.bumps.vault_state` and `ctx.bumps.vault_authority` give you
+the canonical bumps Anchor used to derive those PDAs for this exact instruction. Storing
+them in `VaultState` means future instructions (particularly withdraw's PDA-signed CPI)
+can read `vault_state.authority_bump` and include it in signer seeds without re-calling
+`find_program_address` on-chain — which matters because `find_program_address` iterates
+256 combinations in the worst case.
 
+**LiteSVM mint injection**: LiteSVM 0.10.0 includes the SPL Token program natively. To
+test against a real-looking mint without issuing a `spl_token::instruction::initialize_mint`
+transaction, you manually construct the 82-byte `MintState` binary layout (COption tag +
+authority pubkey + supply + decimals + is_initialized flag) and inject it via
+`LiteSVM::set_account()`. This avoids pulling in the classic `spl-token` crate (which
+conflicts with Anchor's use of `spl-token-interface`) while still giving you a valid mint
+the on-chain SPL Token program will accept.
 
 **What confused me:**
-
+Solana 3.x splits what used to be `solana-sdk` into many separate crates: `solana-keypair`,
+`solana-pubkey`, `solana-account`, `solana-message`, `solana-transaction`, etc. The type
+resolution was subtle: `anchor-lang` depends on `solana-pubkey 3.x`, which re-exports
+`solana-address 1.x`. The dev dependencies use `solana-pubkey 4.x`, which re-exports
+`solana-address 2.x`. The types are different nominal types but represent the same
+underlying data — so bridging them via `Pubkey::from(anchor_pubkey.to_bytes())` is a safe
+no-op at runtime. Understanding this required tracing the dependency tree through
+`Cargo.lock`.
 
 **How I verified it:**
+```
+cargo build-sbf  →  exit 0  (compiled to .so without warnings)
+cargo test       →  4 passed, 0 failed
 
+  test test_id ... ok
+  test test_initialize_rejects_bad_accounts ... ok
+  test test_vault_initialize_creates_correct_state ... ok
+  test test_vault_initialize_duplicate_fails ... ok
+```
+Code review (8 angles) identified 10 findings; 4 were fixed before commit:
+- Bump assertions changed from `> 0` to exact `find_program_address` comparison.
+- Dead scaffold test replaced with an explicit `is_err()` assertion.
+- `pause_authority != payer` constraint added with `VaultError::Unauthorized`.
+- ARCHITECTURE.md field name aligned (`_reserved` → `reserved`).
 
 **How I would explain it in an interview:**
+"The initialize instruction allocates the vault's on-chain state and creates the custody
+ATA in a single atomic transaction. Anchor's `init` constraint handles allocation and
+discriminator writing; all I do in the handler is fill the fields. The two bumps — one for
+`vault_state` and one for `vault_authority` — are stored right there in `VaultState` so
+future withdraw CPIs can sign with `vault_authority` without re-deriving the bump on-chain.
+The `pause_authority != payer` constraint is enforced on-chain so the vault can't be
+deployed with the hot wallet having unilateral pause capability. Three tests cover the
+happy path with full field assertions, duplicate init rejection, and garbage-account
+rejection."
 
 
 ---

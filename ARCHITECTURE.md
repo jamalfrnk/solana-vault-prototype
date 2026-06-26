@@ -40,7 +40,7 @@ controls (pause/unpause) are gated by an explicit `pause_authority` keypair stor
 | `total_assets` | `u64` | Token units held in custody |
 | `total_shares` | `u64` | Sum of all UserPosition.shares |
 | `is_paused` | `bool` | Blocks deposit and withdraw when true |
-| `_reserved` | `[u8; 22]` | Future expansion |
+| `reserved` | `[u8; 22]` | Future expansion |
 
 ### UserPosition
 
