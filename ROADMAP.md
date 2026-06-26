@@ -17,7 +17,7 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 | 7 | Pause controls | `[x]` complete |
 | 8 | Security / adversarial test expansion | `[x]` complete |
 | 9 | Documentation and interview walkthrough | `[x]` complete |
-| 10 | Optional devnet demonstration | `[ ]` not started |
+| 10 | Optional devnet demonstration | `[x]` complete |
 
 ## Milestone 0 — Repository bootstrap (complete)
 
@@ -105,6 +105,26 @@ updated with all adversarial items checked. `TEST_PLAN.md` updated with full 29-
 matrix. `README.md` updated to reflect complete status.
 
 Observed: `cargo test` — 29/29 pass (doc-only changes; no regressions).
+
+## Milestone 10 — Devnet Demonstration (complete)
+
+`scripts/devnet_demo.ts` created on `feature/devnet-demo`. Deployed vault program to Solana
+devnet at `FYqCCoAnM9tUYRcSRbeLbUE9LBPv8bN2uyuhcz46pSgq`. Demo creates a fresh SPL mint,
+funds a user ATA with 10 000 tokens, and calls initialize → deposit (1 000 tokens) →
+withdraw (500 shares) → pause — all four instructions confirmed on-chain with Explorer URLs.
+Fixed ATP address typo in script (`...LJe1bS` → `...LJA8knL`); replaced devnet airdrop for
+pause authority with `SystemProgram.transfer` to avoid rate limits. Added `ts-node@^10.9.2`
+for TypeScript 5.x compatibility. All 29 Rust tests continue to pass.
+
+Observed (2026-06-26):
+```
+./node_modules/.bin/ts-node scripts/devnet_demo.ts  →  exit 0
+initialize:  https://explorer.solana.com/tx/42sBW8LJ2MrZYENR8WRuG8G6L9uiucM155PpdpraAQ8eRCvA3A8hdgHdfmT7B8yWdpziPYw3PEHgbH946aMu6w64?cluster=devnet
+deposit:     https://explorer.solana.com/tx/5C3ssG5BzCNSt3yNHiPzAZJiZa2bWUfYojPucwH9r59DkH2ayM5sciV7j9XqLJyRSvHe5uEwFdjmmYcBo4kVT2GK?cluster=devnet
+withdraw:    https://explorer.solana.com/tx/45hnMcQUF6u8fZNRu8MPRZCjXnsUZfuPYrBgEfB14DSRmj7eBGnBVNy1dpKPaKpk9QduabvnhmrN4UxxwZoFLbWK?cluster=devnet
+pause:       https://explorer.solana.com/tx/4xhKJaXL87A3HQBfm1w7UgyHzog9z8KZiHPYRBoNMzaVC3XH1xTb2jW5jgR24sa62MSKRUURs9nQobvvf5VJ9H5M?cluster=devnet
+cargo test   →  29/29 pass (no regressions)
+```
 
 ## Notes
 

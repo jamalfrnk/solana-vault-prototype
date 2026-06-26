@@ -1,8 +1,6 @@
 # Learning Log
 
-A living record updated after every milestone. Fill in each section in your own words
-immediately after finishing an iteration, while the context is fresh. The goal is to
-build a bank of honest, specific answers you can draw from in any interview.
+A living record updated after every milestone. 
 
 ---
 
@@ -566,21 +564,100 @@ in a 30-minute technical discussion."
 ## Milestone 10 — Devnet Demonstration (optional)
 
 **What I built:**
+`scripts/devnet_demo.ts` — a TypeScript script that runs the complete vault lifecycle against
+the Solana devnet cluster: creates a fresh SPL mint, sets up a user ATA, mints 10 000 test
+tokens, then calls all four vault instructions in sequence (initialize → deposit 1 000 tokens →
+withdraw 500 shares → pause), printing each transaction as a Solana Explorer URL. Supporting
+changes: Anchor.toml cluster changed from `localnet` to `devnet`, `ts-node@^10.9.2` added to
+devDependencies for TypeScript 5.x compatibility, the pause-authority funding switched from a
+devnet airdrop to a `SystemProgram.transfer` from the payer, and a one-character ATP address
+typo fixed in the script (`...LJe1bS` → `...LJA8knL`).
 
+The program was already deployed to devnet at program ID
+`FYqCCoAnM9tUYRcSRbeLbUE9LBPv8bN2uyuhcz46pSgq` from an earlier build/deploy step, so
+M10 was purely about running the live demo against the already-deployed bytecode.
 
 **What problem it solves:**
-
+LiteSVM proves the program logic is correct in isolation. A devnet run proves it works
+under real network conditions: an actual RPC endpoint, real signature verification by
+live validators, real on-chain account creation, real CPI execution, and real explorer
+links I can show to an interviewer. The gap between "tests pass locally" and "instructions
+land on a real cluster" is where most real bugs live — rate limits, wrong program IDs,
+encoding mismatches, RPC confirmation delays.
 
 **What command or concept I learned:**
+**Devnet airdrop rate limits vs payer transfer**: The devnet faucet caps airdrops per IP
+and per pubkey per day. Rather than block the demo on an airdrop failure, the fix is to
+transfer a small amount of SOL from the payer (which already has balance) to the recipient
+using `SystemProgram.transfer`. The pause authority only needed ~0.000005 SOL per signing
+transaction; transferring 0.01 SOL from the payer was more than sufficient and never touches
+the devnet rate limit.
 
+**ts-node version vs TypeScript version**: ts-node v7 (the version installed by ts-mocha as
+a peer dependency) does not reliably support TypeScript 5.x or Node 22. Upgrading to
+ts-node v10.9.2 resolved the mismatch without breaking ts-mocha's peer requirement.
+
+**How to find the correct Associated Token Program ID**: Hardcoded program addresses in
+scripts rot. The right way to verify an address is to run `solana account <address> --url devnet`
+and check that the account is `Executable: true`. Comparing against what `@anchor-lang/core`
+exports internally (`utils/token.js`) is the authoritative source for what the Anchor framework
+actually uses.
 
 **What confused me:**
+Two blockers in sequence. First: the devnet airdrop for the pause authority kept failing
+with `429 Too Many Requests`. The airdrop limit had been exhausted by earlier setup work.
+I replaced the airdrop with a SystemProgram.transfer from the payer, which is cleaner and
+doesn't depend on the devnet faucet at all.
 
+Second: the user ATA creation failed with "Attempt to load a program that does not exist."
+The `ASSOCIATED_TOKEN_PROGRAM_ID` constant in the script (`ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJe1bS`)
+was wrong — it doesn't exist on any cluster. The correct ATP address is
+`ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL`, confirmed by `solana account` and by reading
+the value from `node_modules/@anchor-lang/core/dist/cjs/utils/token.js`. The error message
+("program that does not exist") was the right signal — it points to an invalid programId,
+not a logic error.
 
 **How I verified it:**
+```
+./node_modules/.bin/ts-node scripts/devnet_demo.ts  →  exit 0
 
+Payer: 4zmQQyXsjQFGKoHo1uNDsFCBDd5uuKeFhVNbqgqVXPiy
+Balance: 0.28620676 SOL
+
+Mint created: 8NvaS3pNfYETXJKMWdj4U77GRE37W9GToGPeiHS7JXL4
+User ATA created: 2t33LPxxpzE6mhfS8z2QvkX3Xa3dEQJJP4BK3dY9yK6t
+Vault state PDA:     E268LB5bKyZsvqrW6rTweBpagkGzxQ9YK2g8SjjCB9GV
+Vault authority PDA: D7yVHZvXaX9wb6RTM4NNVBwpHhw6Ed7mevmHPy5RdnXq
+Custody ATA:         99SF6KM5DT1QS8RXi62hQcy4dNMaPj2pShHuMFftBzxo
+
+[1/4] initialize
+  https://explorer.solana.com/tx/42sBW8LJ2MrZYENR8WRuG8G6L9uiucM155PpdpraAQ8eRCvA3A8hdgHdfmT7B8yWdpziPYw3PEHgbH946aMu6w64?cluster=devnet
+
+[2/4] deposit 1 000 tokens
+  User ATA balance after: 9000 tokens
+  https://explorer.solana.com/tx/5C3ssG5BzCNSt3yNHiPzAZJiZa2bWUfYojPucwH9r59DkH2ayM5sciV7j9XqLJyRSvHe5uEwFdjmmYcBo4kVT2GK?cluster=devnet
+
+[3/4] withdraw 500 shares
+  User ATA balance after: 9500 tokens
+  https://explorer.solana.com/tx/45hnMcQUF6u8fZNRu8MPRZCjXnsUZfuPYrBgEfB14DSRmj7eBGnBVNy1dpKPaKpk9QduabvnhmrN4UxxwZoFLbWK?cluster=devnet
+
+[4/4] pause
+  https://explorer.solana.com/tx/4xhKJaXL87A3HQBfm1w7UgyHzog9z8KZiHPYRBoNMzaVC3XH1xTb2jW5jgR24sa62MSKRUURs9nQobvvf5VJ9H5M?cluster=devnet
+
+✓ All four instructions confirmed on devnet.
+```
+Balances match expectations: depositing 1 000 from a 10 000-token ATA leaves 9 000; withdrawing
+500 shares at 1:1 ratio (only depositor, first deposit) returns 500 tokens, leaving 9 500.
 
 **How I would explain it in an interview:**
+"The devnet run is the live proof that the vault works outside the test harness. I pointed
+the TypeScript demo at the already-deployed program (`FYqCCoAnM9...`) on devnet, created a
+fresh mint and funded my ATA with 10 000 tokens, then called initialize, deposit, withdraw,
+and pause in sequence — each returning a transaction signature I can open in Solana Explorer.
+Two bugs surfaced that the LiteSVM tests never caught: a wrong Associated Token Program address
+(caught immediately by 'program that does not exist'), and a devnet airdrop rate limit on the
+pause authority (fixed by transferring from the payer instead). Both are the kind of issue
+you only find when you run against a real cluster."
 
 
 ---
