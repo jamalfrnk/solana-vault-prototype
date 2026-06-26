@@ -1,5 +1,6 @@
 pub mod deposit;
 pub mod initialize;
+pub mod pause;
 pub mod withdraw;
 
 // Glob re-exports required by Anchor's #[program] macro-generated client code.
@@ -8,5 +9,7 @@ pub mod withdraw;
 pub use deposit::*;
 #[allow(ambiguous_glob_reexports)]
 pub use initialize::*;
+#[allow(ambiguous_glob_reexports)]
+pub use pause::*;
 #[allow(ambiguous_glob_reexports)]
 pub use withdraw::*;

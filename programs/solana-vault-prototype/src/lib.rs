@@ -27,4 +27,12 @@ pub mod solana_vault_prototype {
     pub fn withdraw(ctx: Context<Withdraw>, shares_in: u64) -> Result<()> {
         withdraw::handler(ctx, shares_in)
     }
+
+    pub fn pause(ctx: Context<Pause>) -> Result<()> {
+        pause::pause_handler(ctx)
+    }
+
+    pub fn unpause(ctx: Context<Unpause>) -> Result<()> {
+        pause::unpause_handler(ctx)
+    }
 }
