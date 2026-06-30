@@ -2,11 +2,12 @@
 
 ## Status
 
-**Milestone 9 complete — all instructions live, 29 tests passing.**
+**Milestone 10 complete — all instructions verified on Solana devnet.**
 
-M0–M9 are merged. The vault is fully implemented: `initialize`, `deposit`, `withdraw`,
-`pause`, and `unpause` are all live, tested, and documented. Architecture is ACCEPTED
-in `ARCHITECTURE.md`. Interview walkthrough is at `docs/INTERVIEW_WALKTHROUGH.md`.
+All 10 milestones merged. The vault is fully implemented, tested, and demonstrated
+on-chain: `initialize`, `deposit`, `withdraw`, `pause`, and `unpause` confirmed on
+Solana devnet (2026-06-26). 29/29 Rust tests pass. Architecture is ACCEPTED.
+Interview walkthrough at `docs/INTERVIEW_WALKTHROUGH.md`.
 
 This is an interview-grade educational prototype. It is **not** audited, **not**
 production-safe, **not** mainnet-ready, and **not** formally verified.
@@ -19,7 +20,7 @@ Program Derived Addresses, SPL token movement, Cross-Program Invocation, PDA sig
 authority, deterministic vault-share accounting, and adversarial testing — small enough
 to explain line by line in an interview.
 
-## What this will demonstrate
+## What this demonstrates
 
 - SVM account-based program architecture
 - Anchor account validation at the instruction boundary
@@ -29,6 +30,7 @@ to explain line by line in an interview.
 - Deterministic vault-share accounting with checked arithmetic
 - Negative-path and adversarial testing
 - Disciplined Git and pull-request workflow
+- Live on-chain execution on Solana devnet
 
 ## Architecture
 
@@ -62,6 +64,74 @@ A single vault custodies one SPL token mint:
 See `SECURITY_CHECKLIST.md`. This prototype is not audited and not intended for
 production custody.
 
+## Devnet demonstration (M10)
+
+Deployed and executed on **Solana devnet** on 2026-06-26.
+
+**Program ID:** `FYqCCoAnM9tUYRcSRbeLbUE9LBPv8bN2uyuhcz46pSgq`
+
+The demo script (`scripts/devnet_demo.ts`) creates a fresh SPL mint, funds a user ATA
+with 10 000 tokens, then calls all four instructions in sequence:
+
+| Step | Instruction | On-chain confirmation |
+|------|-------------|----------------------|
+| 1 | `initialize` | [42sBW8L...](https://explorer.solana.com/tx/42sBW8LJ2MrZYENR8WRuG8G6L9uiucM155PpdpraAQ8eRCvA3A8hdgHdfmT7B8yWdpziPYw3PEHgbH946aMu6w64?cluster=devnet) |
+| 2 | `deposit` (1 000 tokens) | [5C3ssG5...](https://explorer.solana.com/tx/5C3ssG5BzCNSt3yNHiPzAZJiZa2bWUfYojPucwH9r59DkH2ayM5sciV7j9XqLJyRSvHe5uEwFdjmmYcBo4kVT2GK?cluster=devnet) |
+| 3 | `withdraw` (500 shares) | [45hnMcQ...](https://explorer.solana.com/tx/45hnMcQUF6u8fZNRu8MPRZCjXnsUZfuPYrBgEfB14DSRmj7eBGnBVNy1dpKPaKpk9QduabvnhmrN4UxxwZoFLbWK?cluster=devnet) |
+| 4 | `pause` | [4xhKJaX...](https://explorer.solana.com/tx/4xhKJaXL87A3HQBfm1w7UgyHzog9z8KZiHPYRBoNMzaVC3XH1xTb2jW5jgR24sa62MSKRUURs9nQobvvf5VJ9H5M?cluster=devnet) |
+
+**Terminal output (observed):**
+
+```
+$ ./node_modules/.bin/ts-node scripts/devnet_demo.ts
+
+Payer: <wallet pubkey>
+Balance: <SOL balance> SOL
+Pause authority: <generated pubkey>
+Funded pause authority (0.01 SOL from payer)
+
+Mint created: <fresh SPL mint>
+User ATA created: <ATA address>
+Minted 10 000 tokens to user ATA
+
+Vault state PDA:     <derived PDA>
+Vault authority PDA: <derived PDA>
+Custody ATA:         <custody ATA>
+
+[1/4] initialize
+  https://explorer.solana.com/tx/42sBW8LJ2MrZYENR8WRuG8G6L9uiucM155PpdpraAQ8eRCvA3A8hdgHdfmT7B8yWdpziPYw3PEHgbH946aMu6w64?cluster=devnet
+
+[2/4] deposit 1 000 tokens
+  User ATA balance after: 9000 tokens
+  https://explorer.solana.com/tx/5C3ssG5BzCNSt3yNHiPzAZJiZa2bWUfYojPucwH9r59DkH2ayM5sciV7j9XqLJyRSvHe5uEwFdjmmYcBo4kVT2GK?cluster=devnet
+
+[3/4] withdraw 500 shares
+  User ATA balance after: 9500 tokens
+  https://explorer.solana.com/tx/45hnMcQUF6u8fZNRu8MPRZCjXnsUZfuPYrBgEfB14DSRmj7eBGnBVNy1dpKPaKpk9QduabvnhmrN4UxxwZoFLbWK?cluster=devnet
+
+[4/4] pause
+  https://explorer.solana.com/tx/4xhKJaXL87A3HQBfm1w7UgyHzog9z8KZiHPYRBoNMzaVC3XH1xTb2jW5jgR24sa62MSKRUURs9nQobvvf5VJ9H5M?cluster=devnet
+
+✓ All four instructions confirmed on devnet.
+```
+
+**Rust test suite (no regressions):**
+
+```
+$ cargo test
+running 29 tests
+...
+test result: ok. 29 passed; 0 failed; 0 ignored
+```
+
+To run the demo yourself (requires a funded devnet keypair at `~/.config/solana/id.json`):
+
+```bash
+anchor build
+anchor deploy --provider.cluster devnet
+npx ts-node scripts/devnet_demo.ts
+```
+
 ## Development workflow
 
 - One milestone and one feature branch at a time; no feature work on `main`.
@@ -77,10 +147,11 @@ README.md                   This file
 CLAUDE.md                   Operating rules for Claude Code
 PROJECT_CONTEXT.md          Goals, scope, anti-goals, success criteria
 ARCHITECTURE.md             Vault architecture (ACCEPTED)
-SECURITY_CHECKLIST.md       Security checklist (M4–M8 complete)
+SECURITY_CHECKLIST.md       Security checklist (all items checked)
 TEST_PLAN.md                Test matrix (29 tests, all passing)
-ROADMAP.md                  Milestone order and status
+ROADMAP.md                  Milestone order and status (all 10 complete)
 LEARNING_LOG.md             Per-milestone reflection and interview prep notes
+RUNBOOK.md                  Operational runbook for build, test, and deploy
 rust-toolchain.toml         Pinned Rust toolchain (1.89.0)
 Anchor.toml                 Anchor workspace configuration
 Cargo.toml                  Rust workspace manifest
@@ -116,6 +187,8 @@ programs/
       test_withdraw.rs      LiteSVM integration tests — withdraw (7 tests)
       test_pause.rs         LiteSVM integration tests — pause (5 tests)
       test_adversarial.rs   LiteSVM adversarial tests (8 tests)
+scripts/
+  devnet_demo.ts            M10 devnet demonstration script
 prompts/                    Milestone and operating prompts (00–11)
 .gitignore
 ```
@@ -146,19 +219,20 @@ A devcontainer is configured. To start a reproducible environment:
 
 ## Testing strategy
 
-> See `TEST_PLAN.md`. Baseline LiteSVM scaffold test added in Milestone 2.
+> See `TEST_PLAN.md`. All 29 tests pass.
 
-The generated scaffold includes one default LiteSVM test (`test_initialize`) which
-loads the compiled program into an in-process SVM, airdrops lamports to a payer,
-and invokes the no-op `initialize` instruction. This test runs entirely locally via
-`anchor test` (no network, no devnet, no mainnet).
+Tests run entirely via LiteSVM (in-process SVM, no network required):
 
-Planned coverage spans unit (arithmetic), integration (instructions), happy-path,
-negative, account-substitution, arithmetic-boundary, and clean-environment tests.
+```
+cargo test
+```
+
+Coverage: unit (arithmetic), integration (all 5 instructions), happy-path, negative,
+account-substitution, arithmetic-boundary, and adversarial (8 targeted attack scenarios).
 
 ## Roadmap
 
-See `ROADMAP.md`.
+See `ROADMAP.md`. All milestones complete.
 
 | Milestone | Status |
 |---|---|
@@ -172,7 +246,7 @@ See `ROADMAP.md`.
 | 7 — Pause controls | complete |
 | 8 — Security / adversarial test expansion | complete |
 | 9 — Documentation and interview walkthrough | complete |
-| 10 — Optional devnet demonstration | not started |
+| 10 — Devnet demonstration | complete |
 
 ## Interview walkthrough
 
