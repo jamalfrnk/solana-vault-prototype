@@ -1,3 +1,9 @@
+// Anchor 1.0.2's #[program] macro expansion itself trips this lint on current
+// clippy; a crate-level allow is required because the macro does not forward
+// item-level attributes into its generated code. Fixed upstream for the
+// unreleased v1.1.0 (otter-sec/anchor#4389, PR #4403). Not a vault code issue.
+#![allow(clippy::diverging_sub_expression)]
+
 pub mod constants;
 pub mod error;
 pub mod instructions;
@@ -12,10 +18,6 @@ pub use state::*;
 
 declare_id!("FYqCCoAnM9tUYRcSRbeLbUE9LBPv8bN2uyuhcz46pSgq");
 
-// Anchor 1.0.2's #[program] macro expansion itself trips this lint on current
-// clippy; fixed upstream for v1.1.0 (otter-sec/anchor#4389, PR #4403), not yet
-// released. Not a vault code issue.
-#[allow(clippy::diverging_sub_expression)]
 #[program]
 pub mod solana_vault_prototype {
     use super::*;
