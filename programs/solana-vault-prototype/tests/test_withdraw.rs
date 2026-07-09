@@ -151,6 +151,7 @@ fn make_initialize_ix(
     )
 }
 
+#[allow(clippy::too_many_arguments)] // one arg per account in the instruction's Accounts struct
 fn make_deposit_ix(
     user: Pubkey,
     vault_state: Pubkey,
@@ -179,6 +180,7 @@ fn make_deposit_ix(
     )
 }
 
+#[allow(clippy::too_many_arguments)] // one arg per account in the instruction's Accounts struct
 fn make_withdraw_ix(
     user: Pubkey,
     vault_state: Pubkey,
