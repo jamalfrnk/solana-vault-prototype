@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  AGAVE_VERSION: v3.1.10
+  ANCHOR_VERSION: "1.0.2"
+
+jobs:
+  build-and-test:
+    name: fmt, clippy, build-sbf, test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        run: rustup show
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-
+
+      - name: Cache Agave / Anchor toolchain
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/share/solana
+            ~/.avm
+            ~/.cargo/bin/avm
+            ~/.cargo/bin/anchor
+          key: solana-toolchain-${{ env.AGAVE_VERSION }}-${{ env.ANCHOR_VERSION }}
+
+      - name: Install Agave CLI and Anchor CLI
+        run: |
+          bash .devcontainer/post-create.sh
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.avm/bin" >> "$GITHUB_PATH"
+
+      - name: cargo fmt --check
+        run: cargo fmt --all -- --check
+
+      - name: cargo clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: cargo build-sbf
+        run: cargo build-sbf
+
+      - name: cargo test
+        run: cargo test
+
+      - name: Whitespace / conflict marker check
+        run: git diff --check
+
+  audit:
+    name: cargo audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        run: rustup show
+
+      - name: Cache cargo-audit binary
+        id: cache-audit
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/cargo-audit
+          key: cargo-audit-${{ runner.os }}-v1
+
+      - name: Install cargo-audit
+        if: steps.cache-audit.outputs.cache-hit != 'true'
+        run: cargo install cargo-audit --locked
+
+      - name: cargo audit
+        run: cargo audit

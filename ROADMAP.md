@@ -18,6 +18,7 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 | 8 | Security / adversarial test expansion | `[x]` complete |
 | 9 | Documentation and interview walkthrough | `[x]` complete |
 | 10 | Optional devnet demonstration | `[x]` complete |
+| 11 | CI/CD pipeline | `[~]` in progress |
 
 ## Milestone 0 — Repository bootstrap (complete)
 
@@ -126,8 +127,20 @@ pause:       https://explorer.solana.com/tx/4xhKJaXL87A3HQBfm1w7UgyHzog9z8KZiHPY
 cargo test   →  29/29 pass (no regressions)
 ```
 
+## Milestone 11 — CI/CD Pipeline (in progress)
+
+`.github/workflows/ci.yml` added on `feature/ci-pipeline`. Two jobs on `push`/`pull_request`
+to `main`: `build-and-test` (`cargo fmt --check`, `cargo clippy -D warnings`,
+`cargo build-sbf`, `cargo test`, `git diff --check`) and `audit` (`cargo audit`, separate
+job so a dependency advisory doesn't mask a code/test regression). Mirrors the exact
+pre-PR checklist already documented in `RUNBOOK.md` section 9, plus clippy and cargo-audit
+as new gates. Toolchain install reuses `.devcontainer/post-create.sh` directly (single
+source of truth for pinned Agave v3.1.10 / Anchor 1.0.2 versions) rather than duplicating
+install steps. No vault program logic touched.
+
 ## Notes
 
 - No milestone starts until the prior one passes its checks, has updated documentation,
   and is merged through a pull request.
 - Milestone 10 (devnet) is optional and explicitly never targets mainnet.
+- Milestone 11 (CI/CD) runs no deploy or devnet credentials — build/test/lint/audit only.
