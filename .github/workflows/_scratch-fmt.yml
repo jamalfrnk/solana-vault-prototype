@@ -1,0 +1,28 @@
+name: scratch-fmt
+
+on:
+  push:
+    branches: [feature/production-hardening]
+
+jobs:
+  fmt-patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        run: rustup show
+
+      - name: cargo fmt --all
+        run: cargo fmt --all
+
+      - name: Print patch
+        run: git --no-pager diff
+
+      - name: Upload patch artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fmt-patch
+          path: |
+            programs/solana-vault-prototype/src
+            programs/solana-vault-prototype/tests
