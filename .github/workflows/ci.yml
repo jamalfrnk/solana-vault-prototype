@@ -84,3 +84,25 @@ jobs:
 
       - name: cargo audit
         run: cargo audit
+
+  sdk-test:
+    name: SDK tests (Node, no Solana/Anchor toolchain)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: yarn install
+        run: corepack yarn install --frozen-lockfile
+
+      - name: typecheck
+        run: corepack yarn typecheck
+
+      - name: SDK tests
+        run: corepack yarn test:sdk

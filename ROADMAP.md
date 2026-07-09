@@ -20,6 +20,7 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 | 10 | Optional devnet demonstration | `[x]` complete |
 | 11 | CI/CD pipeline | `[x]` complete |
 | 12 | Production hardening pass | `[x]` complete |
+| 13 | SDK package | `[x]` complete |
 
 ## Milestone 0 — Repository bootstrap (complete)
 
@@ -207,6 +208,53 @@ exercised.
 
 Observed (2026-07-09): `build-and-test` — fmt/build-sbf/clippy/test/whitespace all green,
 41/41 tests pass (see `TEST_PLAN.md` for the full list). `audit` — green. PR #16.
+
+## Milestone 13 — SDK Package (complete)
+
+Added `sdk/` — a TypeScript client (`constants.ts`, `discriminator.ts`, `pdas.ts`,
+`instructions.ts`, `accounts.ts`, `errors.ts`, `client.ts`, `index.ts`) on
+`feature/sdk-package`. Deliberately has **no runtime dependency on
+`target/idl/*.json`**: `target/idl/solana_vault_prototype.json` doesn't exist anywhere
+in this repo (gitignored, only produced by `anchor build`, and the Anchor CLI isn't
+available on this development machine). Every Anchor discriminator is computed directly
+(`sha256("global:<name>")`/`sha256("account:<Name>")`, confirmed against Anchor's actual
+codegen — golden values independently recomputed and verified locally, not just trusted
+from research) rather than read from a generated IDL file.
+
+This is also the first milestone with a genuine local TDD loop: Node v22.22.2 / npm
+10.4.0 were confirmed working locally, and `corepack yarn` (Node's built-in shim, no
+global install) matched the project's declared package manager (`Anchor.toml`'s
+`package_manager = "yarn"`, committed `yarn.lock`) — so every red/green step in this
+milestone was actually observed locally via `corepack yarn test:sdk`, unlike M11/M12
+where CI was the only verification loop.
+
+Account/instruction wire order in every builder was cross-checked field-by-field against
+the actual `#[derive(Accounts)]` structs in `initialize.rs`/`deposit.rs`/`withdraw.rs`/
+`pause.rs`, not just `ARCHITECTURE.md`'s tables. `amount`/`sharesIn` use `bigint`, not
+Anchor's `BN`, avoiding `bn.js` as a real dependency. `errors.ts` reuses
+`@anchor-lang/core`'s own `AnchorError.parse` rather than reimplementing its log-parsing
+regex. `tsconfig.json`'s `target`/`lib` bumped `es6`→`es2020` to support BigInt literal
+syntax (`42n`) — confirmed Node 22 fully supports it and existing scripts using
+`BigInt(...)` calls are unaffected.
+
+Deliberate deviation from the SDK's originating brief: no `sdk/package.json`/yarn
+workspace, no publish-to-npm tooling — a publishable package is real infra nobody needs
+yet, and the brief itself defers that to a later milestone. `sdk/` is a plain source
+folder importable today via relative paths, same as any other in-repo TS file.
+
+`scripts/sdk_devnet_smoke.ts` mirrors `devnet_demo.ts`'s flow, built on the SDK instead
+of an IDL-loaded Anchor `Program`, but is **not executed** this milestone — no funded
+devnet keypair available on this machine. Kept outside `sdk/tests/` so mocha and the new
+`sdk-test` CI job's glob (`sdk/tests/**/*.test.ts`) never pick it up. Its correctness
+rests on the 48 offline unit tests and manual review, not an observed live run — flagged
+explicitly rather than claimed.
+
+New `sdk-test` CI job added to `ci.yml`, Node-only (no Agave/Anchor toolchain install),
+gating every future PR the same way `build-and-test`/`audit` already do.
+
+Observed (2026-07-09): `corepack yarn test:sdk` — 48/48 pass, offline, no RPC, no
+compiled program. `corepack yarn typecheck` — clean. No Rust files touched this
+milestone (nothing to regress). PR pending.
 
 ## Notes
 
