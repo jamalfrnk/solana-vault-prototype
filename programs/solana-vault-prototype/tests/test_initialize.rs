@@ -59,7 +59,7 @@ fn make_mint_account(mint_authority: &Pubkey, decimals: u8) -> Account {
     // [36..44] supply = 0 (already zeroed)
     data[44] = decimals;
     data[45] = 1; // is_initialized = true
-    // [46..82] COption::None for freeze_authority (already zeroed)
+                  // [46..82] COption::None for freeze_authority (already zeroed)
     Account {
         lamports: 1_461_600,
         data,
@@ -89,8 +89,11 @@ fn associated_token_address(owner: &Pubkey, mint: &Pubkey) -> Pubkey {
 
 fn build_svm() -> LiteSVM {
     let mut svm = LiteSVM::new();
-    svm.add_program(program_id(), include_bytes!("../../../target/deploy/solana_vault_prototype.so"))
-        .unwrap();
+    svm.add_program(
+        program_id(),
+        include_bytes!("../../../target/deploy/solana_vault_prototype.so"),
+    )
+    .unwrap();
     svm
 }
 
@@ -139,8 +142,11 @@ fn test_initialize_rejects_bad_accounts() {
     let pid = program_id();
     let payer = Keypair::new();
     let mut svm = LiteSVM::new();
-    svm.add_program(pid, include_bytes!("../../../target/deploy/solana_vault_prototype.so"))
-        .unwrap();
+    svm.add_program(
+        pid,
+        include_bytes!("../../../target/deploy/solana_vault_prototype.so"),
+    )
+    .unwrap();
     svm.airdrop(&payer.pubkey(), 1_000_000_000).unwrap();
 
     let ix = Instruction::new_with_bytes(
@@ -183,8 +189,11 @@ fn test_vault_initialize_creates_correct_state() {
 
     let mut svm = build_svm();
     svm.airdrop(&payer.pubkey(), 10_000_000_000).unwrap();
-    svm.set_account(mint_pk, make_mint_account(&keypair_pubkey(&mint_authority), 6))
-        .unwrap();
+    svm.set_account(
+        mint_pk,
+        make_mint_account(&keypair_pubkey(&mint_authority), 6),
+    )
+    .unwrap();
 
     let (vault_state_pda, _) = find_vault_state(&mint_pk, &pid);
     let (vault_authority_pda, _) = find_vault_authority(&vault_state_pda, &pid);
@@ -200,20 +209,32 @@ fn test_vault_initialize_creates_correct_state() {
     );
     send_ok(&mut svm, &[ix], &[&payer, &pause_authority], &payer);
 
-    let acct = svm.get_account(&vault_state_pda).expect("vault_state not found");
+    let acct = svm
+        .get_account(&vault_state_pda)
+        .expect("vault_state not found");
     let vault_state =
         VaultState::try_deserialize(&mut acct.data.as_slice()).expect("deserialize failed");
 
     let (_, expected_vault_bump) = find_vault_state(&mint_pk, &pid);
     let (_, expected_authority_bump) = find_vault_authority(&vault_state_pda, &pid);
 
-    assert_eq!(to_pk(vault_state.pause_authority), pause_auth_pk, "pause_authority mismatch");
+    assert_eq!(
+        to_pk(vault_state.pause_authority),
+        pause_auth_pk,
+        "pause_authority mismatch"
+    );
     assert_eq!(to_pk(vault_state.mint), mint_pk, "mint mismatch");
     assert_eq!(vault_state.total_assets, 0, "total_assets != 0");
     assert_eq!(vault_state.total_shares, 0, "total_shares != 0");
     assert!(!vault_state.is_paused, "should not be paused");
-    assert_eq!(vault_state.vault_bump, expected_vault_bump, "vault_bump mismatch");
-    assert_eq!(vault_state.authority_bump, expected_authority_bump, "authority_bump mismatch");
+    assert_eq!(
+        vault_state.vault_bump, expected_vault_bump,
+        "vault_bump mismatch"
+    );
+    assert_eq!(
+        vault_state.authority_bump, expected_authority_bump,
+        "authority_bump mismatch"
+    );
 }
 
 /// Duplicate initialization must fail.
@@ -230,8 +251,11 @@ fn test_vault_initialize_duplicate_fails() {
 
     let mut svm = build_svm();
     svm.airdrop(&payer.pubkey(), 10_000_000_000).unwrap();
-    svm.set_account(mint_pk, make_mint_account(&keypair_pubkey(&mint_authority), 6))
-        .unwrap();
+    svm.set_account(
+        mint_pk,
+        make_mint_account(&keypair_pubkey(&mint_authority), 6),
+    )
+    .unwrap();
 
     let (vault_state_pda, _) = find_vault_state(&mint_pk, &pid);
     let (vault_authority_pda, _) = find_vault_authority(&vault_state_pda, &pid);
@@ -253,13 +277,12 @@ fn test_vault_initialize_duplicate_fails() {
 
     // Second init must fail — vault_state PDA already exists
     let blockhash = svm.latest_blockhash();
-    let msg = Message::new_with_blockhash(
-        &[ix()],
-        Some(&keypair_pubkey(&payer)),
-        &blockhash,
-    );
+    let msg = Message::new_with_blockhash(&[ix()], Some(&keypair_pubkey(&payer)), &blockhash);
     let tx =
         VersionedTransaction::try_new(VersionedMessage::Legacy(msg), &[&payer, &pause_authority])
             .unwrap();
-    assert!(svm.send_transaction(tx).is_err(), "duplicate init should fail");
+    assert!(
+        svm.send_transaction(tx).is_err(),
+        "duplicate init should fail"
+    );
 }

@@ -91,8 +91,14 @@ pub fn handler(ctx: Context<Deposit>, amount: u64) -> Result<()> {
 
     // Update vault accounting.
     let vs = &mut ctx.accounts.vault_state;
-    vs.total_assets = vs.total_assets.checked_add(amount).ok_or(VaultError::ZeroDenominator)?;
-    vs.total_shares = vs.total_shares.checked_add(shares_out).ok_or(VaultError::ZeroDenominator)?;
+    vs.total_assets = vs
+        .total_assets
+        .checked_add(amount)
+        .ok_or(VaultError::ZeroDenominator)?;
+    vs.total_shares = vs
+        .total_shares
+        .checked_add(shares_out)
+        .ok_or(VaultError::ZeroDenominator)?;
 
     // Update (or initialise) user position.
     let up = &mut ctx.accounts.user_position;
@@ -101,7 +107,10 @@ pub fn handler(ctx: Context<Deposit>, amount: u64) -> Result<()> {
         up.vault = ctx.accounts.vault_state.key();
         up.bump = ctx.bumps.user_position;
     }
-    up.shares = up.shares.checked_add(shares_out).ok_or(VaultError::ZeroDenominator)?;
+    up.shares = up
+        .shares
+        .checked_add(shares_out)
+        .ok_or(VaultError::ZeroDenominator)?;
 
     Ok(())
 }
