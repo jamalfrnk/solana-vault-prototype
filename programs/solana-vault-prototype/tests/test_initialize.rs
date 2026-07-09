@@ -357,8 +357,11 @@ fn test_initialize_succeeds_with_preexisting_empty_custody_ata() {
     let custody_ata = associated_token_address(&vault_authority_pda, &mint_pk);
 
     // Pre-create the custody ATA before `initialize` ever runs, with zero balance.
-    svm.set_account(custody_ata, make_token_account(&vault_authority_pda, &mint_pk, 0))
-        .unwrap();
+    svm.set_account(
+        custody_ata,
+        make_token_account(&vault_authority_pda, &mint_pk, 0),
+    )
+    .unwrap();
 
     let ix = make_init_ix(
         keypair_pubkey(&payer),

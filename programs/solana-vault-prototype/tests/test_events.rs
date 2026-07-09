@@ -122,7 +122,9 @@ fn send_and_get_logs(
     let payer_pk = keypair_pubkey(payer);
     let msg = Message::new_with_blockhash(ixs, Some(&payer_pk), &blockhash);
     let tx = VersionedTransaction::try_new(VersionedMessage::Legacy(msg), signers).unwrap();
-    let meta = svm.send_transaction(tx).expect("transaction should succeed");
+    let meta = svm
+        .send_transaction(tx)
+        .expect("transaction should succeed");
     meta.logs
 }
 

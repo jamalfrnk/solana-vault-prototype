@@ -1109,8 +1109,14 @@ fn test_direct_donation_does_not_skew_second_depositor_share_price() {
         let acct = v.svm.get_account(&ata_b).unwrap();
         u64::from_le_bytes(acct.data[64..72].try_into().unwrap())
     };
-    assert_eq!(ata_a_balance, deposit_a, "A gets back exactly their principal");
-    assert_eq!(ata_b_balance, deposit_b, "B gets back exactly their principal");
+    assert_eq!(
+        ata_a_balance, deposit_a,
+        "A gets back exactly their principal"
+    );
+    assert_eq!(
+        ata_b_balance, deposit_b,
+        "B gets back exactly their principal"
+    );
 
     let custody_balance = {
         let acct = v.svm.get_account(&v.custody_ata).unwrap();
@@ -1167,8 +1173,8 @@ fn test_deposit_rejects_foreign_owned_vault_authority() {
         deposit_amount,
     );
     let msg = Message::new_with_blockhash(&[ix], Some(&keypair_pubkey(&v.payer)), &blockhash);
-    let tx = VersionedTransaction::try_new(VersionedMessage::Legacy(msg), &[&v.payer, &user])
-        .unwrap();
+    let tx =
+        VersionedTransaction::try_new(VersionedMessage::Legacy(msg), &[&v.payer, &user]).unwrap();
     assert!(
         v.svm.send_transaction(tx).is_err(),
         "foreign-owned vault_authority must be rejected on deposit"
