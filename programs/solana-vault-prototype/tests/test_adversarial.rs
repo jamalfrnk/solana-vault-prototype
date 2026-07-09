@@ -5,8 +5,8 @@
 /// wrong token program, overflow/boundary arithmetic.
 use {
     anchor_lang::{
-        solana_program::instruction::Instruction, AccountDeserialize, InstructionData,
-        ToAccountMetas,
+        solana_program::instruction::{AccountMeta, Instruction},
+        AccountDeserialize, InstructionData, ToAccountMetas,
     },
     litesvm::LiteSVM,
     solana_account::Account,
@@ -84,6 +84,28 @@ fn find_user_position(vault_state: &Pubkey, user: &Pubkey, pid: &Pubkey) -> (Pub
         &[USER_POSITION_SEED, vault_state.as_ref(), user.as_ref()],
         pid,
     )
+}
+
+/// Build a raw SPL Token `Transfer` instruction (discriminant 3, stable/unchanged
+/// SPL Token layout: [3u8][amount: u64 LE]), bypassing the vault program entirely.
+/// Used to simulate a direct "donation" transfer into custody.
+fn make_raw_spl_transfer_ix(
+    source: Pubkey,
+    destination: Pubkey,
+    authority: Pubkey,
+    amount: u64,
+) -> Instruction {
+    let mut data = vec![3u8];
+    data.extend_from_slice(&amount.to_le_bytes());
+    Instruction {
+        program_id: spl_token_id(),
+        accounts: vec![
+            AccountMeta::new(source, false),
+            AccountMeta::new(destination, false),
+            AccountMeta::new_readonly(authority, true),
+        ],
+        data,
+    }
 }
 
 fn ata(owner: &Pubkey, mint: &Pubkey) -> Pubkey {
@@ -774,5 +796,389 @@ fn test_deposit_large_amount_no_overflow() {
         vs.total_shares,
         large * 2,
         "no overflow — shares should equal assets at 1:1"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// M12 — direct-transfer / donation accounting and confused-deputy hardening
+// ---------------------------------------------------------------------------
+
+/// A custody ATA pre-created with dust (nonzero balance) before `initialize`
+/// runs must not leak into vault accounting.
+#[test]
+fn test_initialize_succeeds_with_preexisting_dust_in_custody_ata() {
+    let pid = program_id();
+    let payer = Keypair::new();
+    let pa = Keypair::new();
+    let ma = Keypair::new();
+    let mint_kp = Keypair::new();
+    let mint_pk = keypair_pubkey(&mint_kp);
+
+    let mut svm = build_svm();
+    svm.airdrop(&payer.pubkey(), 10_000_000_000).unwrap();
+    svm.set_account(mint_pk, make_mint_account(&keypair_pubkey(&ma), 6))
+        .unwrap();
+
+    let (vault_state_pda, _) = find_vault_state(&mint_pk, &pid);
+    let (vault_authority_pda, _) = find_vault_authority(&vault_state_pda, &pid);
+    let custody_ata = ata(&vault_authority_pda, &mint_pk);
+
+    // Pre-fund the custody ATA with dust before initialize ever runs.
+    svm.set_account(
+        custody_ata,
+        make_token_account(&vault_authority_pda, &mint_pk, 500_000),
+    )
+    .unwrap();
+
+    let ix = make_initialize_ix(
+        keypair_pubkey(&payer),
+        keypair_pubkey(&pa),
+        mint_pk,
+        vault_state_pda,
+        vault_authority_pda,
+        custody_ata,
+    );
+    send_ok(&mut svm, &[ix], &[&payer, &pa], &payer);
+
+    let vs_acct = svm.get_account(&vault_state_pda).unwrap();
+    let vs = VaultState::try_deserialize(&mut vs_acct.data.as_slice()).unwrap();
+    assert_eq!(
+        vs.total_assets, 0,
+        "pre-existing dust in custody must not affect vault accounting at init"
+    );
+}
+
+/// A direct (non-CPI) SPL token transfer straight into custody — a "donation" —
+/// must not let the depositor withdraw more than their own principal.
+#[test]
+fn test_direct_donation_does_not_inflate_withdrawable_amount() {
+    let mut v = Vault::new();
+    let user_a = Keypair::new();
+    let user_a_pk = keypair_pubkey(&user_a);
+    let attacker = Keypair::new();
+    let attacker_pk = keypair_pubkey(&attacker);
+
+    v.svm.airdrop(&user_a.pubkey(), 10_000_000_000).unwrap();
+    v.svm.airdrop(&attacker.pubkey(), 10_000_000_000).unwrap();
+
+    let deposit_amount = 1_000_000u64;
+    let donation_amount = 250_000u64;
+
+    let ata_a = ata(&user_a_pk, &v.mint_pk);
+    v.svm
+        .set_account(
+            ata_a,
+            make_token_account(&user_a_pk, &v.mint_pk, deposit_amount),
+        )
+        .unwrap();
+
+    let attacker_ata = ata(&attacker_pk, &v.mint_pk);
+    v.svm
+        .set_account(
+            attacker_ata,
+            make_token_account(&attacker_pk, &v.mint_pk, donation_amount),
+        )
+        .unwrap();
+
+    let (pos_a, _) = find_user_position(&v.vault_state_pda, &user_a_pk, &v.pid);
+
+    // A deposits (1:1, sole depositor).
+    send_ok(
+        &mut v.svm,
+        &[make_deposit_ix(
+            user_a_pk,
+            v.vault_state_pda,
+            v.vault_authority_pda,
+            v.custody_ata,
+            ata_a,
+            pos_a,
+            v.mint_pk,
+            deposit_amount,
+        )],
+        &[&v.payer, &user_a],
+        &v.payer,
+    );
+
+    // Attacker donates directly into custody, bypassing the vault program.
+    send_ok(
+        &mut v.svm,
+        &[make_raw_spl_transfer_ix(
+            attacker_ata,
+            v.custody_ata,
+            attacker_pk,
+            donation_amount,
+        )],
+        &[&v.payer, &attacker],
+        &v.payer,
+    );
+
+    // Custody's real balance now includes the donation; vault accounting does not.
+    let custody_acct = v.svm.get_account(&v.custody_ata).unwrap();
+    let custody_balance = u64::from_le_bytes(custody_acct.data[64..72].try_into().unwrap());
+    assert_eq!(
+        custody_balance,
+        deposit_amount + donation_amount,
+        "donation should land in custody's real balance"
+    );
+    let vs_acct = v.svm.get_account(&v.vault_state_pda).unwrap();
+    let vs = VaultState::try_deserialize(&mut vs_acct.data.as_slice()).unwrap();
+    assert_eq!(
+        vs.total_assets, deposit_amount,
+        "donation must not be visible to vault accounting"
+    );
+
+    // A withdraws everything — must receive back exactly their own principal.
+    send_ok(
+        &mut v.svm,
+        &[make_withdraw_ix(
+            user_a_pk,
+            v.vault_state_pda,
+            v.vault_authority_pda,
+            v.custody_ata,
+            ata_a,
+            pos_a,
+            v.mint_pk,
+            deposit_amount,
+        )],
+        &[&v.payer, &user_a],
+        &v.payer,
+    );
+
+    let ata_a_acct = v.svm.get_account(&ata_a).unwrap();
+    let ata_a_balance = u64::from_le_bytes(ata_a_acct.data[64..72].try_into().unwrap());
+    assert_eq!(
+        ata_a_balance, deposit_amount,
+        "A must receive back exactly their own principal, not the donation too"
+    );
+
+    let vs_acct = v.svm.get_account(&v.vault_state_pda).unwrap();
+    let vs = VaultState::try_deserialize(&mut vs_acct.data.as_slice()).unwrap();
+    assert_eq!(vs.total_assets, 0, "vault accounting fully drained");
+    assert_eq!(vs.total_shares, 0, "all shares redeemed");
+
+    let custody_acct = v.svm.get_account(&v.custody_ata).unwrap();
+    let custody_balance = u64::from_le_bytes(custody_acct.data[64..72].try_into().unwrap());
+    assert_eq!(
+        custody_balance, donation_amount,
+        "the donation remains as inert dust in custody"
+    );
+}
+
+/// A donation landing between two deposits must not skew the second
+/// depositor's share price — they must still receive shares proportional to
+/// the vault's own tracked total_assets/total_shares, not the inflated
+/// custody balance.
+#[test]
+fn test_direct_donation_does_not_skew_second_depositor_share_price() {
+    let mut v = Vault::new();
+    let user_a = Keypair::new();
+    let user_a_pk = keypair_pubkey(&user_a);
+    let user_b = Keypair::new();
+    let user_b_pk = keypair_pubkey(&user_b);
+    let attacker = Keypair::new();
+    let attacker_pk = keypair_pubkey(&attacker);
+
+    v.svm.airdrop(&user_a.pubkey(), 10_000_000_000).unwrap();
+    v.svm.airdrop(&user_b.pubkey(), 10_000_000_000).unwrap();
+    v.svm.airdrop(&attacker.pubkey(), 10_000_000_000).unwrap();
+
+    let deposit_a = 1_000_000u64;
+    let deposit_b = 400_000u64;
+    let donation_amount = 250_000u64;
+
+    let ata_a = ata(&user_a_pk, &v.mint_pk);
+    v.svm
+        .set_account(ata_a, make_token_account(&user_a_pk, &v.mint_pk, deposit_a))
+        .unwrap();
+    let ata_b = ata(&user_b_pk, &v.mint_pk);
+    v.svm
+        .set_account(ata_b, make_token_account(&user_b_pk, &v.mint_pk, deposit_b))
+        .unwrap();
+    let attacker_ata = ata(&attacker_pk, &v.mint_pk);
+    v.svm
+        .set_account(
+            attacker_ata,
+            make_token_account(&attacker_pk, &v.mint_pk, donation_amount),
+        )
+        .unwrap();
+
+    let (pos_a, _) = find_user_position(&v.vault_state_pda, &user_a_pk, &v.pid);
+    let (pos_b, _) = find_user_position(&v.vault_state_pda, &user_b_pk, &v.pid);
+
+    // A deposits (1:1, sole depositor).
+    send_ok(
+        &mut v.svm,
+        &[make_deposit_ix(
+            user_a_pk,
+            v.vault_state_pda,
+            v.vault_authority_pda,
+            v.custody_ata,
+            ata_a,
+            pos_a,
+            v.mint_pk,
+            deposit_a,
+        )],
+        &[&v.payer, &user_a],
+        &v.payer,
+    );
+
+    // Attacker donates between A's and B's deposits.
+    send_ok(
+        &mut v.svm,
+        &[make_raw_spl_transfer_ix(
+            attacker_ata,
+            v.custody_ata,
+            attacker_pk,
+            donation_amount,
+        )],
+        &[&v.payer, &attacker],
+        &v.payer,
+    );
+
+    let vs_before = {
+        let acct = v.svm.get_account(&v.vault_state_pda).unwrap();
+        VaultState::try_deserialize(&mut acct.data.as_slice()).unwrap()
+    };
+    let expected_shares_b = (deposit_b as u128 * vs_before.total_shares as u128
+        / vs_before.total_assets as u128) as u64;
+
+    // B deposits after the donation.
+    send_ok(
+        &mut v.svm,
+        &[make_deposit_ix(
+            user_b_pk,
+            v.vault_state_pda,
+            v.vault_authority_pda,
+            v.custody_ata,
+            ata_b,
+            pos_b,
+            v.mint_pk,
+            deposit_b,
+        )],
+        &[&v.payer, &user_b],
+        &v.payer,
+    );
+
+    let vs_after = {
+        let acct = v.svm.get_account(&v.vault_state_pda).unwrap();
+        VaultState::try_deserialize(&mut acct.data.as_slice()).unwrap()
+    };
+    assert_eq!(
+        vs_after.total_shares - vs_before.total_shares,
+        expected_shares_b,
+        "B's shares must follow the vault-tracked ratio, not the donation-inflated custody balance"
+    );
+
+    // Both withdraw fully; each must receive back exactly their own principal.
+    send_ok(
+        &mut v.svm,
+        &[make_withdraw_ix(
+            user_a_pk,
+            v.vault_state_pda,
+            v.vault_authority_pda,
+            v.custody_ata,
+            ata_a,
+            pos_a,
+            v.mint_pk,
+            deposit_a,
+        )],
+        &[&v.payer, &user_a],
+        &v.payer,
+    );
+    send_ok(
+        &mut v.svm,
+        &[make_withdraw_ix(
+            user_b_pk,
+            v.vault_state_pda,
+            v.vault_authority_pda,
+            v.custody_ata,
+            ata_b,
+            pos_b,
+            v.mint_pk,
+            expected_shares_b,
+        )],
+        &[&v.payer, &user_b],
+        &v.payer,
+    );
+
+    let ata_a_balance = {
+        let acct = v.svm.get_account(&ata_a).unwrap();
+        u64::from_le_bytes(acct.data[64..72].try_into().unwrap())
+    };
+    let ata_b_balance = {
+        let acct = v.svm.get_account(&ata_b).unwrap();
+        u64::from_le_bytes(acct.data[64..72].try_into().unwrap())
+    };
+    assert_eq!(
+        ata_a_balance, deposit_a,
+        "A gets back exactly their principal"
+    );
+    assert_eq!(
+        ata_b_balance, deposit_b,
+        "B gets back exactly their principal"
+    );
+
+    let custody_balance = {
+        let acct = v.svm.get_account(&v.custody_ata).unwrap();
+        u64::from_le_bytes(acct.data[64..72].try_into().unwrap())
+    };
+    assert_eq!(
+        custody_balance, donation_amount,
+        "only the donation remains as inert dust after both withdrawals"
+    );
+}
+
+/// A `vault_authority` PDA that is not owned by the System Program must be
+/// rejected on `deposit`, not just at `initialize`.
+#[test]
+fn test_deposit_rejects_foreign_owned_vault_authority() {
+    let mut v = Vault::new();
+    let user = Keypair::new();
+    let user_pk = keypair_pubkey(&user);
+    v.svm.airdrop(&user.pubkey(), 10_000_000_000).unwrap();
+
+    let deposit_amount = 1_000_000u64;
+    let user_ata = ata(&user_pk, &v.mint_pk);
+    v.svm
+        .set_account(
+            user_ata,
+            make_token_account(&user_pk, &v.mint_pk, deposit_amount),
+        )
+        .unwrap();
+    let (pos, _) = find_user_position(&v.vault_state_pda, &user_pk, &v.pid);
+
+    // Assign vault_authority's address to a foreign owner after init.
+    // Nonzero lamports: a zero-lamport account is treated as non-existent and
+    // its owner is not meaningfully checkable, which would make this a no-op.
+    v.svm
+        .set_account(
+            v.vault_authority_pda,
+            Account {
+                lamports: 1_000_000,
+                data: vec![],
+                owner: spl_token_id(),
+                executable: false,
+                rent_epoch: u64::MAX,
+            },
+        )
+        .unwrap();
+
+    let blockhash = v.svm.latest_blockhash();
+    let ix = make_deposit_ix(
+        user_pk,
+        v.vault_state_pda,
+        v.vault_authority_pda,
+        v.custody_ata,
+        user_ata,
+        pos,
+        v.mint_pk,
+        deposit_amount,
+    );
+    let msg = Message::new_with_blockhash(&[ix], Some(&keypair_pubkey(&v.payer)), &blockhash);
+    let tx =
+        VersionedTransaction::try_new(VersionedMessage::Legacy(msg), &[&v.payer, &user]).unwrap();
+    assert!(
+        v.svm.send_transaction(tx).is_err(),
+        "foreign-owned vault_authority must be rejected on deposit"
     );
 }

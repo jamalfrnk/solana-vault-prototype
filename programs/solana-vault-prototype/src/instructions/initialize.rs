@@ -7,6 +7,7 @@ use anchor_spl::{
 use crate::{
     constants::{VAULT_AUTHORITY_SEED, VAULT_SEED},
     error::VaultError,
+    events::VaultInitialized,
     state::VaultState,
 };
 
@@ -20,26 +21,30 @@ pub struct Initialize<'info> {
     )]
     pub pause_authority: Signer<'info>,
 
+    #[account(
+        constraint = mint.freeze_authority.is_none() @ VaultError::FreezeAuthorityPresent,
+    )]
     pub mint: Account<'info, Mint>,
 
     #[account(
         init,
         payer = payer,
-        space = VaultState::LEN,
+        space = 8 + VaultState::INIT_SPACE,
         seeds = [VAULT_SEED, mint.key().as_ref()],
         bump,
     )]
     pub vault_state: Account<'info, VaultState>,
 
-    /// CHECK: PDA that owns the custody ATA; authority validated by seeds
+    /// CHECK: PDA that owns the custody ATA; authority validated by seeds + owner
     #[account(
         seeds = [VAULT_AUTHORITY_SEED, vault_state.key().as_ref()],
         bump,
+        owner = System::id() @ VaultError::InvalidVaultAuthorityOwner,
     )]
     pub vault_authority: UncheckedAccount<'info>,
 
     #[account(
-        init,
+        init_if_needed,
         payer = payer,
         associated_token::mint = mint,
         associated_token::authority = vault_authority,
@@ -61,5 +66,12 @@ pub fn handler(ctx: Context<Initialize>) -> Result<()> {
     vs.total_shares = 0;
     vs.is_paused = false;
     vs.reserved = [0u8; 22];
+
+    emit!(VaultInitialized {
+        vault: ctx.accounts.vault_state.key(),
+        mint: ctx.accounts.mint.key(),
+        pause_authority: ctx.accounts.pause_authority.key(),
+    });
+
     Ok(())
 }

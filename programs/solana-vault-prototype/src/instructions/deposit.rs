@@ -4,6 +4,7 @@ use anchor_spl::token::{transfer_checked, Mint, Token, TokenAccount, TransferChe
 use crate::{
     constants::{USER_POSITION_SEED, VAULT_AUTHORITY_SEED, VAULT_SEED},
     error::VaultError,
+    events::Deposited,
     state::{UserPosition, VaultState},
 };
 
@@ -20,10 +21,11 @@ pub struct Deposit<'info> {
     )]
     pub vault_state: Account<'info, VaultState>,
 
-    /// CHECK: PDA that owns the custody ATA; authority validated by seeds + bump.
+    /// CHECK: PDA that owns the custody ATA; authority validated by seeds + bump + owner.
     #[account(
         seeds = [VAULT_AUTHORITY_SEED, vault_state.key().as_ref()],
         bump = vault_state.authority_bump,
+        owner = System::id() @ VaultError::InvalidVaultAuthorityOwner,
     )]
     pub vault_authority: UncheckedAccount<'info>,
 
@@ -44,7 +46,7 @@ pub struct Deposit<'info> {
     #[account(
         init_if_needed,
         payer = user,
-        space = UserPosition::LEN,
+        space = 8 + UserPosition::INIT_SPACE,
         seeds = [USER_POSITION_SEED, vault_state.key().as_ref(), user.key().as_ref()],
         bump,
     )]
@@ -111,6 +113,15 @@ pub fn handler(ctx: Context<Deposit>, amount: u64) -> Result<()> {
         .shares
         .checked_add(shares_out)
         .ok_or(VaultError::ZeroDenominator)?;
+
+    emit!(Deposited {
+        vault: ctx.accounts.vault_state.key(),
+        user: ctx.accounts.user.key(),
+        amount,
+        shares_out,
+        total_assets: ctx.accounts.vault_state.total_assets,
+        total_shares: ctx.accounts.vault_state.total_shares,
+    });
 
     Ok(())
 }

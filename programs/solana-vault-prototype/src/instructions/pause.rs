@@ -1,6 +1,11 @@
 use anchor_lang::prelude::*;
 
-use crate::{constants::VAULT_SEED, error::VaultError, state::VaultState};
+use crate::{
+    constants::VAULT_SEED,
+    error::VaultError,
+    events::{Paused, Unpaused},
+    state::VaultState,
+};
 
 #[derive(Accounts)]
 pub struct Pause<'info> {
@@ -19,6 +24,12 @@ pub struct Pause<'info> {
 
 pub fn pause_handler(ctx: Context<Pause>) -> Result<()> {
     ctx.accounts.vault_state.is_paused = true;
+
+    emit!(Paused {
+        vault: ctx.accounts.vault_state.key(),
+        pause_authority: ctx.accounts.pause_authority.key(),
+    });
+
     Ok(())
 }
 
@@ -41,5 +52,11 @@ pub struct Unpause<'info> {
 
 pub fn unpause_handler(ctx: Context<Unpause>) -> Result<()> {
     ctx.accounts.vault_state.is_paused = false;
+
+    emit!(Unpaused {
+        vault: ctx.accounts.vault_state.key(),
+        pause_authority: ctx.accounts.pause_authority.key(),
+    });
+
     Ok(())
 }

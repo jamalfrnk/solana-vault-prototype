@@ -69,6 +69,46 @@ fn make_mint_account(mint_authority: &Pubkey, decimals: u8) -> Account {
     }
 }
 
+/// Same layout as `make_mint_account`, but with an active freeze authority set
+/// (COption::Some at [46..82]: 4-byte tag + 32-byte pubkey).
+fn make_mint_account_with_freeze(
+    mint_authority: &Pubkey,
+    freeze_authority: &Pubkey,
+    decimals: u8,
+) -> Account {
+    let mut data = vec![0u8; 82];
+    data[0] = 1; // COption::Some tag for mint_authority
+    data[4..36].copy_from_slice(mint_authority.as_ref());
+    data[44] = decimals;
+    data[45] = 1; // is_initialized = true
+    data[46] = 1; // COption::Some tag for freeze_authority
+    data[50..82].copy_from_slice(freeze_authority.as_ref());
+    Account {
+        lamports: 1_461_600,
+        data,
+        owner: spl_token_id(),
+        executable: false,
+        rent_epoch: u64::MAX,
+    }
+}
+
+/// Build a 165-byte SPL Token Account (TokenAccount) with a given owner and mint.
+/// Identical layout used across the other test files in this crate.
+fn make_token_account(owner: &Pubkey, mint: &Pubkey, amount: u64) -> Account {
+    let mut data = vec![0u8; 165];
+    data[0..32].copy_from_slice(mint.as_ref());
+    data[32..64].copy_from_slice(owner.as_ref());
+    data[64..72].copy_from_slice(&amount.to_le_bytes());
+    data[108] = 1; // state = AccountState::Initialized
+    Account {
+        lamports: 2_039_280,
+        data,
+        owner: spl_token_id(),
+        executable: false,
+        rent_epoch: u64::MAX,
+    }
+}
+
 fn find_vault_state(mint: &Pubkey, pid: &Pubkey) -> (Pubkey, u8) {
     Pubkey::find_program_address(&[VAULT_SEED, mint.as_ref()], pid)
 }
@@ -284,5 +324,172 @@ fn test_vault_initialize_duplicate_fails() {
     assert!(
         svm.send_transaction(tx).is_err(),
         "duplicate init should fail"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// M12 — production hardening
+// ---------------------------------------------------------------------------
+
+/// A pre-created, empty custody ATA (e.g. by a griefer front-running `initialize`)
+/// must not permanently block vault initialization for that mint.
+#[test]
+fn test_initialize_succeeds_with_preexisting_empty_custody_ata() {
+    let pid = program_id();
+    let payer = Keypair::new();
+    let pause_authority = Keypair::new();
+    let mint_authority = Keypair::new();
+    let mint_kp = Keypair::new();
+
+    let mint_pk = keypair_pubkey(&mint_kp);
+    let pause_auth_pk = keypair_pubkey(&pause_authority);
+
+    let mut svm = build_svm();
+    svm.airdrop(&payer.pubkey(), 10_000_000_000).unwrap();
+    svm.set_account(
+        mint_pk,
+        make_mint_account(&keypair_pubkey(&mint_authority), 6),
+    )
+    .unwrap();
+
+    let (vault_state_pda, _) = find_vault_state(&mint_pk, &pid);
+    let (vault_authority_pda, _) = find_vault_authority(&vault_state_pda, &pid);
+    let custody_ata = associated_token_address(&vault_authority_pda, &mint_pk);
+
+    // Pre-create the custody ATA before `initialize` ever runs, with zero balance.
+    svm.set_account(
+        custody_ata,
+        make_token_account(&vault_authority_pda, &mint_pk, 0),
+    )
+    .unwrap();
+
+    let ix = make_init_ix(
+        keypair_pubkey(&payer),
+        pause_auth_pk,
+        mint_pk,
+        vault_state_pda,
+        vault_authority_pda,
+        custody_ata,
+    );
+    send_ok(&mut svm, &[ix], &[&payer, &pause_authority], &payer);
+
+    let acct = svm
+        .get_account(&vault_state_pda)
+        .expect("vault_state not found");
+    let vault_state =
+        VaultState::try_deserialize(&mut acct.data.as_slice()).expect("deserialize failed");
+    assert_eq!(
+        vault_state.total_assets, 0,
+        "pre-existing empty custody must not affect accounting"
+    );
+}
+
+/// A mint with an active freeze authority must be rejected at initialize.
+#[test]
+fn test_initialize_rejects_mint_with_freeze_authority() {
+    let pid = program_id();
+    let payer = Keypair::new();
+    let pause_authority = Keypair::new();
+    let mint_authority = Keypair::new();
+    let freeze_authority = Keypair::new();
+    let mint_kp = Keypair::new();
+
+    let mint_pk = keypair_pubkey(&mint_kp);
+    let pause_auth_pk = keypair_pubkey(&pause_authority);
+
+    let mut svm = build_svm();
+    svm.airdrop(&payer.pubkey(), 10_000_000_000).unwrap();
+    svm.set_account(
+        mint_pk,
+        make_mint_account_with_freeze(
+            &keypair_pubkey(&mint_authority),
+            &keypair_pubkey(&freeze_authority),
+            6,
+        ),
+    )
+    .unwrap();
+
+    let (vault_state_pda, _) = find_vault_state(&mint_pk, &pid);
+    let (vault_authority_pda, _) = find_vault_authority(&vault_state_pda, &pid);
+    let custody_ata = associated_token_address(&vault_authority_pda, &mint_pk);
+
+    let ix = make_init_ix(
+        keypair_pubkey(&payer),
+        pause_auth_pk,
+        mint_pk,
+        vault_state_pda,
+        vault_authority_pda,
+        custody_ata,
+    );
+
+    let blockhash = svm.latest_blockhash();
+    let msg = Message::new_with_blockhash(&[ix], Some(&keypair_pubkey(&payer)), &blockhash);
+    let tx =
+        VersionedTransaction::try_new(VersionedMessage::Legacy(msg), &[&payer, &pause_authority])
+            .unwrap();
+    assert!(
+        svm.send_transaction(tx).is_err(),
+        "mint with an active freeze authority must be rejected"
+    );
+}
+
+/// A `vault_authority` PDA that is not owned by the System Program (e.g. a
+/// confused-deputy scenario where the address is co-opted by another program)
+/// must be rejected at initialize.
+#[test]
+fn test_initialize_rejects_foreign_owned_vault_authority() {
+    let pid = program_id();
+    let payer = Keypair::new();
+    let pause_authority = Keypair::new();
+    let mint_authority = Keypair::new();
+    let mint_kp = Keypair::new();
+
+    let mint_pk = keypair_pubkey(&mint_kp);
+    let pause_auth_pk = keypair_pubkey(&pause_authority);
+
+    let mut svm = build_svm();
+    svm.airdrop(&payer.pubkey(), 10_000_000_000).unwrap();
+    svm.set_account(
+        mint_pk,
+        make_mint_account(&keypair_pubkey(&mint_authority), 6),
+    )
+    .unwrap();
+
+    let (vault_state_pda, _) = find_vault_state(&mint_pk, &pid);
+    let (vault_authority_pda, _) = find_vault_authority(&vault_state_pda, &pid);
+    let custody_ata = associated_token_address(&vault_authority_pda, &mint_pk);
+
+    // Assign vault_authority's address to a foreign owner (any non-system program).
+    // Nonzero lamports: a zero-lamport account is treated as non-existent and
+    // its owner is not meaningfully checkable, which would make this a no-op.
+    svm.set_account(
+        vault_authority_pda,
+        Account {
+            lamports: 1_000_000,
+            data: vec![],
+            owner: spl_token_id(),
+            executable: false,
+            rent_epoch: u64::MAX,
+        },
+    )
+    .unwrap();
+
+    let ix = make_init_ix(
+        keypair_pubkey(&payer),
+        pause_auth_pk,
+        mint_pk,
+        vault_state_pda,
+        vault_authority_pda,
+        custody_ata,
+    );
+
+    let blockhash = svm.latest_blockhash();
+    let msg = Message::new_with_blockhash(&[ix], Some(&keypair_pubkey(&payer)), &blockhash);
+    let tx =
+        VersionedTransaction::try_new(VersionedMessage::Legacy(msg), &[&payer, &pause_authority])
+            .unwrap();
+    assert!(
+        svm.send_transaction(tx).is_err(),
+        "foreign-owned vault_authority must be rejected"
     );
 }
