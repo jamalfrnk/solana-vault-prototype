@@ -56,7 +56,7 @@ fn make_mint_account(mint_authority: &Pubkey, decimals: u8) -> Account {
     // [36..44] supply = 0
     data[44] = decimals;
     data[45] = 1; // is_initialized
-    // [46..82] COption::None freeze_authority
+                  // [46..82] COption::None freeze_authority
     Account {
         lamports: 1_461_600,
         data,
@@ -168,6 +168,7 @@ fn make_initialize_ix(
     )
 }
 
+#[allow(clippy::too_many_arguments)] // one arg per account in the instruction's Accounts struct
 fn make_deposit_ix(
     user: Pubkey,
     vault_state: Pubkey,
@@ -224,8 +225,11 @@ impl VaultFixture {
 
         let mut svm = build_svm();
         svm.airdrop(&payer.pubkey(), 10_000_000_000).unwrap();
-        svm.set_account(mint_pk, make_mint_account(&keypair_pubkey(&mint_authority), 6))
-            .unwrap();
+        svm.set_account(
+            mint_pk,
+            make_mint_account(&keypair_pubkey(&mint_authority), 6),
+        )
+        .unwrap();
 
         let (vault_state_pda, _) = find_vault_state(&mint_pk, &pid);
         let (vault_authority_pda, _) = find_vault_authority(&vault_state_pda, &pid);
@@ -239,14 +243,18 @@ impl VaultFixture {
             vault_authority_pda,
             custody_ata,
         );
-        send_ok(
-            &mut svm,
-            &[ix],
-            &[&payer, &pause_authority],
-            &payer,
-        );
+        send_ok(&mut svm, &[ix], &[&payer, &pause_authority], &payer);
 
-        Self { svm, pid, payer, _pause_authority: pause_authority, mint_pk, vault_state_pda, vault_authority_pda, custody_ata }
+        Self {
+            svm,
+            pid,
+            payer,
+            _pause_authority: pause_authority,
+            mint_pk,
+            vault_state_pda,
+            vault_authority_pda,
+            custody_ata,
+        }
     }
 }
 
@@ -268,7 +276,10 @@ fn test_deposit_first_deposit_one_to_one() {
 
     // Inject a funded user token account
     f.svm
-        .set_account(user_ata, make_token_account(&user_pk, &f.mint_pk, deposit_amount))
+        .set_account(
+            user_ata,
+            make_token_account(&user_pk, &f.mint_pk, deposit_amount),
+        )
         .unwrap();
 
     let (user_position_pda, _) = find_user_position(&f.vault_state_pda, &user_pk, &f.pid);
@@ -286,17 +297,29 @@ fn test_deposit_first_deposit_one_to_one() {
     send_ok(&mut f.svm, &[ix], &[&f.payer, &user], &f.payer);
 
     // Assert VaultState
-    let vs_acct = f.svm.get_account(&f.vault_state_pda).expect("vault_state not found");
+    let vs_acct = f
+        .svm
+        .get_account(&f.vault_state_pda)
+        .expect("vault_state not found");
     let vs = VaultState::try_deserialize(&mut vs_acct.data.as_slice()).expect("deser failed");
     assert_eq!(vs.total_assets, deposit_amount, "total_assets mismatch");
-    assert_eq!(vs.total_shares, deposit_amount, "total_shares mismatch (first deposit 1:1)");
+    assert_eq!(
+        vs.total_shares, deposit_amount,
+        "total_shares mismatch (first deposit 1:1)"
+    );
 
     // Assert UserPosition
-    let up_acct = f.svm.get_account(&user_position_pda).expect("user_position not found");
+    let up_acct = f
+        .svm
+        .get_account(&user_position_pda)
+        .expect("user_position not found");
     let up = UserPosition::try_deserialize(&mut up_acct.data.as_slice()).expect("deser failed");
     assert_eq!(to_pk(up.owner), user_pk, "owner mismatch");
     assert_eq!(to_pk(up.vault), f.vault_state_pda, "vault mismatch");
-    assert_eq!(up.shares, deposit_amount, "shares mismatch (first deposit 1:1)");
+    assert_eq!(
+        up.shares, deposit_amount,
+        "shares mismatch (first deposit 1:1)"
+    );
 }
 
 /// Second deposit: proportional share issuance.
@@ -317,31 +340,64 @@ fn test_deposit_second_deposit_proportional() {
     let user_a_ata = associated_token_address(&user_a_pk, &f.mint_pk);
     let user_b_ata = associated_token_address(&user_b_pk, &f.mint_pk);
 
-    f.svm.set_account(user_a_ata, make_token_account(&user_a_pk, &f.mint_pk, amount_a)).unwrap();
-    f.svm.set_account(user_b_ata, make_token_account(&user_b_pk, &f.mint_pk, amount_b)).unwrap();
+    f.svm
+        .set_account(
+            user_a_ata,
+            make_token_account(&user_a_pk, &f.mint_pk, amount_a),
+        )
+        .unwrap();
+    f.svm
+        .set_account(
+            user_b_ata,
+            make_token_account(&user_b_pk, &f.mint_pk, amount_b),
+        )
+        .unwrap();
 
     let (pos_a, _) = find_user_position(&f.vault_state_pda, &user_a_pk, &f.pid);
     let (pos_b, _) = find_user_position(&f.vault_state_pda, &user_b_pk, &f.pid);
 
     // First deposit by user_a
-    let ix_a = make_deposit_ix(user_a_pk, f.vault_state_pda, f.vault_authority_pda,
-        f.custody_ata, user_a_ata, pos_a, f.mint_pk, amount_a);
+    let ix_a = make_deposit_ix(
+        user_a_pk,
+        f.vault_state_pda,
+        f.vault_authority_pda,
+        f.custody_ata,
+        user_a_ata,
+        pos_a,
+        f.mint_pk,
+        amount_a,
+    );
     send_ok(&mut f.svm, &[ix_a], &[&f.payer, &user_a], &f.payer);
 
     // Second deposit by user_b — total_assets = 1_000_000, total_shares = 1_000_000
     // shares_out = floor(2_000_000 * 1_000_000 / 1_000_000) = 2_000_000
-    let ix_b = make_deposit_ix(user_b_pk, f.vault_state_pda, f.vault_authority_pda,
-        f.custody_ata, user_b_ata, pos_b, f.mint_pk, amount_b);
+    let ix_b = make_deposit_ix(
+        user_b_pk,
+        f.vault_state_pda,
+        f.vault_authority_pda,
+        f.custody_ata,
+        user_b_ata,
+        pos_b,
+        f.mint_pk,
+        amount_b,
+    );
     send_ok(&mut f.svm, &[ix_b], &[&f.payer, &user_b], &f.payer);
 
     let vs_acct = f.svm.get_account(&f.vault_state_pda).unwrap();
     let vs = VaultState::try_deserialize(&mut vs_acct.data.as_slice()).unwrap();
     assert_eq!(vs.total_assets, amount_a + amount_b, "total_assets");
-    assert_eq!(vs.total_shares, amount_a + amount_b, "total_shares (same price per share)");
+    assert_eq!(
+        vs.total_shares,
+        amount_a + amount_b,
+        "total_shares (same price per share)"
+    );
 
     let up_acct = f.svm.get_account(&pos_b).unwrap();
     let up = UserPosition::try_deserialize(&mut up_acct.data.as_slice()).unwrap();
-    assert_eq!(up.shares, amount_b, "user_b shares should equal amount_b at 1:1 price");
+    assert_eq!(
+        up.shares, amount_b,
+        "user_b shares should equal amount_b at 1:1 price"
+    );
 }
 
 /// Deposit of zero must fail.
@@ -354,17 +410,33 @@ fn test_deposit_zero_amount_fails() {
     f.svm.airdrop(&user.pubkey(), 10_000_000_000).unwrap();
 
     let user_ata = associated_token_address(&user_pk, &f.mint_pk);
-    f.svm.set_account(user_ata, make_token_account(&user_pk, &f.mint_pk, 1_000_000)).unwrap();
+    f.svm
+        .set_account(
+            user_ata,
+            make_token_account(&user_pk, &f.mint_pk, 1_000_000),
+        )
+        .unwrap();
 
     let (pos, _) = find_user_position(&f.vault_state_pda, &user_pk, &f.pid);
 
-    let ix = make_deposit_ix(user_pk, f.vault_state_pda, f.vault_authority_pda,
-        f.custody_ata, user_ata, pos, f.mint_pk, 0);
+    let ix = make_deposit_ix(
+        user_pk,
+        f.vault_state_pda,
+        f.vault_authority_pda,
+        f.custody_ata,
+        user_ata,
+        pos,
+        f.mint_pk,
+        0,
+    );
 
     let blockhash = f.svm.latest_blockhash();
     let msg = Message::new_with_blockhash(&[ix], Some(&user.pubkey()), &blockhash);
     let tx = VersionedTransaction::try_new(VersionedMessage::Legacy(msg), &[&user]).unwrap();
-    assert!(f.svm.send_transaction(tx).is_err(), "zero deposit must fail");
+    assert!(
+        f.svm.send_transaction(tx).is_err(),
+        "zero deposit must fail"
+    );
 }
 
 /// Deposit into a paused vault must fail.
@@ -384,17 +456,33 @@ fn test_deposit_paused_vault_fails() {
     f.svm.airdrop(&user.pubkey(), 10_000_000_000).unwrap();
 
     let user_ata = associated_token_address(&user_pk, &f.mint_pk);
-    f.svm.set_account(user_ata, make_token_account(&user_pk, &f.mint_pk, 1_000_000)).unwrap();
+    f.svm
+        .set_account(
+            user_ata,
+            make_token_account(&user_pk, &f.mint_pk, 1_000_000),
+        )
+        .unwrap();
 
     let (pos, _) = find_user_position(&f.vault_state_pda, &user_pk, &f.pid);
 
-    let ix = make_deposit_ix(user_pk, f.vault_state_pda, f.vault_authority_pda,
-        f.custody_ata, user_ata, pos, f.mint_pk, 500_000);
+    let ix = make_deposit_ix(
+        user_pk,
+        f.vault_state_pda,
+        f.vault_authority_pda,
+        f.custody_ata,
+        user_ata,
+        pos,
+        f.mint_pk,
+        500_000,
+    );
 
     let blockhash = f.svm.latest_blockhash();
     let msg = Message::new_with_blockhash(&[ix], Some(&user.pubkey()), &blockhash);
     let tx = VersionedTransaction::try_new(VersionedMessage::Legacy(msg), &[&user]).unwrap();
-    assert!(f.svm.send_transaction(tx).is_err(), "deposit into paused vault must fail");
+    assert!(
+        f.svm.send_transaction(tx).is_err(),
+        "deposit into paused vault must fail"
+    );
 }
 
 /// Wrong mint token account must be rejected.
@@ -409,22 +497,40 @@ fn test_deposit_wrong_mint_fails() {
     let other_mint_kp = Keypair::new();
     let other_mint_pk = keypair_pubkey(&other_mint_kp);
     let other_mint_authority = Keypair::new();
-    f.svm.set_account(
-        other_mint_pk,
-        make_mint_account(&keypair_pubkey(&other_mint_authority), 6),
-    ).unwrap();
+    f.svm
+        .set_account(
+            other_mint_pk,
+            make_mint_account(&keypair_pubkey(&other_mint_authority), 6),
+        )
+        .unwrap();
 
     // User token account for the OTHER mint
     let wrong_user_ata = associated_token_address(&user_pk, &other_mint_pk);
-    f.svm.set_account(wrong_user_ata, make_token_account(&user_pk, &other_mint_pk, 1_000_000)).unwrap();
+    f.svm
+        .set_account(
+            wrong_user_ata,
+            make_token_account(&user_pk, &other_mint_pk, 1_000_000),
+        )
+        .unwrap();
 
     let (pos, _) = find_user_position(&f.vault_state_pda, &user_pk, &f.pid);
 
-    let ix = make_deposit_ix(user_pk, f.vault_state_pda, f.vault_authority_pda,
-        f.custody_ata, wrong_user_ata, pos, f.mint_pk, 500_000);
+    let ix = make_deposit_ix(
+        user_pk,
+        f.vault_state_pda,
+        f.vault_authority_pda,
+        f.custody_ata,
+        wrong_user_ata,
+        pos,
+        f.mint_pk,
+        500_000,
+    );
 
     let blockhash = f.svm.latest_blockhash();
     let msg = Message::new_with_blockhash(&[ix], Some(&user.pubkey()), &blockhash);
     let tx = VersionedTransaction::try_new(VersionedMessage::Legacy(msg), &[&user]).unwrap();
-    assert!(f.svm.send_transaction(tx).is_err(), "wrong-mint token account must be rejected");
+    assert!(
+        f.svm.send_transaction(tx).is_err(),
+        "wrong-mint token account must be rejected"
+    );
 }

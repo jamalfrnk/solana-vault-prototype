@@ -662,4 +662,26 @@ you only find when you run against a real cluster."
 
 ---
 
+## Milestone 11 — CI/CD Pipeline
+
+**What I built:**
+
+
+**What problem it solves:**
+
+
+**What command or concept I learned:**
+
+
+**What confused me:**
+
+
+**How I verified it:**
+
+
+**How I would explain it in an interview:**
+
+
+---
+
 *Updated after each milestone merge. Fill in immediately — specific beats vague.*

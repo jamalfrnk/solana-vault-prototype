@@ -22,7 +22,10 @@ echo "=== Installing avm (Anchor Version Manager) ==="
 if command -v avm &>/dev/null; then
   echo "  avm already installed, skipping."
 else
-  cargo install --git https://github.com/coral-xyz/anchor avm --locked --force
+  # Pinned to the v${ANCHOR_VERSION} tag, not the default branch: an unpinned
+  # `--git` install floats to whatever is on `main`, which later required a
+  # newer rustc than this project's pinned toolchain and broke fresh installs.
+  cargo install --git https://github.com/coral-xyz/anchor --tag "v${ANCHOR_VERSION}" avm --locked --force
 fi
 
 echo "=== Installing Anchor CLI ${ANCHOR_VERSION} via avm ==="

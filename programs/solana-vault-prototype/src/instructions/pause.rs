@@ -1,10 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{
-    constants::VAULT_SEED,
-    error::VaultError,
-    state::VaultState,
-};
+use crate::{constants::VAULT_SEED, error::VaultError, state::VaultState};
 
 #[derive(Accounts)]
 pub struct Pause<'info> {

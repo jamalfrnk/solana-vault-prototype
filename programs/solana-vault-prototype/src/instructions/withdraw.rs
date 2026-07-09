@@ -58,7 +58,10 @@ pub fn handler(ctx: Context<Withdraw>, shares_in: u64) -> Result<()> {
     require!(shares_in > 0, VaultError::ZeroAmount);
 
     let vs = &ctx.accounts.vault_state;
-    require!(shares_in <= ctx.accounts.user_position.shares, VaultError::InsufficientShares);
+    require!(
+        shares_in <= ctx.accounts.user_position.shares,
+        VaultError::InsufficientShares
+    );
 
     // Asset redemption: floor(shares_in * total_assets / total_shares)
     let assets_out: u64 = {
@@ -96,11 +99,20 @@ pub fn handler(ctx: Context<Withdraw>, shares_in: u64) -> Result<()> {
 
     // Update vault accounting.
     let vs = &mut ctx.accounts.vault_state;
-    vs.total_assets = vs.total_assets.checked_sub(assets_out).ok_or(VaultError::ZeroDenominator)?;
-    vs.total_shares = vs.total_shares.checked_sub(shares_in).ok_or(VaultError::ZeroDenominator)?;
+    vs.total_assets = vs
+        .total_assets
+        .checked_sub(assets_out)
+        .ok_or(VaultError::ZeroDenominator)?;
+    vs.total_shares = vs
+        .total_shares
+        .checked_sub(shares_in)
+        .ok_or(VaultError::ZeroDenominator)?;
 
     // Update user position.
-    ctx.accounts.user_position.shares = ctx.accounts.user_position.shares
+    ctx.accounts.user_position.shares = ctx
+        .accounts
+        .user_position
+        .shares
         .checked_sub(shares_in)
         .ok_or(VaultError::InsufficientShares)?;
 

@@ -50,7 +50,13 @@ fn make_mint_account(mint_authority: &Pubkey, decimals: u8) -> Account {
     data[4..36].copy_from_slice(mint_authority.as_ref());
     data[44] = decimals;
     data[45] = 1;
-    Account { lamports: 1_461_600, data, owner: spl_token_id(), executable: false, rent_epoch: u64::MAX }
+    Account {
+        lamports: 1_461_600,
+        data,
+        owner: spl_token_id(),
+        executable: false,
+        rent_epoch: u64::MAX,
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -71,7 +77,8 @@ fn associated_token_address(owner: &Pubkey, mint: &Pubkey) -> Pubkey {
     Pubkey::find_program_address(
         &[owner.as_ref(), token_prog.as_ref(), mint.as_ref()],
         &ata_prog,
-    ).0
+    )
+    .0
 }
 
 // ---------------------------------------------------------------------------
@@ -83,7 +90,8 @@ fn build_svm() -> LiteSVM {
     svm.add_program(
         program_id(),
         include_bytes!("../../../target/deploy/solana_vault_prototype.so"),
-    ).unwrap();
+    )
+    .unwrap();
     svm
 }
 
@@ -96,18 +104,28 @@ fn send_ok(svm: &mut LiteSVM, ixs: &[Instruction], signers: &[&Keypair], payer: 
 }
 
 fn make_initialize_ix(
-    payer: Pubkey, pause_authority: Pubkey, mint: Pubkey,
-    vault_state: Pubkey, vault_authority: Pubkey, custody: Pubkey,
+    payer: Pubkey,
+    pause_authority: Pubkey,
+    mint: Pubkey,
+    vault_state: Pubkey,
+    vault_authority: Pubkey,
+    custody: Pubkey,
 ) -> Instruction {
     Instruction::new_with_bytes(
         program_id(),
         &solana_vault_prototype::instruction::Initialize {}.data(),
         solana_vault_prototype::accounts::Initialize {
-            payer, pause_authority, mint, vault_state, vault_authority, custody,
+            payer,
+            pause_authority,
+            mint,
+            vault_state,
+            vault_authority,
+            custody,
             token_program: spl_token_id(),
             associated_token_program: ata_program_id(),
             system_program: system_program_id(),
-        }.to_account_metas(None),
+        }
+        .to_account_metas(None),
     )
 }
 
@@ -115,8 +133,11 @@ fn make_pause_ix(pause_authority: Pubkey, vault_state: Pubkey) -> Instruction {
     Instruction::new_with_bytes(
         program_id(),
         &solana_vault_prototype::instruction::Pause {}.data(),
-        solana_vault_prototype::accounts::Pause { pause_authority, vault_state }
-            .to_account_metas(None),
+        solana_vault_prototype::accounts::Pause {
+            pause_authority,
+            vault_state,
+        }
+        .to_account_metas(None),
     )
 }
 
@@ -124,8 +145,11 @@ fn make_unpause_ix(pause_authority: Pubkey, vault_state: Pubkey) -> Instruction 
     Instruction::new_with_bytes(
         program_id(),
         &solana_vault_prototype::instruction::Unpause {}.data(),
-        solana_vault_prototype::accounts::Unpause { pause_authority, vault_state }
-            .to_account_metas(None),
+        solana_vault_prototype::accounts::Unpause {
+            pause_authority,
+            vault_state,
+        }
+        .to_account_metas(None),
     )
 }
 
@@ -152,19 +176,32 @@ impl VaultFixture {
 
         let mut svm = build_svm();
         svm.airdrop(&payer.pubkey(), 10_000_000_000).unwrap();
-        svm.set_account(mint_pk, make_mint_account(&keypair_pubkey(&mint_authority), 6)).unwrap();
+        svm.set_account(
+            mint_pk,
+            make_mint_account(&keypair_pubkey(&mint_authority), 6),
+        )
+        .unwrap();
 
         let (vault_state_pda, _) = find_vault_state(&mint_pk, &pid);
         let (vault_authority_pda, _) = find_vault_authority(&vault_state_pda, &pid);
         let custody_ata = associated_token_address(&vault_authority_pda, &mint_pk);
 
         let ix = make_initialize_ix(
-            keypair_pubkey(&payer), keypair_pubkey(&pause_authority), mint_pk,
-            vault_state_pda, vault_authority_pda, custody_ata,
+            keypair_pubkey(&payer),
+            keypair_pubkey(&pause_authority),
+            mint_pk,
+            vault_state_pda,
+            vault_authority_pda,
+            custody_ata,
         );
         send_ok(&mut svm, &[ix], &[&payer, &pause_authority], &payer);
 
-        Self { svm, payer, pause_authority, vault_state_pda }
+        Self {
+            svm,
+            payer,
+            pause_authority,
+            vault_state_pda,
+        }
     }
 }
 
@@ -197,10 +234,20 @@ fn test_unpause_clears_is_paused() {
     let pa_pk = keypair_pubkey(&f.pause_authority);
 
     // Pause first
-    send_ok(&mut f.svm, &[make_pause_ix(pa_pk, f.vault_state_pda)], &[&f.payer, &f.pause_authority], &f.payer);
+    send_ok(
+        &mut f.svm,
+        &[make_pause_ix(pa_pk, f.vault_state_pda)],
+        &[&f.payer, &f.pause_authority],
+        &f.payer,
+    );
 
     // Then unpause
-    send_ok(&mut f.svm, &[make_unpause_ix(pa_pk, f.vault_state_pda)], &[&f.payer, &f.pause_authority], &f.payer);
+    send_ok(
+        &mut f.svm,
+        &[make_unpause_ix(pa_pk, f.vault_state_pda)],
+        &[&f.payer, &f.pause_authority],
+        &f.payer,
+    );
 
     let acct = f.svm.get_account(&f.vault_state_pda).unwrap();
     let vs = VaultState::try_deserialize(&mut acct.data.as_slice()).unwrap();
@@ -213,10 +260,20 @@ fn test_pause_idempotent() {
     let mut f = VaultFixture::new();
     let pa_pk = keypair_pubkey(&f.pause_authority);
 
-    send_ok(&mut f.svm, &[make_pause_ix(pa_pk, f.vault_state_pda)], &[&f.payer, &f.pause_authority], &f.payer);
+    send_ok(
+        &mut f.svm,
+        &[make_pause_ix(pa_pk, f.vault_state_pda)],
+        &[&f.payer, &f.pause_authority],
+        &f.payer,
+    );
     // Expire the blockhash so the second identical transaction is not rejected as AlreadyProcessed.
     f.svm.expire_blockhash();
-    send_ok(&mut f.svm, &[make_pause_ix(pa_pk, f.vault_state_pda)], &[&f.payer, &f.pause_authority], &f.payer);
+    send_ok(
+        &mut f.svm,
+        &[make_pause_ix(pa_pk, f.vault_state_pda)],
+        &[&f.payer, &f.pause_authority],
+        &f.payer,
+    );
 
     let acct = f.svm.get_account(&f.vault_state_pda).unwrap();
     let vs = VaultState::try_deserialize(&mut acct.data.as_slice()).unwrap();
@@ -235,7 +292,10 @@ fn test_pause_wrong_authority_fails() {
     let blockhash = f.svm.latest_blockhash();
     let msg = Message::new_with_blockhash(&[ix], Some(&impostor_pk), &blockhash);
     let tx = VersionedTransaction::try_new(VersionedMessage::Legacy(msg), &[&impostor]).unwrap();
-    assert!(f.svm.send_transaction(tx).is_err(), "wrong authority must be rejected");
+    assert!(
+        f.svm.send_transaction(tx).is_err(),
+        "wrong authority must be rejected"
+    );
 }
 
 /// Wrong authority for unpause must fail.
@@ -244,7 +304,12 @@ fn test_unpause_wrong_authority_fails() {
     let mut f = VaultFixture::new();
     let pa_pk = keypair_pubkey(&f.pause_authority);
     // Pause legitimately first
-    send_ok(&mut f.svm, &[make_pause_ix(pa_pk, f.vault_state_pda)], &[&f.payer, &f.pause_authority], &f.payer);
+    send_ok(
+        &mut f.svm,
+        &[make_pause_ix(pa_pk, f.vault_state_pda)],
+        &[&f.payer, &f.pause_authority],
+        &f.payer,
+    );
 
     let impostor = Keypair::new();
     let impostor_pk = keypair_pubkey(&impostor);
@@ -254,5 +319,8 @@ fn test_unpause_wrong_authority_fails() {
     let blockhash = f.svm.latest_blockhash();
     let msg = Message::new_with_blockhash(&[ix], Some(&impostor_pk), &blockhash);
     let tx = VersionedTransaction::try_new(VersionedMessage::Legacy(msg), &[&impostor]).unwrap();
-    assert!(f.svm.send_transaction(tx).is_err(), "wrong authority must be rejected for unpause");
+    assert!(
+        f.svm.send_transaction(tx).is_err(),
+        "wrong authority must be rejected for unpause"
+    );
 }
