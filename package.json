@@ -4,7 +4,11 @@
     "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
     "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check",
     "test:sdk": "ts-mocha -p tsconfig.json 'sdk/tests/**/*.test.ts'",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "app:dev": "npm --prefix app run dev",
+    "app:build": "npm --prefix app run build",
+    "app:test": "npm --prefix app run test",
+    "app:typecheck": "npm --prefix app run typecheck"
   },
   "dependencies": {
     "@anchor-lang/core": "^1.0.2",
