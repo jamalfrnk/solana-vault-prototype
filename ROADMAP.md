@@ -18,7 +18,7 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 | 8 | Security / adversarial test expansion | `[x]` complete |
 | 9 | Documentation and interview walkthrough | `[x]` complete |
 | 10 | Optional devnet demonstration | `[x]` complete |
-| 11 | CI/CD pipeline | `[~]` in progress |
+| 11 | CI/CD pipeline | `[x]` complete |
 
 ## Milestone 0 — Repository bootstrap (complete)
 
@@ -127,16 +127,41 @@ pause:       https://explorer.solana.com/tx/4xhKJaXL87A3HQBfm1w7UgyHzog9z8KZiHPY
 cargo test   →  29/29 pass (no regressions)
 ```
 
-## Milestone 11 — CI/CD Pipeline (in progress)
+## Milestone 11 — CI/CD Pipeline (complete)
 
 `.github/workflows/ci.yml` added on `feature/ci-pipeline`. Two jobs on `push`/`pull_request`
-to `main`: `build-and-test` (`cargo fmt --check`, `cargo clippy -D warnings`,
-`cargo build-sbf`, `cargo test`, `git diff --check`) and `audit` (`cargo audit`, separate
-job so a dependency advisory doesn't mask a code/test regression). Mirrors the exact
-pre-PR checklist already documented in `RUNBOOK.md` section 9, plus clippy and cargo-audit
-as new gates. Toolchain install reuses `.devcontainer/post-create.sh` directly (single
-source of truth for pinned Agave v3.1.10 / Anchor 1.0.2 versions) rather than duplicating
-install steps. No vault program logic touched.
+to `main`: `build-and-test` (`cargo fmt --check`, `cargo build-sbf`, `cargo clippy -D warnings`,
+`cargo test`, `git diff --check`) and `audit` (`cargo audit`, separate job so a dependency
+advisory doesn't mask a code/test regression). Mirrors the exact pre-PR checklist already
+documented in `RUNBOOK.md` section 9, plus clippy and cargo-audit as new gates. Toolchain
+install reuses `.devcontainer/post-create.sh` directly (single source of truth for pinned
+Agave v3.1.10 / Anchor 1.0.2 versions) rather than duplicating install steps. No vault
+program logic touched — `deposit.rs`/`pause.rs`/`withdraw.rs` diffs are `cargo fmt` output
+only (verified token-for-token against pre-fmt source).
+
+First CI run surfaced four real, pre-existing issues, each fixed with the smallest
+corrective change:
+- `post-create.sh`'s `avm` install had no git tag/rev pin, floating to Anchor's `main`
+  branch HEAD — which had since bumped a transitive dep requiring rustc >= 1.91, breaking
+  against this project's pinned 1.89.0. Pinned to the `v1.0.2` tag instead of floating
+  the toolchain to `stable` (reconciled with a concurrent fix pushed from Codespaces).
+- Existing code had never been gated by `cargo fmt --check`; applied `cargo fmt --all`
+  (obtained via a temporary scratch CI workflow — no local Rust toolchain available on
+  this machine — then verified purely line-wrapping, no logic changes).
+- Anchor 1.0.2's `#[program]` macro itself trips `clippy::diverging_sub_expression`
+  (verified upstream: otter-sec/anchor#4389, fixed by #4403 for the unreleased v1.1.0).
+  Crate-level `#![allow(...)]` in `lib.rs` (item-level allow above `#[program]` had no
+  effect — the macro doesn't forward it).
+- `cargo clippy --all-targets` compiles test targets, which need
+  `target/deploy/solana_vault_prototype.so` via `include_bytes!`; reordered `cargo build-sbf`
+  before `cargo clippy` in the workflow.
+- Five test helper functions (`make_deposit_ix`/`make_withdraw_ix` across three test files)
+  exceed clippy's default 7-arg threshold (8 args: one per account). Scoped
+  `#[allow(clippy::too_many_arguments)]` per function — test-only code mirroring each
+  instruction's `Accounts` struct field-for-field.
+
+Observed (2026-07-09): `build-and-test` — fmt/build-sbf/clippy/test/whitespace all green,
+29/29 tests pass. `audit` — green. Merged via PR #14.
 
 ## Notes
 
