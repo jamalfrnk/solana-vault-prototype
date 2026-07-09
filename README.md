@@ -2,16 +2,19 @@
 
 ## Status
 
-**Milestone 12 complete — production hardening pass applied; all instructions verified
-on Solana devnet (M10).**
+**Milestone 13 complete — TypeScript SDK package added; production hardening pass and
+all instructions verified on Solana devnet (M10).**
 
-All 12 milestones merged. The vault is fully implemented, tested, hardened, and
+All 13 milestones merged. The vault is fully implemented, tested, hardened, and
 demonstrated on-chain: `initialize`, `deposit`, `withdraw`, `pause`, and `unpause`
 confirmed on Solana devnet (2026-06-26). M11 added a CI pipeline (fmt, build, clippy,
 test, audit) gating every PR. M12 closed four MVP-accepted risks (custody ATA
 pre-creation DoS, unchecked mint freeze authority, `vault_authority` confused-deputy
-exposure, hand-calculated account size) and added instruction events. 41/41 Rust tests
-pass. Architecture is ACCEPTED. Interview walkthrough at `docs/INTERVIEW_WALKTHROUGH.md`.
+exposure, hand-calculated account size) and added instruction events. M13 added a
+TypeScript SDK (`sdk/`) — PDA derivation, instruction builders, account decoders, and
+Anchor error parsing, all IDL-free and locally testable (48 tests). 41/41 Rust tests and
+48/48 SDK tests pass. Architecture is ACCEPTED. Interview walkthrough at
+`docs/INTERVIEW_WALKTHROUGH.md`.
 
 This is an interview-grade educational prototype. It is **not** audited, **not**
 production-safe, **not** mainnet-ready, and **not** formally verified. This hardening
@@ -140,6 +143,40 @@ anchor deploy --provider.cluster devnet
 npx ts-node scripts/devnet_demo.ts
 ```
 
+## SDK (M13)
+
+`sdk/` is a TypeScript client for the vault — PDA derivation, instruction builders,
+account decoders, and Anchor error parsing. Unlike `scripts/devnet_demo.ts`, it has
+**no runtime dependency on `target/idl/*.json`**: every Anchor discriminator (the 8-byte
+prefix Anchor uses to tag instructions and accounts) is computed directly via
+`sha256("global:<name>")`/`sha256("account:<Name>")`, matching Anchor's own codegen,
+rather than read from a generated IDL file. That's a deliberate choice, not just a
+convenience — it makes the SDK fully testable without the Anchor CLI, and it's arguably
+a cleaner dependency story for downstream consumers who don't want an IDL at runtime
+either.
+
+```bash
+corepack yarn install     # or: yarn install, if you have yarn on PATH already
+corepack yarn test:sdk    # 48 tests, offline, no RPC, no compiled program
+corepack yarn typecheck
+```
+
+```ts
+import { VaultClient } from "./sdk/src";
+
+const client = new VaultClient(connection, mintPublicKey);
+const ix = client.buildDepositIx(userPublicKey, 1_000_000n);
+const state = await client.fetchVaultState();
+```
+
+`scripts/sdk_devnet_smoke.ts` exercises the SDK against a real deployed vault
+(initialize → deposit → withdraw → pause) as a full end-to-end proof, mirroring
+`devnet_demo.ts`'s flow but built entirely on `sdk/` instead of an IDL-loaded Anchor
+`Program`. **It has not been run** — this development machine has no funded devnet
+keypair — so its correctness rests on the 48 offline unit tests plus manual review, not
+an observed run. Treat it the same way `devnet_demo.ts`'s own prerequisites are treated:
+run it yourself with a funded `~/.config/solana/id.json` before trusting it live.
+
 ## Development workflow
 
 - One milestone and one feature branch at a time; no feature work on `main`.
@@ -157,7 +194,7 @@ PROJECT_CONTEXT.md          Goals, scope, anti-goals, success criteria
 ARCHITECTURE.md             Vault architecture (ACCEPTED)
 SECURITY_CHECKLIST.md       Security checklist (all items checked)
 TEST_PLAN.md                Test matrix (41 tests, all passing)
-ROADMAP.md                  Milestone order and status (all 12 complete)
+ROADMAP.md                  Milestone order and status (all 13 complete)
 LEARNING_LOG.md             Per-milestone reflection and interview prep notes
 RUNBOOK.md                  Operational runbook for build, test, and deploy
 rust-toolchain.toml         Pinned Rust toolchain (1.89.0)
@@ -171,7 +208,7 @@ tsconfig.json               TypeScript configuration
 .github/
   pull_request_template.md
   workflows/
-    ci.yml                  CI: fmt, build-sbf, clippy, test, audit (M11)
+    ci.yml                  CI: fmt, build-sbf, clippy, test, audit, sdk-test (M11/M13)
 docs/
   INTERVIEW_WALKTHROUGH.md  Guided tour of the vault for technical interviews (M9)
   decisions/                Architecture Decision Records
@@ -199,8 +236,20 @@ programs/
       test_pause.rs         LiteSVM integration tests — pause (5 tests)
       test_adversarial.rs   LiteSVM adversarial tests (12 tests)
       test_events.rs        LiteSVM event emission tests (5 tests)
+sdk/
+  src/
+    constants.ts            Program ID, token program IDs, PDA seed bytes (M13)
+    discriminator.ts        Anchor instruction/account discriminators, no IDL needed (M13)
+    pdas.ts                 PDA + ATA derivation (M13)
+    instructions.ts         Instruction builders for all 5 program instructions (M13)
+    accounts.ts              VaultState/UserPosition decoders + fetch helpers (M13)
+    errors.ts                 Anchor error parsing, wraps @anchor-lang/core (M13)
+    client.ts                  VaultClient convenience wrapper (M13)
+    index.ts                    Barrel export (M13)
+  tests/                       48 offline unit tests — no IDL, no live cluster (M13)
 scripts/
   devnet_demo.ts            M10 devnet demonstration script
+  sdk_devnet_smoke.ts       M13 SDK devnet smoke script (not yet executed — see SDK section below)
 prompts/                    Milestone and operating prompts (00–11)
 .gitignore
 ```
@@ -231,9 +280,9 @@ A devcontainer is configured. To start a reproducible environment:
 
 ## Testing strategy
 
-> See `TEST_PLAN.md`. All 41 tests pass.
+> See `TEST_PLAN.md`. All 41 Rust tests and 48 SDK tests pass.
 
-Tests run entirely via LiteSVM (in-process SVM, no network required):
+Program tests run entirely via LiteSVM (in-process SVM, no network required):
 
 ```
 cargo test
@@ -243,6 +292,13 @@ Coverage: unit (arithmetic), integration (all 5 instructions), happy-path, negat
 account-substitution, arithmetic-boundary, adversarial (12 targeted attack scenarios
 including confused-deputy, frozen mints, and donation/dust accounting), and event
 emission.
+
+SDK tests (`sdk/tests/`) run independently via Node/mocha, no Rust/Solana/Anchor
+toolchain and no live cluster required:
+
+```
+corepack yarn test:sdk
+```
 
 ## Roadmap
 
@@ -263,6 +319,7 @@ See `ROADMAP.md`. All milestones complete.
 | 10 — Devnet demonstration | complete |
 | 11 — CI/CD pipeline | complete |
 | 12 — Production hardening pass | complete |
+| 13 — SDK package | complete |
 
 ## Interview walkthrough
 
