@@ -2,15 +2,21 @@
 
 ## Status
 
-**Milestone 10 complete — all instructions verified on Solana devnet.**
+**Milestone 12 complete — production hardening pass applied; all instructions verified
+on Solana devnet (M10).**
 
-All 10 milestones merged. The vault is fully implemented, tested, and demonstrated
-on-chain: `initialize`, `deposit`, `withdraw`, `pause`, and `unpause` confirmed on
-Solana devnet (2026-06-26). 29/29 Rust tests pass. Architecture is ACCEPTED.
-Interview walkthrough at `docs/INTERVIEW_WALKTHROUGH.md`.
+All 12 milestones merged. The vault is fully implemented, tested, hardened, and
+demonstrated on-chain: `initialize`, `deposit`, `withdraw`, `pause`, and `unpause`
+confirmed on Solana devnet (2026-06-26). M11 added a CI pipeline (fmt, build, clippy,
+test, audit) gating every PR. M12 closed four MVP-accepted risks (custody ATA
+pre-creation DoS, unchecked mint freeze authority, `vault_authority` confused-deputy
+exposure, hand-calculated account size) and added instruction events. 41/41 Rust tests
+pass. Architecture is ACCEPTED. Interview walkthrough at `docs/INTERVIEW_WALKTHROUGH.md`.
 
 This is an interview-grade educational prototype. It is **not** audited, **not**
-production-safe, **not** mainnet-ready, and **not** formally verified.
+production-safe, **not** mainnet-ready, and **not** formally verified. This hardening
+pass closes several specific, named gaps (see `SECURITY_CHECKLIST.md`) but does not
+constitute an audit.
 
 ## Mission
 
@@ -124,6 +130,8 @@ running 29 tests
 test result: ok. 29 passed; 0 failed; 0 ignored
 ```
 
+(29/29 at the time of the M10 devnet run; M12 added 12 more, see below.)
+
 To run the demo yourself (requires a funded devnet keypair at `~/.config/solana/id.json`):
 
 ```bash
@@ -148,8 +156,8 @@ CLAUDE.md                   Operating rules for Claude Code
 PROJECT_CONTEXT.md          Goals, scope, anti-goals, success criteria
 ARCHITECTURE.md             Vault architecture (ACCEPTED)
 SECURITY_CHECKLIST.md       Security checklist (all items checked)
-TEST_PLAN.md                Test matrix (29 tests, all passing)
-ROADMAP.md                  Milestone order and status (all 10 complete)
+TEST_PLAN.md                Test matrix (41 tests, all passing)
+ROADMAP.md                  Milestone order and status (all 12 complete)
 LEARNING_LOG.md             Per-milestone reflection and interview prep notes
 RUNBOOK.md                  Operational runbook for build, test, and deploy
 rust-toolchain.toml         Pinned Rust toolchain (1.89.0)
@@ -162,6 +170,8 @@ tsconfig.json               TypeScript configuration
   post-create.sh            Idempotent install script (Agave CLI, avm, Anchor CLI)
 .github/
   pull_request_template.md
+  workflows/
+    ci.yml                  CI: fmt, build-sbf, clippy, test, audit (M11)
 docs/
   INTERVIEW_WALKTHROUGH.md  Guided tour of the vault for technical interviews (M9)
   decisions/                Architecture Decision Records
@@ -174,19 +184,21 @@ programs/
     src/
       lib.rs                Program entry point and declare_id!
       instructions/
-        initialize.rs       initialize instruction (M4)
-        deposit.rs          deposit instruction (M5)
-        withdraw.rs         withdraw instruction (M6)
-        pause.rs            pause/unpause instructions (M7)
+        initialize.rs       initialize instruction (M4, hardened M12)
+        deposit.rs          deposit instruction (M5, hardened M12)
+        withdraw.rs         withdraw instruction (M6, hardened M12)
+        pause.rs            pause/unpause instructions (M7, events M12)
       state.rs              VaultState + UserPosition account structs
       constants.rs          PDA seed constants
       error.rs              VaultError codes
+      events.rs             Instruction events (M12)
     tests/
-      test_initialize.rs    LiteSVM integration tests — initialize (3 tests)
+      test_initialize.rs    LiteSVM integration tests — initialize (6 tests)
       test_deposit.rs       LiteSVM integration tests — deposit (5 tests)
       test_withdraw.rs      LiteSVM integration tests — withdraw (7 tests)
       test_pause.rs         LiteSVM integration tests — pause (5 tests)
-      test_adversarial.rs   LiteSVM adversarial tests (8 tests)
+      test_adversarial.rs   LiteSVM adversarial tests (12 tests)
+      test_events.rs        LiteSVM event emission tests (5 tests)
 scripts/
   devnet_demo.ts            M10 devnet demonstration script
 prompts/                    Milestone and operating prompts (00–11)
@@ -219,7 +231,7 @@ A devcontainer is configured. To start a reproducible environment:
 
 ## Testing strategy
 
-> See `TEST_PLAN.md`. All 29 tests pass.
+> See `TEST_PLAN.md`. All 41 tests pass.
 
 Tests run entirely via LiteSVM (in-process SVM, no network required):
 
@@ -228,7 +240,9 @@ cargo test
 ```
 
 Coverage: unit (arithmetic), integration (all 5 instructions), happy-path, negative,
-account-substitution, arithmetic-boundary, and adversarial (8 targeted attack scenarios).
+account-substitution, arithmetic-boundary, adversarial (12 targeted attack scenarios
+including confused-deputy, frozen mints, and donation/dust accounting), and event
+emission.
 
 ## Roadmap
 
@@ -247,6 +261,8 @@ See `ROADMAP.md`. All milestones complete.
 | 8 — Security / adversarial test expansion | complete |
 | 9 — Documentation and interview walkthrough | complete |
 | 10 — Devnet demonstration | complete |
+| 11 — CI/CD pipeline | complete |
+| 12 — Production hardening pass | complete |
 
 ## Interview walkthrough
 
