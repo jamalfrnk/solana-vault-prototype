@@ -460,10 +460,12 @@ fn test_initialize_rejects_foreign_owned_vault_authority() {
     let custody_ata = associated_token_address(&vault_authority_pda, &mint_pk);
 
     // Assign vault_authority's address to a foreign owner (any non-system program).
+    // Nonzero lamports: a zero-lamport account is treated as non-existent and
+    // its owner is not meaningfully checkable, which would make this a no-op.
     svm.set_account(
         vault_authority_pda,
         Account {
-            lamports: 0,
+            lamports: 1_000_000,
             data: vec![],
             owner: spl_token_id(),
             executable: false,

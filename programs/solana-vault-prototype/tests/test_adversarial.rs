@@ -1148,11 +1148,13 @@ fn test_deposit_rejects_foreign_owned_vault_authority() {
     let (pos, _) = find_user_position(&v.vault_state_pda, &user_pk, &v.pid);
 
     // Assign vault_authority's address to a foreign owner after init.
+    // Nonzero lamports: a zero-lamport account is treated as non-existent and
+    // its owner is not meaningfully checkable, which would make this a no-op.
     v.svm
         .set_account(
             v.vault_authority_pda,
             Account {
-                lamports: 0,
+                lamports: 1_000_000,
                 data: vec![],
                 owner: spl_token_id(),
                 executable: false,
