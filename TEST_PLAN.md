@@ -1,6 +1,6 @@
 # Test Plan
 
-**Status: M9 complete — 29 tests passing across M4–M8.**
+**Status: M12 complete — 41 tests passing across M4–M12.**
 
 ## Repository hygiene (complete)
 
@@ -14,7 +14,7 @@
 - [x] Program ID is correct.
       — `test_id` passes. (M2/M4 baseline)
 
-## Integration tests — initialize (3 tests)
+## Integration tests — initialize (6 tests)
 
 - [x] `initialize` creates the vault state PDA and custody account bound to one mint.
       — `test_vault_initialize_creates_correct_state`: verifies pause_authority, mint,
@@ -23,6 +23,12 @@
       — `test_vault_initialize_duplicate_fails`.
 - [x] Garbage accounts / payer == pause_authority rejected.
       — `test_initialize_rejects_bad_accounts`.
+- [x] A pre-created, empty custody ATA does not block initialization (M12).
+      — `test_initialize_succeeds_with_preexisting_empty_custody_ata`.
+- [x] A mint with an active freeze authority is rejected (M12).
+      — `test_initialize_rejects_mint_with_freeze_authority`.
+- [x] A foreign-owned `vault_authority` is rejected (M12).
+      — `test_initialize_rejects_foreign_owned_vault_authority`.
 
 ## Integration tests — deposit (5 tests)
 
@@ -67,7 +73,7 @@
 - [x] Wrong unpause authority rejected.
       — `test_unpause_wrong_authority_fails`.
 
-## Adversarial tests (8 tests)
+## Adversarial tests (12 tests)
 
 - [x] Deposit with missing user signature rejected.
       — `test_deposit_missing_user_signature`.
@@ -85,6 +91,34 @@
       — `test_deposit_large_amount_no_overflow`.
 - [x] Multi-user accounting cycle: two users deposit + withdraw, vault ends at zero.
       — `test_adversarial_repeated_deposits_withdrawals_consistent`.
+- [x] Pre-existing custody ATA with dust does not leak into accounting at init (M12).
+      — `test_initialize_succeeds_with_preexisting_dust_in_custody_ata`.
+- [x] Direct (non-CPI) SPL transfer donation into custody cannot inflate the
+      depositor's withdrawable amount (M12).
+      — `test_direct_donation_does_not_inflate_withdrawable_amount`.
+- [x] A donation between two deposits does not skew the second depositor's share
+      price (M12).
+      — `test_direct_donation_does_not_skew_second_depositor_share_price`.
+- [x] Foreign-owned `vault_authority` rejected on deposit, not just initialize (M12).
+      — `test_deposit_rejects_foreign_owned_vault_authority`.
+
+## Event emission tests (5 tests)
+
+- [x] `initialize` emits `VaultInitialized`.
+      — `test_initialize_emits_vault_initialized_log`.
+- [x] `deposit` emits `Deposited`.
+      — `test_deposit_emits_deposited_log`.
+- [x] `withdraw` emits `Withdrawn`.
+      — `test_withdraw_emits_withdrawn_log`.
+- [x] `pause` emits `Paused`.
+      — `test_pause_emits_paused_log`.
+- [x] `unpause` emits `Unpaused`.
+      — `test_unpause_emits_unpaused_log`.
+
+Each test asserts on transaction logs containing a `"Program data:"` line (what
+`emit!()`'s `sol_log_data` call surfaces as in litesvm), proving the event actually
+fired, without full Borsh-decode-and-field-assert complexity. Decoding and asserting on
+individual event fields is a possible follow-up, not required for M12.
 
 ## Anchor scaffold baseline (complete — M2)
 
@@ -135,6 +169,65 @@ cargo test       →  29 passed, 0 failed
   test test_deposit_large_amount_no_overflow ... ok
   test test_adversarial_repeated_deposits_withdrawals_consistent ... ok
 ```
+
+## M12 observed test results (2026-07-09)
+
+```
+cargo fmt --all -- --check  →  exit 0
+cargo build-sbf              →  exit 0
+cargo clippy -D warnings     →  exit 0
+cargo test                   →  41 passed, 0 failed
+git diff --check             →  exit 0
+cargo audit                  →  exit 0
+
+  test test_id ... ok
+  test test_initialize_rejects_bad_accounts ... ok
+  test test_initialize_succeeds_with_preexisting_empty_custody_ata ... ok
+  test test_initialize_rejects_mint_with_freeze_authority ... ok
+  test test_initialize_rejects_foreign_owned_vault_authority ... ok
+  test test_vault_initialize_creates_correct_state ... ok
+  test test_vault_initialize_duplicate_fails ... ok
+  test test_deposit_first_deposit_one_to_one ... ok
+  test test_deposit_second_deposit_proportional ... ok
+  test test_deposit_zero_amount_fails ... ok
+  test test_deposit_paused_vault_fails ... ok
+  test test_deposit_wrong_mint_fails ... ok
+  test test_withdraw_full_withdrawal ... ok
+  test test_withdraw_partial_withdrawal ... ok
+  test test_withdraw_principal_preserved ... ok
+  test test_withdraw_zero_shares_fails ... ok
+  test test_withdraw_excessive_shares_fails ... ok
+  test test_withdraw_wrong_user_fails ... ok
+  test test_withdraw_paused_vault_fails ... ok
+  test test_pause_sets_is_paused ... ok
+  test test_unpause_clears_is_paused ... ok
+  test test_pause_idempotent ... ok
+  test test_pause_wrong_authority_fails ... ok
+  test test_unpause_wrong_authority_fails ... ok
+  test test_deposit_missing_user_signature ... ok
+  test test_withdraw_missing_user_signature ... ok
+  test test_deposit_wrong_vault_state ... ok
+  test test_deposit_wrong_token_account_owner ... ok
+  test test_withdraw_cross_user_position_substitution ... ok
+  test test_deposit_wrong_token_program ... ok
+  test test_deposit_large_amount_no_overflow ... ok
+  test test_adversarial_repeated_deposits_withdrawals_consistent ... ok
+  test test_initialize_succeeds_with_preexisting_dust_in_custody_ata ... ok
+  test test_direct_donation_does_not_inflate_withdrawable_amount ... ok
+  test test_direct_donation_does_not_skew_second_depositor_share_price ... ok
+  test test_deposit_rejects_foreign_owned_vault_authority ... ok
+  test test_initialize_emits_vault_initialized_log ... ok
+  test test_deposit_emits_deposited_log ... ok
+  test test_withdraw_emits_withdrawn_log ... ok
+  test test_pause_emits_paused_log ... ok
+  test test_unpause_emits_unpaused_log ... ok
+```
+
+PR #16. First run caught one real test-design bug: the foreign-owned-`vault_authority`
+tests initially used `lamports: 0` accounts, which are treated as non-existent (owner
+not meaningfully checkable), silently defeating the test. Fixed by giving those accounts
+nonzero lamports so the owner constraint is genuinely exercised — see PR history for
+detail.
 
 ## Clean-environment tests (in progress)
 

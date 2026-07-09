@@ -19,6 +19,7 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 | 9 | Documentation and interview walkthrough | `[x]` complete |
 | 10 | Optional devnet demonstration | `[x]` complete |
 | 11 | CI/CD pipeline | `[x]` complete |
+| 12 | Production hardening pass | `[x]` complete |
 
 ## Milestone 0 — Repository bootstrap (complete)
 
@@ -162,6 +163,50 @@ corrective change:
 
 Observed (2026-07-09): `build-and-test` — fmt/build-sbf/clippy/test/whitespace all green,
 29/29 tests pass. `audit` — green. Merged via PR #14.
+
+## Milestone 12 — Production Hardening Pass (complete)
+
+Closed four risks documented in `SECURITY_CHECKLIST.md`'s "Known risks accepted for
+MVP" section, plus added instruction events, on `feature/production-hardening`:
+
+- **Custody ATA pre-creation DoS**: `initialize`'s `custody` account changed from `init`
+  to `init_if_needed`. An ATA's address is derived from (owner, mint), so a pre-created
+  account at that exact address cannot have a different owner/mint — this closes pure
+  griefing, not a substitution attack.
+- **Mint freeze authority**: `initialize` now rejects mints with an active freeze
+  authority by default (`VaultError::FreezeAuthorityPresent`).
+- **`vault_authority` confused-deputy hardening**: `owner = System::id()` constraint
+  added on `initialize`/`deposit`/`withdraw` (`VaultError::InvalidVaultAuthorityOwner`).
+- **Account size safety**: `VaultState`/`UserPosition` now derive `InitSpace` instead of
+  a hand-calculated `LEN` constant — a field added without updating space can no longer
+  silently under-allocate. Confirmed byte-identical to the prior `LEN` (105 + 8 = 113).
+- **Events**: `VaultInitialized`/`Deposited`/`Withdrawn`/`Paused`/`Unpaused`, emitted at
+  the end of each handler after state mutation. Informational only, not a security
+  boundary.
+- **Direct-transfer ("donation") accounting**: deliberately did **not** build a
+  `sync_assets` reconciliation instruction, diverging from an external
+  architecture-planning brief that recommended one. A new instruction reconciling
+  `total_assets` to custody's live balance is a new privileged surface with unresolved
+  access-control questions (who can call it, can it be timed to shift share price).
+  Instead, three adversarial tests prove a direct SPL transfer into custody can never let
+  a depositor be shorted or over-paid — donations are inert dust, `total_assets` stays
+  the sole accounting source of truth. Confirmed with the user before implementing.
+
+29 → 41 tests. No behavior change to any existing happy path (verified diffs to
+`deposit.rs`/`withdraw.rs`/`pause.rs` are additive: new constraints and `emit!()` calls
+only).
+
+First real CI run caught one test-design bug: `test_deposit_rejects_foreign_owned_vault_authority`
+failed because the deposit unexpectedly *succeeded* — the fake foreign-owned
+`vault_authority` account was set up with `lamports: 0`, and a zero-lamport account is
+treated as non-existent, so its `owner` field was never meaningfully checked. The
+sibling `test_initialize_rejects_foreign_owned_vault_authority` had the same bug but
+happened to still fail for an unrelated reason, masking it as a false-positive pass.
+Fixed by giving both fake accounts nonzero lamports so the owner constraint is genuinely
+exercised.
+
+Observed (2026-07-09): `build-and-test` — fmt/build-sbf/clippy/test/whitespace all green,
+41/41 tests pass (see `TEST_PLAN.md` for the full list). `audit` — green. PR #16.
 
 ## Notes
 

@@ -1,6 +1,6 @@
 # Security Checklist
 
-**Status: M9 complete — M4–M8 implemented and tested. Items checked only when built, tested, and reviewed.**
+**Status: M12 complete — M4–M12 implemented and tested. Items checked only when built, tested, and reviewed.**
 
 Checked items reflect only what is true today. Implementation items remain unchecked
 until the corresponding milestone is implemented and tested. This is an interview-grade
@@ -31,6 +31,11 @@ for production custody.
       — M4: All accounts use the tightest Anchor type available; `vault_authority` is
         `UncheckedAccount` because it carries no data — the PDA address itself is the
         only invariant, verified by seeds constraint.
+- [x] `vault_authority` is confirmed System-Program-owned before use (confused-deputy
+      hardening).
+      — M12: `owner = System::id() @ VaultError::InvalidVaultAuthorityOwner` on
+        `initialize`, `deposit`, and `withdraw`. `test_initialize_rejects_foreign_owned_vault_authority`,
+        `test_deposit_rejects_foreign_owned_vault_authority`.
 - [x] Executable/program accounts are constrained.
       — M5/M6: `token_program` constrained to `anchor_spl::token::ID` via Anchor's `Program<'info, Token>` type.
         `test_deposit_wrong_token_program_fails` verifies substitution is rejected.
@@ -50,6 +55,13 @@ for production custody.
         stored bumps equal the values returned by `find_program_address`.
 - [x] Custody authority is the intended PDA, not an arbitrary account.
       — M4: Anchor ATA constraint derives custody address from `vault_authority` and `mint`.
+- [x] A pre-created custody ATA cannot permanently block vault initialization.
+      — M12: `custody` changed from `init` to `init_if_needed`. `associated_token::mint`/
+        `associated_token::authority` constraints are enforced regardless of init mode —
+        an ATA's address is derived from (owner, mint), so a pre-created account at that
+        exact address cannot have a different owner or mint; this closes pure griefing,
+        not a substitution attack. `test_initialize_succeeds_with_preexisting_empty_custody_ata`,
+        `test_initialize_succeeds_with_preexisting_dust_in_custody_ata`.
 - [x] Substituting a wrong PDA fails.
       — M4: `test_initialize_rejects_bad_accounts` confirms garbage PDA inputs are rejected;
         `test_vault_initialize_duplicate_fails` confirms the PDA cannot be re-initialized.
@@ -58,6 +70,9 @@ for production custody.
 
 - [x] Vault state is bound to exactly one deposit mint.
       — M4: `vault_state.mint` is set once on initialize and is immutable (no setter instruction).
+- [x] Mints with a live freeze authority are rejected at initialize.
+      — M12: `constraint = mint.freeze_authority.is_none() @ VaultError::FreezeAuthorityPresent`.
+        `test_initialize_rejects_mint_with_freeze_authority`.
 - [x] Custody token account uses that mint.
       — M4: Anchor ATA constraint `associated_token::mint = mint` enforces this on init.
 - [x] User token accounts are validated for mint and authority.
@@ -121,9 +136,12 @@ for production custody.
 - [x] Serialization size is calculated correctly.
       — M4: `VaultState::LEN = 113` verified by code review (8 discriminator + 32 + 32 +
         1 + 1 + 8 + 8 + 1 + 22 = 113). Note: Rust in-memory `sizeof` is 120 due to
-        alignment padding; `LEN` is Borsh wire size. **Risk**: LEN is a hand constant with
-        no compile-time assertion; adding a field without updating LEN will cause silent
-        corruption at runtime. Tracked for resolution before production use.
+        alignment padding; `LEN` is Borsh wire size.
+      — M12: Hand-calculated `LEN` constants replaced with `#[derive(InitSpace)]` on
+        both `VaultState` and `UserPosition`; `space = 8 + T::INIT_SPACE` in the account
+        constraints. A field added without updating space can no longer silently
+        under-allocate — the size is compiler-derived, not hand-maintained. Confirmed
+        byte-identical to the prior hand `LEN` (105 + 8 = 113).
 - [x] Account reinitialization is prevented.
       — M4: Anchor `init` constraint on `vault_state` fails if the account already has
         lamports. `test_vault_initialize_duplicate_fails` verifies this. The custody ATA
@@ -133,30 +151,52 @@ for production custody.
 
 ## Known risks (accepted for MVP, track before production)
 
-- **Custody ATA pre-creation DoS**: The custody ATA address is deterministic and public.
-  Any party can pre-create it via `create_associated_token_account` before `initialize`.
-  Anchor's `init` constraint will then fail (`AccountAlreadyInitialized`), blocking
-  initialization of the vault for that mint permanently. Mitigation for production:
-  switch custody `init` to `init_if_needed` with post-init owner/mint validation.
-  Acceptable for M4 MVP because the vault is a controlled deployment.
+All four MVP-accepted risks below were resolved in M12 (production hardening pass):
+custody ATA pre-creation DoS, unchecked mint freeze authority, `vault_authority` missing
+an owner constraint, and `VaultState::LEN` having no compile-time assertion. See the
+corresponding `— M12:` citations above for each fix. This checklist entry is kept as a
+record of what was accepted-and-later-fixed, not as an active risk list.
 
-- **Mint freeze authority not checked**: `Account<'info, Mint>` verifies SPL Token
-  ownership and valid Mint deserialization but does not check `freeze_authority`. A vault
-  initialized with a mint that has a live freeze authority can have its custody ATA frozen
-  post-initialization, rendering the vault inoperative. Mitigation for production: add
-  `constraint = mint.freeze_authority.is_none()`. Not enforced in MVP because accepting
-  only freeze-free mints would block wrapped tokens that have a delegated freeze.
+## Direct-transfer / donation accounting (M12)
 
-- **vault_authority has no explicit owner constraint**: The `UncheckedAccount` seeds check
-  verifies the address but not that the account is owned by the System Program (i.e.,
-  uninitialized). In practice, `vault_authority` carries no data and its only role is as
-  ATA authority, so this is an info-level risk for initialize. Future instructions that
-  accept `vault_authority` must add `owner = system_program::ID` to prevent a confused-
-  deputy attack if the account were ever owned by a malicious program.
+`total_assets` is vault-maintained state, not derived from custody's live token balance.
+Anyone can transfer SPL tokens directly into the custody ATA outside the `deposit`
+instruction (a "donation"), or — combined with the `init_if_needed` fix above — pre-fund
+custody before `initialize` ever runs. This is a deliberate design decision, not an
+oversight: donations are treated as inert dust. `total_assets` remains the sole
+accounting source of truth for all deposit/withdraw math; the excess sits in custody
+unclaimed until a future feature intentionally reconciles it.
 
-- **VaultState::LEN has no compile-time assertion**: The constant is hand-calculated.
-  Adding a field without updating `LEN` causes silent under-allocation. A `static_assert`
-  macro or `const` expression asserting correct Borsh size should be added for production.
+This deliberately diverges from an external architecture-planning brief that recommended
+a `sync_assets` reconciliation instruction. That was rejected for this pass: a new
+instruction reconciling `total_assets` to custody's live balance is a new privileged (or
+public?) surface with its own unresolved access-control questions — who can call it, and
+can it be timed to shift share price around a pending deposit or withdrawal. Proving the
+*existing* code already can't be exploited by a donation closes the actual safety gap
+(no depositor can be shorted or over-paid) without adding that surface.
+
+- [x] A pre-existing custody ATA (empty or with dust) cannot affect `total_assets` at init.
+      — M12: `test_initialize_succeeds_with_preexisting_empty_custody_ata`,
+        `test_initialize_succeeds_with_preexisting_dust_in_custody_ata`.
+- [x] A direct (non-CPI) SPL transfer donation into custody cannot inflate what the
+      depositor can withdraw.
+      — M12: `test_direct_donation_does_not_inflate_withdrawable_amount`.
+- [x] A donation landing between two deposits cannot skew the second depositor's share
+      price.
+      — M12: `test_direct_donation_does_not_skew_second_depositor_share_price`.
+
+## Events (M12)
+
+`VaultInitialized`, `Deposited`, `Withdrawn`, `Paused`, `Unpaused` are emitted at the end
+of each handler, after all state mutation, so they reflect final post-instruction state.
+Events are informational only — intended for off-chain indexing and monitoring. They are
+**not** a security boundary: no instruction's correctness depends on an event being
+observed, and emitting an event grants no authority.
+
+- [x] Each instruction emits its corresponding event.
+      — M12: `test_initialize_emits_vault_initialized_log`, `test_deposit_emits_deposited_log`,
+        `test_withdraw_emits_withdrawn_log`, `test_pause_emits_paused_log`,
+        `test_unpause_emits_unpaused_log`.
 
 ## Adversarial tests
 
@@ -192,6 +232,17 @@ for production custody.
 - [x] Multi-user accounting cycle.
       — M8: `test_adversarial_repeated_deposits_withdrawals_consistent` verifies two users
         deposit+withdraw and vault returns to zero with correct per-user balances.
+- [x] Foreign-owned `vault_authority` (confused-deputy).
+      — M12: `test_initialize_rejects_foreign_owned_vault_authority`,
+        `test_deposit_rejects_foreign_owned_vault_authority`.
+- [x] Mint with an active freeze authority.
+      — M12: `test_initialize_rejects_mint_with_freeze_authority`.
+- [x] Pre-existing custody ATA (empty or with dust) at initialize.
+      — M12: `test_initialize_succeeds_with_preexisting_empty_custody_ata`,
+        `test_initialize_succeeds_with_preexisting_dust_in_custody_ata`.
+- [x] Direct-transfer donation into custody.
+      — M12: `test_direct_donation_does_not_inflate_withdrawable_amount`,
+        `test_direct_donation_does_not_skew_second_depositor_share_price`.
 
 ## Secrets
 
