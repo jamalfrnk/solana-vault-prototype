@@ -14,4 +14,8 @@ pub enum VaultError {
     MintMismatch,
     #[msg("Unauthorized: signer does not match expected authority")]
     Unauthorized,
+    #[msg("Mint has an active freeze authority; vault requires a freeze-authority-free mint")]
+    FreezeAuthorityPresent,
+    #[msg("vault_authority PDA is not owned by the System Program")]
+    InvalidVaultAuthorityOwner,
 }

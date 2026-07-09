@@ -4,6 +4,7 @@ use anchor_spl::token::{transfer_checked, Mint, Token, TokenAccount, TransferChe
 use crate::{
     constants::{USER_POSITION_SEED, VAULT_AUTHORITY_SEED, VAULT_SEED},
     error::VaultError,
+    events::Withdrawn,
     state::{UserPosition, VaultState},
 };
 
@@ -19,10 +20,11 @@ pub struct Withdraw<'info> {
     )]
     pub vault_state: Account<'info, VaultState>,
 
-    /// CHECK: PDA signer for outbound transfer; seeds + bump verified.
+    /// CHECK: PDA signer for outbound transfer; seeds + bump + owner verified.
     #[account(
         seeds = [VAULT_AUTHORITY_SEED, vault_state.key().as_ref()],
         bump = vault_state.authority_bump,
+        owner = System::id() @ VaultError::InvalidVaultAuthorityOwner,
     )]
     pub vault_authority: UncheckedAccount<'info>,
 
@@ -115,6 +117,15 @@ pub fn handler(ctx: Context<Withdraw>, shares_in: u64) -> Result<()> {
         .shares
         .checked_sub(shares_in)
         .ok_or(VaultError::InsufficientShares)?;
+
+    emit!(Withdrawn {
+        vault: ctx.accounts.vault_state.key(),
+        user: ctx.accounts.user.key(),
+        assets_out,
+        shares_in,
+        total_assets: ctx.accounts.vault_state.total_assets,
+        total_shares: ctx.accounts.vault_state.total_shares,
+    });
 
     Ok(())
 }
