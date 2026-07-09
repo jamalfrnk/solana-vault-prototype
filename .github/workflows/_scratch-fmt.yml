@@ -1,7 +1,8 @@
 name: scratch-fmt
 
 on:
-  workflow_dispatch:
+  push:
+    branches: [feature/ci-pipeline]
 
 jobs:
   fmt-patch:
