@@ -2,10 +2,13 @@
   "license": "ISC",
   "scripts": {
     "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
-    "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check"
+    "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check",
+    "test:sdk": "ts-mocha -p tsconfig.json 'sdk/tests/**/*.test.ts'",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@anchor-lang/core": "^1.0.2"
+    "@anchor-lang/core": "^1.0.2",
+    "@solana/web3.js": "^1.98.4"
   },
   "devDependencies": {
     "@types/bn.js": "^5.1.0",
