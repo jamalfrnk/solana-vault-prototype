@@ -107,6 +107,17 @@ jobs:
       - name: SDK tests
         run: corepack yarn test:sdk
 
+      # Yarn 1's audit exit code is a severity bitmask (1=info, 2=low, 4=moderate,
+      # 8=high, 16=critical); gate on high/critical only so a new low/moderate
+      # advisory in a transitive dep doesn't block unrelated PRs.
+      - name: yarn audit (fail on high/critical)
+        run: |
+          corepack yarn audit || code=$?
+          if [ $(( ${code:-0} & 24 )) -ne 0 ]; then
+            echo "High or critical severity advisories found."
+            exit 1
+          fi
+
   app-test:
     name: dApp tests (Node, no Solana/Anchor toolchain)
     runs-on: ubuntu-latest
@@ -134,3 +145,6 @@ jobs:
 
       - name: test
         run: npm --prefix app run test
+
+      - name: npm audit (fail on high/critical)
+        run: npm --prefix app audit --audit-level=high
