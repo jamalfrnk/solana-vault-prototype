@@ -117,6 +117,12 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: root yarn install
+        run: corepack yarn install --frozen-lockfile
+
       - name: npm install
         run: npm --prefix app ci
 
