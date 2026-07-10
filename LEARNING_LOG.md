@@ -684,4 +684,55 @@ you only find when you run against a real cluster."
 
 ---
 
+## MVP Retrospective — Post-MVP Outlook
+
+**What I built:**
+Nothing new this entry — this is the retrospective for Milestones 0 through 14 as a
+whole: a single-asset SPL vault (`initialize`/`deposit`/`withdraw`/`pause`/`unpause`)
+hardened against the M12 findings, a CI pipeline gating every PR, a live devnet
+demonstration, a TypeScript SDK with no IDL runtime dependency, and a minimal Next.js
+dApp built on top of that SDK. 41 Rust tests, 48 SDK tests, 32 dApp tests, all green.
+
+**What problem it solves:**
+Closes the original interview claim end to end — but it also produces something that
+outlives the interview use case: a small, fully-tested, honestly-scoped reference
+implementation that a Solana or Rust developer can read start to finish, and that a
+real DeFi team could fork as groundwork for an actual vault product instead of
+starting custody logic from zero.
+
+**What command or concept I learned:**
+That "done" for a shared branch isn't just "tests pass locally." GitHub computes a
+synthetic merge ref (`refs/pull/<n>/merge`) for `pull_request`-triggered CI, so a
+clean local `git diff --check` can still hide a conflict that only surfaces once the
+PR's base has moved past the branch's own fork point. `gh pr view --json mergeable`
+and `gh run view --log-failed` were what actually surfaced it, not anything visible
+from a local `git status`.
+
+**What confused me:**
+Two commits landed on `feature/dapp-shell` resolving the same `main`/`tsconfig.json`
+conflict two different ways — one broken (leftover merge debris from a GitHub web-UI
+conflict resolution), one correct. Reconciling them required realizing the CI failure
+wasn't M14's application code at all; it was a stale merge state on top of a second,
+unrelated gap in the new `app-test` CI job, which only ever installed `app/`'s own
+dependencies via `npm --prefix app ci` and never the root `node_modules` that
+`sdk/src`'s imports (`@solana/web3.js`, `@anchor-lang/core`) resolve against when
+TypeScript walks up from `sdk/src/` through the `@vault-sdk` path alias.
+
+**How I verified it:**
+Ran the exact CI commands locally after each fix — `corepack yarn typecheck`,
+`corepack yarn test:sdk`, and `npm run typecheck`/`build`/`test` inside `app/` — before
+pushing anything, then watched the real GitHub Actions run to completion: all four
+jobs (`fmt, clippy, build-sbf, test`, `cargo audit`, SDK tests, dApp tests) green, and
+`gh pr view 19 --json mergeable` returning `MERGEABLE`.
+
+**How I would explain it in an interview:**
+"I scoped this deliberately small and said no to yield strategies, multi-asset
+support, governance, and mainnet claims until the core custody logic was fully tested
+and hardened. Now that it is, those deferred features are the actual post-MVP
+roadmap — not because the MVP was incomplete, but because a vault's blast radius
+means every one of those additions deserves the same treatment `initialize` and
+`deposit` got: its own milestone, its own tests, its own review, one at a time."
+
+---
+
 *Updated after each milestone merge. Fill in immediately — specific beats vague.*

@@ -1,47 +1,60 @@
 # solana-vault-prototype
 
+A small, security-tested Solana vault program — plus a TypeScript SDK and a minimal
+dApp on top of it — built by Malcolm to demonstrate practical Anchor/Rust vault
+engineering, and released as open-source groundwork for the Solana and Rust developer
+community.
+
+## Why this exists
+
+This started as an interview-grade project: a vault small enough to explain line by
+line, proving hands-on understanding of the Solana account model, Program Derived
+Addresses, SPL token movement via CPI, and the adversarial testing a real custody
+program demands. That original goal is documented in full in `PROJECT_CONTEXT.md`.
+
+It's published openly because that same discipline is useful past the interview: most
+public Solana vault examples either skip the adversarial testing and CI rigor a real
+custody program needs, or are too large to read in one sitting. This one tries to be
+neither — a compact reference for PDA-based custody, CPI safety, and negative-path
+testing, and a starting point for anyone who wants the groundwork for a real DeFi
+vault product without building custody logic from zero.
+
 ## Status
 
-**Milestone 14 complete — minimal dApp shell added on top of the SDK; production
-hardening pass and all instructions verified on Solana devnet (M10).**
+M0–M13 are merged. **M14 (dApp shell) is code-complete and CI-green, open for review
+on PR #19** — not yet merged; see `ROADMAP.md` for the milestone-by-milestone history.
 
-All 14 milestones merged. The vault is fully implemented, tested, hardened, and
-demonstrated on-chain: `initialize`, `deposit`, `withdraw`, `pause`, and `unpause`
-confirmed on Solana devnet (2026-06-26). M11 added a CI pipeline (fmt, build, clippy,
-test, audit) gating every PR. M12 closed four MVP-accepted risks (custody ATA
-pre-creation DoS, unchecked mint freeze authority, `vault_authority` confused-deputy
-exposure, hand-calculated account size) and added instruction events. M13 added a
-TypeScript SDK (`sdk/`) — PDA derivation, instruction builders, account decoders, and
-Anchor error parsing, all IDL-free and locally testable. M14 added a minimal Next.js
-dApp (`app/`) on top of the SDK: connect wallet, enter a mint, view vault state,
-deposit, withdraw, view shares, an admin pause/unpause panel, and a cluster warning
-banner. 41/41 Rust tests, 48/48 SDK tests, and 32/32 dApp tests pass. Architecture is
-ACCEPTED. Interview walkthrough at `docs/INTERVIEW_WALKTHROUGH.md`.
+The vault is implemented, tested, and hardened, and every instruction has been
+confirmed live on Solana devnet: `initialize`, `deposit`, `withdraw`, `pause`, and
+`unpause` (2026-06-26). A CI pipeline (fmt, build, clippy, test, audit) gates every
+PR. A production-hardening pass closed four MVP-accepted risks and added instruction
+events. A TypeScript SDK (`sdk/`) and a minimal Next.js dApp (`app/`) sit on top of
+the program, both IDL-free and independently testable offline. 41/41 Rust tests,
+48/48 SDK tests, 32/32 dApp tests pass. Architecture is ACCEPTED
+(`ARCHITECTURE.md`, `docs/decisions/0002-vault-architecture.md`).
 
 This is an interview-grade educational prototype. It is **not** audited, **not**
-production-safe, **not** mainnet-ready, and **not** formally verified. This hardening
-pass closes several specific, named gaps (see `SECURITY_CHECKLIST.md`) but does not
-constitute an audit.
+production-safe, **not** mainnet-ready, and **not** formally verified. See
+`SECURITY_CHECKLIST.md` for exactly which gaps this hardening pass closed — that is
+not the same thing as an audit.
 
-## Mission
+## Who this is for, and how to use it
 
-Produce a compact, secure, explainable single-asset SPL-token vault that demonstrates
-practical understanding of the Solana SVM account model, Anchor account validation,
-Program Derived Addresses, SPL token movement, Cross-Program Invocation, PDA signer
-authority, deterministic vault-share accounting, and adversarial testing — small enough
-to explain line by line in an interview.
-
-## What this demonstrates
-
-- SVM account-based program architecture
-- Anchor account validation at the instruction boundary
-- Program Derived Addresses (deterministic vault identity and custody authority)
-- SPL token movement via CPI
-- PDA signer authority for outbound transfers
-- Deterministic vault-share accounting with checked arithmetic
-- Negative-path and adversarial testing
-- Disciplined Git and pull-request workflow
-- Live on-chain execution on Solana devnet
+- **Learning Anchor/Solana vault patterns** — read `docs/INTERVIEW_WALKTHROUGH.md`
+  and the program source in `programs/solana-vault-prototype/src/`; every account,
+  constraint, and CPI is small enough to read end to end.
+- **Evaluating vault security patterns** — `SECURITY_CHECKLIST.md` and the
+  adversarial tests in `programs/solana-vault-prototype/tests/test_adversarial.rs`
+  show the specific attack classes (account substitution, confused deputy, frozen
+  mints, paused-state bypass, over-withdrawal) this design defends against, and how
+  each is tested.
+- **Building a TypeScript client against a similar program** — `sdk/` is a worked
+  example of an IDL-free SDK: PDA derivation, instruction builders, account decoders,
+  and Anchor error parsing computed directly from Anchor's own discriminator scheme.
+- **Forking this as groundwork for a real product** — the vault, SDK, and dApp are a
+  tested starting point, not a finished product. `ROADMAP.md`'s Post-MVP Roadmap
+  section (below) lists the specific gaps between this prototype and a real,
+  audited, mainnet DeFi vault.
 
 ## Architecture
 
@@ -58,10 +71,10 @@ A single vault custodies one SPL token mint:
 
 ## Instruction set
 
-- [x] `initialize` — create the vault state PDA and custody ATA bound to one mint. *(M4)*
-- [x] `deposit` — transfer tokens into custody and credit shares. *(M5)*
-- [x] `withdraw` — redeem shares and transfer tokens out via PDA-signed CPI. *(M6)*
-- [x] `pause` / `unpause` — toggle blocked instructions under an explicit authority. *(M7)*
+- [x] `initialize` — create the vault state PDA and custody ATA bound to one mint.
+- [x] `deposit` — transfer tokens into custody and credit shares.
+- [x] `withdraw` — redeem shares and transfer tokens out via PDA-signed CPI.
+- [x] `pause` / `unpause` — toggle blocked instructions under an explicit authority.
 
 ## Security goals
 
@@ -75,69 +88,15 @@ A single vault custodies one SPL token mint:
 See `SECURITY_CHECKLIST.md`. This prototype is not audited and not intended for
 production custody.
 
-## Devnet demonstration (M10)
+## Devnet demonstration
 
-Deployed and executed on **Solana devnet** on 2026-06-26.
+Deployed and executed on **Solana devnet** on 2026-06-26 — program ID
+`FYqCCoAnM9tUYRcSRbeLbUE9LBPv8bN2uyuhcz46pSgq`. `scripts/devnet_demo.ts` creates a
+fresh SPL mint, funds a user ATA, and calls all four instructions in sequence
+against the live cluster; the full transcript and every transaction link are in
+`LEARNING_LOG.md`'s Milestone 10 entry.
 
-**Program ID:** `FYqCCoAnM9tUYRcSRbeLbUE9LBPv8bN2uyuhcz46pSgq`
-
-The demo script (`scripts/devnet_demo.ts`) creates a fresh SPL mint, funds a user ATA
-with 10 000 tokens, then calls all four instructions in sequence:
-
-| Step | Instruction | On-chain confirmation |
-|------|-------------|----------------------|
-| 1 | `initialize` | [42sBW8L...](https://explorer.solana.com/tx/42sBW8LJ2MrZYENR8WRuG8G6L9uiucM155PpdpraAQ8eRCvA3A8hdgHdfmT7B8yWdpziPYw3PEHgbH946aMu6w64?cluster=devnet) |
-| 2 | `deposit` (1 000 tokens) | [5C3ssG5...](https://explorer.solana.com/tx/5C3ssG5BzCNSt3yNHiPzAZJiZa2bWUfYojPucwH9r59DkH2ayM5sciV7j9XqLJyRSvHe5uEwFdjmmYcBo4kVT2GK?cluster=devnet) |
-| 3 | `withdraw` (500 shares) | [45hnMcQ...](https://explorer.solana.com/tx/45hnMcQUF6u8fZNRu8MPRZCjXnsUZfuPYrBgEfB14DSRmj7eBGnBVNy1dpKPaKpk9QduabvnhmrN4UxxwZoFLbWK?cluster=devnet) |
-| 4 | `pause` | [4xhKJaX...](https://explorer.solana.com/tx/4xhKJaXL87A3HQBfm1w7UgyHzog9z8KZiHPYRBoNMzaVC3XH1xTb2jW5jgR24sa62MSKRUURs9nQobvvf5VJ9H5M?cluster=devnet) |
-
-**Terminal output (observed):**
-
-```
-$ ./node_modules/.bin/ts-node scripts/devnet_demo.ts
-
-Payer: <wallet pubkey>
-Balance: <SOL balance> SOL
-Pause authority: <generated pubkey>
-Funded pause authority (0.01 SOL from payer)
-
-Mint created: <fresh SPL mint>
-User ATA created: <ATA address>
-Minted 10 000 tokens to user ATA
-
-Vault state PDA:     <derived PDA>
-Vault authority PDA: <derived PDA>
-Custody ATA:         <custody ATA>
-
-[1/4] initialize
-  https://explorer.solana.com/tx/42sBW8LJ2MrZYENR8WRuG8G6L9uiucM155PpdpraAQ8eRCvA3A8hdgHdfmT7B8yWdpziPYw3PEHgbH946aMu6w64?cluster=devnet
-
-[2/4] deposit 1 000 tokens
-  User ATA balance after: 9000 tokens
-  https://explorer.solana.com/tx/5C3ssG5BzCNSt3yNHiPzAZJiZa2bWUfYojPucwH9r59DkH2ayM5sciV7j9XqLJyRSvHe5uEwFdjmmYcBo4kVT2GK?cluster=devnet
-
-[3/4] withdraw 500 shares
-  User ATA balance after: 9500 tokens
-  https://explorer.solana.com/tx/45hnMcQUF6u8fZNRu8MPRZCjXnsUZfuPYrBgEfB14DSRmj7eBGnBVNy1dpKPaKpk9QduabvnhmrN4UxxwZoFLbWK?cluster=devnet
-
-[4/4] pause
-  https://explorer.solana.com/tx/4xhKJaXL87A3HQBfm1w7UgyHzog9z8KZiHPYRBoNMzaVC3XH1xTb2jW5jgR24sa62MSKRUURs9nQobvvf5VJ9H5M?cluster=devnet
-
-✓ All four instructions confirmed on devnet.
-```
-
-**Rust test suite (no regressions):**
-
-```
-$ cargo test
-running 29 tests
-...
-test result: ok. 29 passed; 0 failed; 0 ignored
-```
-
-(29/29 at the time of the M10 devnet run; M12 added 12 more, see below.)
-
-To run the demo yourself (requires a funded devnet keypair at `~/.config/solana/id.json`):
+To run it yourself (requires a funded devnet keypair at `~/.config/solana/id.json`):
 
 ```bash
 anchor build
@@ -145,20 +104,16 @@ anchor deploy --provider.cluster devnet
 npx ts-node scripts/devnet_demo.ts
 ```
 
-## SDK (M13)
+## SDK
 
 `sdk/` is a TypeScript client for the vault — PDA derivation, instruction builders,
-account decoders, and Anchor error parsing. Unlike `scripts/devnet_demo.ts`, it has
-**no runtime dependency on `target/idl/*.json`**: every Anchor discriminator (the 8-byte
-prefix Anchor uses to tag instructions and accounts) is computed directly via
-`sha256("global:<name>")`/`sha256("account:<Name>")`, matching Anchor's own codegen,
-rather than read from a generated IDL file. That's a deliberate choice, not just a
-convenience — it makes the SDK fully testable without the Anchor CLI, and it's arguably
-a cleaner dependency story for downstream consumers who don't want an IDL at runtime
-either.
+account decoders, and Anchor error parsing — with **no runtime dependency on
+`target/idl/*.json`**. Every Anchor discriminator is computed directly via
+`sha256("global:<name>")` / `sha256("account:<Name>")`, matching Anchor's own
+codegen, which makes the SDK fully testable without the Anchor CLI installed.
 
 ```bash
-corepack yarn install     # or: yarn install, if you have yarn on PATH already
+corepack yarn install
 corepack yarn test:sdk    # 48 tests, offline, no RPC, no compiled program
 corepack yarn typecheck
 ```
@@ -171,20 +126,18 @@ const ix = client.buildDepositIx(userPublicKey, 1_000_000n);
 const state = await client.fetchVaultState();
 ```
 
-`scripts/sdk_devnet_smoke.ts` exercises the SDK against a real deployed vault
-(initialize → deposit → withdraw → pause) as a full end-to-end proof, mirroring
-`devnet_demo.ts`'s flow but built entirely on `sdk/` instead of an IDL-loaded Anchor
-`Program`. **It has not been run** — this development machine has no funded devnet
-keypair — so its correctness rests on the 48 offline unit tests plus manual review, not
-an observed run. Treat it the same way `devnet_demo.ts`'s own prerequisites are treated:
-run it yourself with a funded `~/.config/solana/id.json` before trusting it live.
+`scripts/sdk_devnet_smoke.ts` mirrors `devnet_demo.ts`'s flow but built entirely on
+`sdk/`. It has not been run against a live cluster in this environment — its
+correctness rests on the 48 offline unit tests plus manual review; run it yourself
+against a funded devnet keypair before trusting it live.
 
-## dApp (M14)
+## dApp
 
-`app/` is a minimal Next.js (App Router) dApp built on top of `sdk/` — connect wallet,
-enter a mint, view vault state, deposit, withdraw, view shares, an admin pause/unpause
-panel, and a cluster warning banner. Deliberately not a polished product: no charts, no
-analytics, plain CSS only.
+`app/` is a minimal Next.js (App Router) dApp built on `sdk/` — connect wallet, enter
+a mint, view vault state, deposit, withdraw, view shares, an admin pause/unpause
+panel, and a cluster warning banner. Deliberately not a polished product: no charts,
+no analytics, plain CSS only — see the Post-MVP Roadmap for what a real product
+version would add.
 
 ```bash
 cd app
@@ -196,26 +149,19 @@ npm run build
 
 (Or from the repo root: `npm run app:dev` / `npm run app:test` / `npm run app:build`.)
 
-Two things worth knowing:
+Two known, deliberate limitations:
 
-- **The cluster warning banner is scoped down.** wallet-adapter has no reliable,
-  portable API to query which cluster a connected wallet is actually on, so the banner
-  states the app's *configured* cluster (devnet) rather than attempting a fragile
-  wallet-cluster-comparison heuristic. Confirm your wallet's network manually before
-  transacting.
-- **The admin pause/unpause panel's authority check is cosmetic only.** It's hidden
-  client-side unless the connected wallet matches `vaultState.pauseAuthority`, but that
-  proves nothing on its own — real enforcement is the on-chain constraint already tested
-  in the Rust program (M4/M7/M12).
+- The cluster warning banner states the app's *configured* cluster rather than
+  attempting to detect the connected wallet's actual cluster — wallet-adapter has no
+  reliable, portable API for that.
+- The admin pause/unpause panel's authority check is cosmetic only (hidden
+  client-side); real enforcement is the on-chain constraint already tested in the
+  Rust program.
 
-Manual browser verification (real `next dev`, a real headless-Chromium pass) confirmed:
-the landing page loads with no console errors; the wallet modal opens and lists exactly
-Phantom and Solflare; an invalid mint address shows an inline error; and a syntactically
-valid but nonexistent mint navigates to `/vault/[mint]` and renders a genuine,
-non-mocked "vault not found" result from a real devnet RPC call. **Not verified**: an
-actual wallet-extension-approved transaction — no wallet extension or funded devnet
-keypair is available in this development environment. Connect a real wallet yourself to
-exercise deposit/withdraw/pause end to end.
+Manual browser verification (real `next dev`, headless Chromium) confirmed the
+golden path works end to end except an actual wallet-extension-approved transaction,
+which this development environment has no wallet extension or funded keypair to
+exercise — connect a real wallet yourself to complete that check.
 
 ## Development workflow
 
@@ -225,160 +171,49 @@ exercise deposit/withdraw/pause end to end.
 - Every milestone is merged through a pull request (Malcolm performs the merge).
 - See `CLAUDE.md`, `prompts/`, and `ROADMAP.md`.
 
-## Repository structure
+## Repository layout
 
-```text
-README.md                   This file
-CLAUDE.md                   Operating rules for Claude Code
-PROJECT_CONTEXT.md          Goals, scope, anti-goals, success criteria
-ARCHITECTURE.md             Vault architecture (ACCEPTED)
-SECURITY_CHECKLIST.md       Security checklist (all items checked)
-TEST_PLAN.md                Test matrix (41 tests, all passing)
-ROADMAP.md                  Milestone order and status (all 13 complete)
-LEARNING_LOG.md             Per-milestone reflection and interview prep notes
-RUNBOOK.md                  Operational runbook for build, test, and deploy
-rust-toolchain.toml         Pinned Rust toolchain (1.89.0)
-Anchor.toml                 Anchor workspace configuration
-Cargo.toml                  Rust workspace manifest
-package.json                JS/TS dev dependencies (prettier, mocha, ts-node)
-tsconfig.json               TypeScript configuration
-.devcontainer/
-  devcontainer.json         Codespaces / VS Code devcontainer configuration
-  post-create.sh            Idempotent install script (Agave CLI, avm, Anchor CLI)
-.github/
-  pull_request_template.md
-  workflows/
-    ci.yml                  CI: fmt, build-sbf, clippy, test, audit, sdk-test (M11/M13)
-docs/
-  INTERVIEW_WALKTHROUGH.md  Guided tour of the vault for technical interviews (M9)
-  decisions/                Architecture Decision Records
-    0001-toolchain-version-pinning.md
-    0002-vault-architecture.md
-migrations/
-  deploy.ts                 Anchor deploy migration stub
-programs/
-  solana-vault-prototype/
-    src/
-      lib.rs                Program entry point and declare_id!
-      instructions/
-        initialize.rs       initialize instruction (M4, hardened M12)
-        deposit.rs          deposit instruction (M5, hardened M12)
-        withdraw.rs         withdraw instruction (M6, hardened M12)
-        pause.rs            pause/unpause instructions (M7, events M12)
-      state.rs              VaultState + UserPosition account structs
-      constants.rs          PDA seed constants
-      error.rs              VaultError codes
-      events.rs             Instruction events (M12)
-    tests/
-      test_initialize.rs    LiteSVM integration tests — initialize (6 tests)
-      test_deposit.rs       LiteSVM integration tests — deposit (5 tests)
-      test_withdraw.rs      LiteSVM integration tests — withdraw (7 tests)
-      test_pause.rs         LiteSVM integration tests — pause (5 tests)
-      test_adversarial.rs   LiteSVM adversarial tests (12 tests)
-      test_events.rs        LiteSVM event emission tests (5 tests)
-sdk/
-  src/
-    constants.ts            Program ID, token program IDs, PDA seed bytes (M13)
-    discriminator.ts        Anchor instruction/account discriminators, no IDL needed (M13)
-    pdas.ts                 PDA + ATA derivation (M13)
-    instructions.ts         Instruction builders for all 5 program instructions (M13)
-    accounts.ts              VaultState/UserPosition decoders + fetch helpers (M13)
-    errors.ts                 Anchor error parsing, wraps @anchor-lang/core (M13)
-    client.ts                  VaultClient convenience wrapper (M13)
-    index.ts                    Barrel export (M13)
-  tests/                       48 offline unit tests — no IDL, no live cluster (M13)
-app/
-  package.json             Next.js/React/wallet-adapter dependencies (nested, npm) (M14)
-  app/
-    layout.tsx               Providers + ClusterWarningBanner (M14)
-    page.tsx                  Landing: wallet connect + mint entry form (M14)
-    vault/[mint]/page.tsx      Vault detail route (M14)
-  components/                 WalletConnectButton, ClusterWarningBanner, MintAddressForm,
-                               VaultDetail, DepositForm, WithdrawForm, AdminPausePanel,
-                               UserSharesDisplay (M14)
-  lib/solana/                 connection.ts, wallets.ts, mint.ts (M14)
-  __tests__/                  32 offline unit tests — mocked wallet + SDK, no live cluster (M14)
-scripts/
-  devnet_demo.ts            M10 devnet demonstration script
-  sdk_devnet_smoke.ts       M13 SDK devnet smoke script (not yet executed — see SDK section below)
-prompts/                    Milestone and operating prompts (00–11)
-.gitignore
-```
+- `programs/solana-vault-prototype/` — the Anchor program (instructions, state, tests).
+- `sdk/` — the IDL-free TypeScript client and its offline test suite.
+- `app/` — the Next.js dApp and its offline test suite.
+- `scripts/` — devnet demo and smoke-test scripts.
+- `docs/` — interview walkthrough and architecture decision records.
+- `.github/workflows/` — CI (Rust build/test/audit, SDK tests, dApp tests).
+- `CLAUDE.md`, `PROJECT_CONTEXT.md`, `ARCHITECTURE.md`, `SECURITY_CHECKLIST.md`,
+  `TEST_PLAN.md`, `ROADMAP.md`, `LEARNING_LOG.md`, `RUNBOOK.md` — the documentation
+  set; start with `ARCHITECTURE.md` for design and `ROADMAP.md` for history and
+  what's next.
 
-## Codespaces setup (Milestone 1 — complete)
+## Codespaces setup
 
-A devcontainer is configured. To start a reproducible environment:
-
-1. Open this repository on GitHub.
-2. Click **Code → Codespaces → Create codespace on main**.
-3. Wait for `post-create.sh` to finish — it installs the Agave CLI and Anchor CLI
-   and prints all installed versions.
-
-**Observed versions** (Codespace, 2026-06-25):
-
-| Tool | Pinned version | Observed |
-|---|---|---|
-| Rust | 1.89.0 | rustc 1.89.0 (29483883e 2025-08-04) |
-| Agave (Solana) CLI | v3.1.10 | solana-cli 3.1.10 |
-| Anchor CLI | 1.0.2 | anchor-cli 1.0.2 |
-| Node.js | 22 LTS | v22.23.1 |
-| npm | bundled | 10.9.8 |
-
-> Note: Rust was upgraded from 1.85.0 (M1 pin) to 1.89.0 during M2 scaffold
-> because `anchor init` 1.0.2 generates a `rust-toolchain.toml` pinning 1.89.0
-> and the litesvm/solana-3.x dev-dependencies require it.
-> See `docs/decisions/0001-toolchain-version-pinning.md`.
+A devcontainer is configured for a reproducible environment: open the repo on
+GitHub, **Code → Codespaces → Create codespace on main**, and wait for
+`post-create.sh` to install the pinned Agave and Anchor CLIs. See
+`docs/decisions/0001-toolchain-version-pinning.md` for why each version is pinned.
 
 ## Testing strategy
 
-> See `TEST_PLAN.md`. All 41 Rust tests, 48 SDK tests, and 32 dApp tests pass.
+> See `TEST_PLAN.md`. 41 Rust tests, 48 SDK tests, 32 dApp tests all pass.
 
-Program tests run entirely via LiteSVM (in-process SVM, no network required):
-
-```
-cargo test
-```
-
-Coverage: unit (arithmetic), integration (all 5 instructions), happy-path, negative,
-account-substitution, arithmetic-boundary, adversarial (12 targeted attack scenarios
-including confused-deputy, frozen mints, and donation/dust accounting), and event
-emission.
-
-SDK tests (`sdk/tests/`) run independently via Node/mocha, no Rust/Solana/Anchor
-toolchain and no live cluster required:
-
-```
-corepack yarn test:sdk
+```bash
+cargo test              # program tests, LiteSVM, no network required
+corepack yarn test:sdk  # SDK tests, no Rust/Solana/Anchor toolchain, no live cluster
+cd app && npm run test  # dApp tests, no Rust/Solana/Anchor toolchain, no live cluster
 ```
 
-dApp tests (`app/__tests__/`) run independently via Vitest + React Testing Library,
-also no Rust/Solana/Anchor toolchain and no live cluster required:
-
-```
-cd app && npm run test
-```
+Program coverage spans unit (arithmetic), integration (all 5 instructions),
+happy-path, negative, account-substitution, arithmetic-boundary, adversarial (12
+targeted attack scenarios), and event emission.
 
 ## Roadmap
 
-See `ROADMAP.md`. All milestones complete.
-
-| Milestone | Status |
-|---|---|
-| 0 — Repository bootstrap | complete |
-| 1 — Codespaces / toolchain | complete |
-| 2 — Default Anchor scaffold | complete |
-| 3 — Architecture decision record | complete |
-| 4 — Vault initialization | complete |
-| 5 — Deposit | complete |
-| 6 — Withdrawal | complete |
-| 7 — Pause controls | complete |
-| 8 — Security / adversarial test expansion | complete |
-| 9 — Documentation and interview walkthrough | complete |
-| 10 — Devnet demonstration | complete |
-| 11 — CI/CD pipeline | complete |
-| 12 — Production hardening pass | complete |
-| 13 — SDK package | complete |
-| 14 — dApp shell | complete |
+See `ROADMAP.md` for the full milestone-by-milestone history (M0–M14) and the
+**Post-MVP Roadmap** section, which lists the specific, currently-unapproved
+candidates for what comes after the MVP — multi-asset support, a fee mechanism,
+governance-controlled authorities, a real third-party audit, mainnet operational
+readiness, yield strategy integration, and further SDK/dApp productization. None of
+them are scheduled; per this project's own rules, nothing starts until Malcolm
+approves it as the next milestone.
 
 ## Interview walkthrough
 
