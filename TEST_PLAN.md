@@ -1,6 +1,8 @@
 # Test Plan
 
-**Status: M12 complete — 41 tests passing across M4–M12.**
+**Status: M16 in progress — 46 Rust tests (41 through M12 + 5 governance-authority
+tests added in M16, pending CI observation), 48 SDK tests (M13), 34 dApp tests
+(M14/M15).**
 
 ## Repository hygiene (complete)
 
@@ -119,6 +121,30 @@ Each test asserts on transaction logs containing a `"Program data:"` line (what
 `emit!()`'s `sol_log_data` call surfaces as in litesvm), proving the event actually
 fired, without full Borsh-decode-and-field-assert complexity. Decoding and asserting on
 individual event fields is a possible follow-up, not required for M12.
+
+## Governance-authority tests (5 tests — M16)
+
+All in `tests/test_governance.rs`, run under `LiteSVM::with_sigverify(false)` so an
+off-curve PDA can be marked as a signer — the same `is_signer` privilege a governance
+program's `invoke_signed` grants in a real execute CPI. See `ARCHITECTURE.md`'s
+"Governance-ready pause authority" section for the claim being proven.
+
+- [ ] `initialize` accepts an off-curve multisig-vault PDA as `pause_authority` and
+      records it verbatim.
+      — `test_initialize_accepts_multisig_pda_pause_authority`.
+- [ ] `pause` + `unpause` succeed end to end under a PDA authority with signer
+      privilege.
+      — `test_pause_and_unpause_with_multisig_pda_authority`.
+- [ ] A real-keypair impostor is still rejected when the authority is a PDA.
+      — `test_pause_with_pda_authority_rejects_keypair_impostor`.
+- [ ] Naming the PDA authority **without** signer privilege is rejected — knowing the
+      governance address is not controlling it.
+      — `test_pause_rejects_pda_authority_without_signer_privilege`.
+- [ ] `payer != pause_authority` separation still enforced in the PDA case.
+      — `test_initialize_pda_payer_authority_separation_still_enforced`.
+
+(Checkboxes flip to `[x]` once CI observes them passing — no local Rust toolchain on
+the M16 development machine.)
 
 ## Anchor scaffold baseline (complete — M2)
 

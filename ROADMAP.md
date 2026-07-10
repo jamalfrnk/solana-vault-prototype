@@ -22,7 +22,8 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 | 12 | Production hardening pass | `[x]` complete |
 | 13 | SDK package | `[x]` complete |
 | 14 | dApp shell | `[x]` complete |
-| 15 | Dependency security remediation | `[~]` in progress |
+| 15 | Dependency security remediation | `[x]` complete |
+| 16 | Governance-ready pause authority | `[~]` in progress |
 
 ## Milestone 0 — Repository bootstrap (complete)
 
@@ -330,7 +331,7 @@ through the `@vault-sdk` path alias — was fixed on the same branch (`fix(ci): 
 root deps before app typecheck in app-test job`) and confirmed green before merge.
 PR #19 merged into `main` as squash commit `b8837fd` on 2026-07-10.
 
-## Milestone 15 — Dependency Security Remediation (in progress)
+## Milestone 15 — Dependency Security Remediation (complete)
 
 First post-MVP milestone, approved by Malcolm 2026-07-10. Remediates all 20 open
 Dependabot alerts (1 critical, 6 high, 12 moderate, 1 low) across `app/package-lock.json`
@@ -367,7 +368,36 @@ audit` at root — 0 vulnerabilities. 48/48 SDK tests under mocha 11 (including 
 deliberate failing-test run confirming forced `diff@8` still renders assertion
 diffs). 34/34 dApp tests (32 prior + 2 new wallet-list pins). Root + app typecheck
 clean. `next build` clean; served production build returned HTTP 200. No Rust or
-on-chain program changes.
+on-chain program changes. Merged as PR #21.
+
+## Milestone 16 — Governance-Ready Pause Authority (in progress)
+
+Second post-MVP milestone, approved by Malcolm 2026-07-10, on
+`feature/governance-authority`. **No program changes** — the milestone proves and
+documents that `pause_authority`'s existing constraint surface (`Signer` + key
+equality, no on-curve assumption) already composes with multisig governance: a
+Squads-style multisig vault PDA can hold the authority, exercising it via the
+`is_signer` privilege `invoke_signed` grants during the multisig's execute CPI.
+
+Five new LiteSVM tests in `tests/test_governance.rs`, run under
+`with_sigverify(false)` (the faithful single-process analog of `invoke_signed`
+privilege — fabricated signature bytes, honored `is_signer` flags): PDA authority
+accepted at initialize and recorded verbatim; pause/unpause succeed end to end under
+the PDA; a keypair impostor is still rejected; the PDA named *without* signer
+privilege is rejected (knowing the governance address ≠ controlling it — the property
+that keeps the multisig threshold meaningful); and `payer != pause_authority` still
+holds in the PDA case.
+
+Documented operational subtlety: because initialize requires the authority to sign,
+a multisig-held vault must be initialized *through* the multisig — and since no
+rotation instruction exists, `pause_authority` is a one-shot initialize-time
+decision. A two-step `set_pause_authority` is called out in ARCHITECTURE.md,
+SECURITY_CHECKLIST.md, and the post-MVP candidates as the natural next on-chain
+change.
+
+Development-environment note: no Rust toolchain on the M16 machine — Rust results
+observed via CI only (same pattern as pre-M13 milestones). Checkbox items in
+TEST_PLAN.md/SECURITY_CHECKLIST.md flip to checked once CI observes them green.
 
 ## Post-MVP Roadmap (proposed — none started, none approved)
 
@@ -383,7 +413,8 @@ branch.
 |---|---|---|
 | Multi-asset vault support | multi-asset support | Today's design is deliberately single-mint; generalizing the PDA seed and account layout is the largest architectural change on this list. |
 | Fee mechanism | tokenomics | Management/performance fees with tested, checked-arithmetic accounting — the same rigor M5/M6/M12 applied to deposit/withdraw. |
-| Governance-controlled authority | governance, multisig | Replace the single `pause_authority` keypair with a multisig or DAO-controlled account — no change to the on-chain constraint itself, only to who can sign it. |
+| Governance-controlled authority | governance, multisig | Picked up as **M16**. Replace the single `pause_authority` keypair with a multisig or DAO-controlled account — no change to the on-chain constraint itself, only to who can sign it. |
+| Authority rotation (`set_pause_authority`) | governance | Two-step propose/accept rotation so the authority isn't a one-shot initialize-time decision — the gap M16's tests made explicit. First new instruction since M7; needs the full M4-style test treatment. |
 | Third-party security audit | formal-audit claims | The one item that actually removes the "not audited" disclaimer — everything else in this table should probably wait until after it. |
 | Mainnet operational readiness | mainnet deployment, production custody claims | Key management, monitoring, alerting, incident runbook — operational maturity, not new instructions. |
 | Yield strategy integration | yield strategies, lending integrations | Deploying idle custody assets into an approved venue. Highest blast radius on this list; should follow, not precede, the audit. |
