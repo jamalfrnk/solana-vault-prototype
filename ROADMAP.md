@@ -396,8 +396,12 @@ SECURITY_CHECKLIST.md, and the post-MVP candidates as the natural next on-chain
 change.
 
 Development-environment note: no Rust toolchain on the M16 machine — Rust results
-observed via CI only (same pattern as pre-M13 milestones). Checkbox items in
-TEST_PLAN.md/SECURITY_CHECKLIST.md flip to checked once CI observes them green.
+observed via CI only (same pattern as pre-M13 milestones).
+
+Observed (2026-07-10, CI run 29128852767 on PR #22): all four jobs green on the
+first run — `tests/test_governance.rs` 5 passed / 0 failed (46 Rust tests total),
+fmt + clippy clean, cargo audit clean, 48/48 SDK, 34/34 dApp. PR #22 open for
+review.
 
 ## Post-MVP Roadmap (proposed — none started, none approved)
 

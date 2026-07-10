@@ -281,14 +281,14 @@ assumption — so a multisig program's vault PDA can hold it via `invoke_signed`
 by `tests/test_governance.rs` (LiteSVM `with_sigverify(false)` as the `invoke_signed`
 analog); full rationale in `ARCHITECTURE.md` → "Governance-ready pause authority".
 
-- [ ] Off-curve PDA accepted as `pause_authority` at initialize, recorded verbatim.
+- [x] Off-curve PDA accepted as `pause_authority` at initialize, recorded verbatim.
       — M16: `test_initialize_accepts_multisig_pda_pause_authority`.
-- [ ] `pause`/`unpause` succeed under a PDA authority carrying signer privilege.
+- [x] `pause`/`unpause` succeed under a PDA authority carrying signer privilege.
       — M16: `test_pause_and_unpause_with_multisig_pda_authority`.
-- [ ] PDA authority named without signer privilege is rejected (threshold stays
+- [x] PDA authority named without signer privilege is rejected (threshold stays
       meaningful — only the multisig's execute CPI can mint the privilege).
       — M16: `test_pause_rejects_pda_authority_without_signer_privilege`.
-- [ ] Impostor keypair and payer-as-authority still rejected in the PDA case.
+- [x] Impostor keypair and payer-as-authority still rejected in the PDA case.
       — M16: `test_pause_with_pda_authority_rejects_keypair_impostor`,
         `test_initialize_pda_payer_authority_separation_still_enforced`.
 
@@ -298,8 +298,9 @@ initialized through the multisig from day one; a compromised or lost authority c
 be rotated without redeploying. A two-step `set_pause_authority` is the natural next
 on-chain milestone (see `ROADMAP.md` post-MVP candidates).
 
-(Checkboxes flip to `[x]` once CI observes the tests passing — no local Rust
-toolchain on the M16 development machine.)
+Observed: CI run 29128852767 (2026-07-10), `tests/test_governance.rs` — 5 passed,
+0 failed. (No local Rust toolchain on the M16 development machine; CI is the
+observation source.)
 
 ## Secrets
 
