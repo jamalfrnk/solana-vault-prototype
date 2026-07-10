@@ -8,4 +8,16 @@
     "esModuleInterop": true
   },
   "exclude": ["node_modules", "app"]
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true
+  },
+  "include": [
+    "sdk/src/**/*",
+    "sdk/tests/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "app"
+  ]
 }
