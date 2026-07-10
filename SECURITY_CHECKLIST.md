@@ -274,6 +274,34 @@ plus a `mocha` 9→11 dev-dependency upgrade.
 Cadence note: `overrides`/`resolutions` pins go stale — when a parent package ships its
 own fixed dependency, remove the pin rather than letting it mask future range bumps.
 
+## Governance readiness (M16)
+
+`pause_authority`'s constraint surface is `Signer` + key equality only — no on-curve
+assumption — so a multisig program's vault PDA can hold it via `invoke_signed`. Proven
+by `tests/test_governance.rs` (LiteSVM `with_sigverify(false)` as the `invoke_signed`
+analog); full rationale in `ARCHITECTURE.md` → "Governance-ready pause authority".
+
+- [x] Off-curve PDA accepted as `pause_authority` at initialize, recorded verbatim.
+      — M16: `test_initialize_accepts_multisig_pda_pause_authority`.
+- [x] `pause`/`unpause` succeed under a PDA authority carrying signer privilege.
+      — M16: `test_pause_and_unpause_with_multisig_pda_authority`.
+- [x] PDA authority named without signer privilege is rejected (threshold stays
+      meaningful — only the multisig's execute CPI can mint the privilege).
+      — M16: `test_pause_rejects_pda_authority_without_signer_privilege`.
+- [x] Impostor keypair and payer-as-authority still rejected in the PDA case.
+      — M16: `test_pause_with_pda_authority_rejects_keypair_impostor`,
+        `test_initialize_pda_payer_authority_separation_still_enforced`.
+
+Known limitation (tracked, not fixed here): `pause_authority` is **immutable after
+initialize** — no rotation instruction exists. A multisig-held vault must be
+initialized through the multisig from day one; a compromised or lost authority cannot
+be rotated without redeploying. A two-step `set_pause_authority` is the natural next
+on-chain milestone (see `ROADMAP.md` post-MVP candidates).
+
+Observed: CI run 29128852767 (2026-07-10), `tests/test_governance.rs` — 5 passed,
+0 failed. (No local Rust toolchain on the M16 development machine; CI is the
+observation source.)
+
 ## Secrets
 
 - [x] `.gitignore` excludes wallets, keypairs, `.env` values, and build artifacts.

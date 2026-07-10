@@ -248,3 +248,43 @@ one.
 | `Withdrawn` | `vault`, `user`, `assets_out`, `shares_in`, `total_assets`, `total_shares` | `withdraw` |
 | `Paused` | `vault`, `pause_authority` | `pause` |
 | `Unpaused` | `vault`, `pause_authority` | `unpause` |
+
+## Governance-ready pause authority (M16)
+
+`pause_authority` is a plain `Pubkey` compared against a `Signer` — nothing in the
+program requires it to be an on-curve (single-keypair) address. That makes the
+authority **governance-ready by construction**: a multisig program's vault PDA (e.g.
+a Squads multisig vault) can hold it, because when the multisig executes an approved
+proposal it CPIs into this program with `invoke_signed`, and the runtime grants the
+PDA exactly the `is_signer` privilege the constraints check. No program change was
+needed for M16; the milestone *proves* the property and documents its operational
+shape.
+
+Three properties, each pinned by a test in `tests/test_governance.rs`:
+
+1. **A PDA authority works end to end.** `initialize` accepts an off-curve
+   pause_authority and records it verbatim; `pause`/`unpause` succeed when that PDA
+   carries signer privilege. (LiteSVM analog: `with_sigverify(false)` + the message's
+   `is_signer` flag, which is precisely what `invoke_signed` produces in a real CPI.)
+2. **Knowing the governance address ≠ controlling it.** Naming the PDA as
+   pause_authority *without* signer privilege fails Anchor's `Signer` check. This is
+   what makes the multisig's threshold meaningful — only an execute CPI that passed
+   the multisig's own approval logic can mint the privilege.
+3. **Existing constraints survive the PDA case.** A real-keypair impostor is still
+   rejected by key equality, and the initialize-time `payer != pause_authority`
+   separation still holds.
+
+Operational subtlety worth knowing: because `initialize` requires the
+pause_authority to **sign**, a vault whose authority is a multisig PDA must be
+initialized *through* that multisig (the initialize instruction is itself a proposal
+the multisig executes; the human payer's signature propagates through the CPI as fee
+payer / rent payer). You cannot initialize with a throwaway keypair and hand the
+authority to a multisig later — **there is no rotation instruction**. `pause_authority`
+is immutable after initialize. A two-step `set_pause_authority` (propose/accept) is
+the natural next on-chain change and is listed in `ROADMAP.md`'s post-MVP candidates;
+until it exists, choosing the authority is a one-shot, initialize-time decision.
+
+What M16 deliberately does not claim: anything about a specific multisig program's
+internal correctness (thresholds, member management, timelocks). That is the
+governance program's contract. The claim proven here is only that *this* program's
+authority surface composes with any `invoke_signed`-based governance executor.

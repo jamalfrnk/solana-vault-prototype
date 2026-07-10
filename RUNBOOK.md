@@ -694,15 +694,43 @@ any production use. Full details are in [SECURITY_CHECKLIST.md](SECURITY_CHECKLI
   PDAs, wrong owners, cross-user position substitution, wrong token program, overflow
   boundary, and multi-user accounting cycles.
 
-### Known risks (accepted for MVP, must fix before production)
+### Known risks
+
+The four MVP-accepted risks this table originally tracked (custody ATA pre-creation
+DoS, unchecked mint freeze authority, missing `vault_authority` owner constraint,
+hand-calculated account size) were all **fixed in M12** — see `SECURITY_CHECKLIST.md`
+for the constraint-by-constraint citations. What remains:
 
 | Risk | Impact | Mitigation for production |
 |------|--------|---------------------------|
-| Custody ATA DoS | Any party can pre-create the custody ATA before `initialize`, permanently blocking vault init for that mint | Switch custody `init` to `init_if_needed` + post-init owner/mint validation |
-| Mint freeze authority not checked | A mint with a live `freeze_authority` can freeze the custody ATA after init, rendering the vault inoperative | Add `constraint = mint.freeze_authority.is_none()` |
-| `VaultState::LEN` is a hand constant | Adding a field without updating `LEN` causes silent under-allocation and on-chain corruption | Add a compile-time assertion: `const _: () = assert!(VaultState::LEN == <computed>)` |
-| `vault_authority` has no explicit owner constraint | `UncheckedAccount` verifies the address but not that it is owned by the System Program | Add `owner = system_program::ID` to the `vault_authority` account constraint |
-| No pause authority rotation | If the `pause_authority` keypair is lost, the vault can never be unpaused | Add an `admin` field with a `rotate_pause_authority` instruction |
+| No pause authority rotation | `pause_authority` is immutable after `initialize`. A lost or compromised authority cannot be replaced — a paused vault stays paused (funds still withdrawable only if unpaused). | Hold the authority in a multisig from day one (see below), and/or add a two-step `set_pause_authority` instruction (post-MVP candidate in `ROADMAP.md`). |
+
+### Holding pause authority with a multisig (M16)
+
+The program has no on-curve assumption on `pause_authority` — its constraints are
+`Signer` + key equality, which a multisig program's vault PDA satisfies via
+`invoke_signed`. Proven in `tests/test_governance.rs`; design rationale in
+`ARCHITECTURE.md` → "Governance-ready pause authority".
+
+Operationally, with a Squads (or equivalent) multisig:
+
+1. **Create the multisig first.** Note its *vault PDA* address — that PDA, not the
+   multisig account itself and not any member key, is what becomes `pause_authority`.
+2. **Initialize the vault through the multisig.** Because `initialize` requires the
+   pause_authority to sign, the initialize instruction must be executed as a multisig
+   proposal (the multisig's execute CPI gives its vault PDA the required signer
+   privilege; the human proposer pays fees/rent as the transaction's fee payer).
+   You cannot initialize with a keypair and hand over the authority later — there is
+   no rotation instruction.
+3. **Pause/unpause are proposals too.** Each pause or unpause is a proposal that must
+   reach the multisig's threshold before execution. Factor that latency into incident
+   response: a 2-of-3 with responsive members pauses in minutes; a DAO vote does not.
+4. **Verify before funding.** After initialize, fetch `VaultState` (SDK:
+   `fetchVaultState`) and confirm `pauseAuthority` equals the multisig vault PDA
+   before any deposits.
+
+What the multisig does *not* change: deposits, withdrawals, and all user-facing flows
+are unaffected — the authority gates only `pause`/`unpause`.
 
 ### What this prototype never claims
 
