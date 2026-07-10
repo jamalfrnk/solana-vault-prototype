@@ -21,8 +21,9 @@ vault product without building custody logic from zero.
 
 ## Status
 
-M0–M13 are merged. **M14 (dApp shell) is code-complete and CI-green, open for review
-on PR #19** — not yet merged; see `ROADMAP.md` for the milestone-by-milestone history.
+**All 14 MVP milestones are merged** — M14 (dApp shell) merged via PR #19 on
+2026-07-10; see `ROADMAP.md` for the milestone-by-milestone history and the
+Post-MVP Roadmap section for what's proposed next.
 
 The vault is implemented, tested, and hardened, and every instruction has been
 confirmed live on Solana devnet: `initialize`, `deposit`, `withdraw`, `pause`, and

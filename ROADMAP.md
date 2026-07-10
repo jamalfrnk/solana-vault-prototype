@@ -21,7 +21,7 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 | 11 | CI/CD pipeline | `[x]` complete |
 | 12 | Production hardening pass | `[x]` complete |
 | 13 | SDK package | `[x]` complete |
-| 14 | dApp shell | `[~]` code-complete, CI green, PR #19 open for review |
+| 14 | dApp shell | `[x]` complete |
 
 ## Milestone 0 — Repository bootstrap (complete)
 
@@ -257,7 +257,7 @@ Observed (2026-07-09): `corepack yarn test:sdk` — 48/48 pass, offline, no RPC,
 compiled program. `corepack yarn typecheck` — clean. No Rust files touched this
 milestone (nothing to regress). PR pending.
 
-## Milestone 14 — dApp Shell (code-complete, CI green, PR #19 open for review)
+## Milestone 14 — dApp Shell (complete)
 
 Added `app/` — a minimal Next.js (App Router) dApp on `feature/dapp-shell`: connect
 wallet, enter a mint, view vault state, deposit, withdraw, view shares, an admin
@@ -321,7 +321,13 @@ since it's exactly what would have caught the `turbopack.root` regression above.
 Observed (2026-07-09): `npm --prefix app run test` — 32/32 pass, offline, mocked wallet
 + SDK, no live RPC. `npm --prefix app run typecheck` — clean. `npm --prefix app run
 build` — clean, from a fresh `npm ci` install matching the committed `package-lock.json`
-(simulating exactly what CI runs). No Rust files touched this milestone. PR pending.
+(simulating exactly what CI runs). No Rust files touched this milestone.
+
+The `app-test` CI job's own gap — it never installed root dependencies, so `sdk/src`'s
+imports (`@solana/web3.js`, `@anchor-lang/core`) were unresolvable when typechecking
+through the `@vault-sdk` path alias — was fixed on the same branch (`fix(ci): install
+root deps before app typecheck in app-test job`) and confirmed green before merge.
+PR #19 merged into `main` as squash commit `b8837fd` on 2026-07-10.
 
 ## Post-MVP Roadmap (proposed — none started, none approved)
 
