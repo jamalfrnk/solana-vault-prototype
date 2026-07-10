@@ -321,7 +321,34 @@ since it's exactly what would have caught the `turbopack.root` regression above.
 Observed (2026-07-09): `npm --prefix app run test` — 32/32 pass, offline, mocked wallet
 + SDK, no live RPC. `npm --prefix app run typecheck` — clean. `npm --prefix app run
 build` — clean, from a fresh `npm ci` install matching the committed `package-lock.json`
-(simulating exactly what CI runs). No Rust files touched this milestone. PR pending.
+(simulating exactly what CI runs). No Rust files touched this milestone.
+
+The `app-test` CI job's own gap — it never installed root dependencies, so `sdk/src`'s
+imports (`@solana/web3.js`, `@anchor-lang/core`) were unresolvable when typechecking
+through the `@vault-sdk` path alias — was fixed on the same branch (`fix(ci): install
+root deps before app typecheck in app-test job`) and confirmed green before merge.
+PR #19 merged into `main` as squash commit `b8837fd` on 2026-07-10.
+
+## Post-MVP Roadmap (proposed — none started, none approved)
+
+Milestones 0–14 are the MVP `PROJECT_CONTEXT.md` scoped from day one: a hardened,
+tested, single-asset vault plus a TypeScript SDK and a minimal dApp shell. That
+document's anti-goals list deliberately kept everything below out of MVP scope so the
+prototype stayed small enough to explain line by line. They are the candidate pool for
+what comes after the MVP, not a committed backlog — per project law, none of them
+starts until Malcolm approves one as the next milestone and it gets its own feature
+branch.
+
+| Candidate | Revisits this anti-goal | Why it's a real next step |
+|---|---|---|
+| Multi-asset vault support | multi-asset support | Today's design is deliberately single-mint; generalizing the PDA seed and account layout is the largest architectural change on this list. |
+| Fee mechanism | tokenomics | Management/performance fees with tested, checked-arithmetic accounting — the same rigor M5/M6/M12 applied to deposit/withdraw. |
+| Governance-controlled authority | governance, multisig | Replace the single `pause_authority` keypair with a multisig or DAO-controlled account — no change to the on-chain constraint itself, only to who can sign it. |
+| Third-party security audit | formal-audit claims | The one item that actually removes the "not audited" disclaimer — everything else in this table should probably wait until after it. |
+| Mainnet operational readiness | mainnet deployment, production custody claims | Key management, monitoring, alerting, incident runbook — operational maturity, not new instructions. |
+| Yield strategy integration | yield strategies, lending integrations | Deploying idle custody assets into an approved venue. Highest blast radius on this list; should follow, not precede, the audit. |
+| SDK v2 / published package | — | Versioned npm publish, IDL-based codegen once a machine with the Anchor CLI is available, replacing the current hand-derived-discriminator approach. |
+| dApp productization | frontend application (already relaxed by M14) | Transaction history, broader wallet support, real analytics — M14 was deliberately plain CSS, no charts. |
 
 ## Notes
 
