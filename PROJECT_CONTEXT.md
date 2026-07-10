@@ -26,6 +26,10 @@ SPL token transfers, PDA authority, CPI, account validation, and security testin
 - technical recruiters
 - interviewers reviewing Rust/Anchor design judgment
 - security-conscious reviewers
+- open-source Solana and Rust developers looking for a small, fully-tested
+  reference for PDA-based custody, CPI safety, and adversarial testing
+- teams scoping a real DeFi vault product who want an honestly-scoped starting
+  point rather than building custody logic from zero
 
 ## Initial product scope
 
@@ -82,6 +86,21 @@ The project is successful when:
 8. The Git history shows small, reviewable milestones.
 9. Malcolm can explain every account, constraint, CPI, invariant, and negative test.
 10. The repository never implies that an unaudited demo is production ready.
+
+## Post-MVP outlook
+
+Milestones 0–14 deliver the MVP this document scoped: an interview-grade,
+security-tested, single-asset vault, a TypeScript SDK, and a minimal dApp shell. That
+MVP now also serves a second purpose beyond the original interview claim above: it is
+open-source groundwork the Solana and Rust developer communities can read, fork, and
+extend — a compact reference for PDA-based custody, CPI safety, and adversarial
+testing discipline, and a starting point for anyone building a real DeFi vault
+product on Solana rather than a from-scratch custody design.
+
+Concrete next-phase candidates live in `ROADMAP.md`'s Post-MVP Roadmap section and
+revisit the anti-goals list above one at a time. None are approved yet — the project
+law and work-in-progress limit below still govern how, and whether, any of them gets
+picked up.
 
 ## Project law
 
