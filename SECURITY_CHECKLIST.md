@@ -244,6 +244,36 @@ observed, and emitting an event grants no authority.
       — M12: `test_direct_donation_does_not_inflate_withdrawable_amount`,
         `test_direct_donation_does_not_skew_second_depositor_share_price`.
 
+## Dependency security (M15)
+
+The JS/TS dependency trees (root `yarn.lock`, `app/package-lock.json`) were remediated
+against all 20 open Dependabot alerts (1 critical, 6 high, 12 moderate, 1 low) plus the
+additional advisories `yarn audit`/`npm audit` surfaced beyond Dependabot's set. The
+primary fix was removal, not patching: `@solana/wallet-adapter-wallets` (the 30+ wallet
+meta-package) was replaced with the two individual adapter packages the dApp actually
+uses (`@solana/wallet-adapter-phantom`, `@solana/wallet-adapter-solflare`), which
+eliminated the unused Torus/Trezor/Particle/Keystone wallet trees carrying `protobufjs`
+(incl. the critical RCE advisory), `elliptic` (low, **no patched version exists** —
+moot once removed rather than accepted as a risk), `lodash`, and vulnerable `ws`
+ranges. The remainder was forced to patched versions via npm `overrides` (`postcss`,
+`uuid`) and yarn `resolutions` (`js-yaml`, `uuid`, `diff`, `serialize-javascript`),
+plus a `mocha` 9→11 dev-dependency upgrade.
+
+- [x] `npm audit` in `app/` reports 0 vulnerabilities.
+      — M15: observed locally after remediation; gated in CI at high/critical.
+- [x] `yarn audit` at root reports 0 vulnerabilities.
+      — M15: observed locally after remediation; gated in CI at high/critical
+        (Yarn 1 exit-code bitmask, fail on the 8|16 bits).
+- [x] Rust dependencies audited.
+      — M11: `cargo audit` job gates every PR (unchanged this pass).
+- [x] Forced transitive bumps verified against real behavior, not just installs.
+      — M15: 48/48 SDK tests under mocha 11 + forced `diff@8` (including a deliberate
+        failing-test run to confirm assertion-diff rendering still works), 34/34 dApp
+        tests, clean `next build`, and a served production build returning HTTP 200.
+
+Cadence note: `overrides`/`resolutions` pins go stale — when a parent package ships its
+own fixed dependency, remove the pin rather than letting it mask future range bumps.
+
 ## Secrets
 
 - [x] `.gitignore` excludes wallets, keypairs, `.env` values, and build artifacts.

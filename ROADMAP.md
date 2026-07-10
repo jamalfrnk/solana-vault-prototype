@@ -22,6 +22,7 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 | 12 | Production hardening pass | `[x]` complete |
 | 13 | SDK package | `[x]` complete |
 | 14 | dApp shell | `[x]` complete |
+| 15 | Dependency security remediation | `[~]` in progress |
 
 ## Milestone 0 — Repository bootstrap (complete)
 
@@ -328,6 +329,45 @@ imports (`@solana/web3.js`, `@anchor-lang/core`) were unresolvable when typechec
 through the `@vault-sdk` path alias — was fixed on the same branch (`fix(ci): install
 root deps before app typecheck in app-test job`) and confirmed green before merge.
 PR #19 merged into `main` as squash commit `b8837fd` on 2026-07-10.
+
+## Milestone 15 — Dependency Security Remediation (in progress)
+
+First post-MVP milestone, approved by Malcolm 2026-07-10. Remediates all 20 open
+Dependabot alerts (1 critical, 6 high, 12 moderate, 1 low) across `app/package-lock.json`
+and `yarn.lock`, plus additional advisories `yarn audit`/`npm audit` surfaced beyond
+Dependabot's set, on `feature/dependency-security`.
+
+Core insight: every app-side alert was transitive through
+`@solana/wallet-adapter-wallets`, the 30+ wallet meta-package — via wallets the dApp
+deliberately never offered (Torus → `elliptic`, Trezor → `protobufjs` including the
+critical RCE advisory, Particle/Keystone → `uuid`, react-native → `ws`). M14 had
+already scoped the UI to Phantom + Solflare; M15 makes the dependency graph match the
+UI by replacing the meta-package with `@solana/wallet-adapter-phantom` +
+`@solana/wallet-adapter-solflare`. Removal over patching: the unpatchable `elliptic`
+advisory became moot instead of an accepted risk, and the attack surface shrank
+instead of being pinned.
+
+Remainder fixed by forcing patched versions: npm `overrides` in `app/package.json`
+(`postcss >=8.5.10` — via Next; `uuid >=11.1.1` — via Solflare SDK and web3.js's
+jayson) and yarn `resolutions` at root (`js-yaml ^4.2.0` — via mocha; `uuid ^11.1.1`;
+`diff ^8.0.3` and `serialize-javascript ^7.0.5` — still vulnerable even under latest
+mocha), plus dev-dependency upgrades `mocha` 9→11, `ts-mocha` →10.1.0 (the first
+version whose peer range admits mocha 11), `@types/mocha` 9→10. The mocha upgrade
+required fixing `test:sdk`'s glob quoting (single→double quotes) for mocha 11 on
+Windows. A new `app/__tests__/lib/wallets.test.ts` pins the wallet list (exactly
+Phantom + Solflare) now that its import source changed.
+
+CI gains two audit gates: `npm audit --audit-level=high` in the app-test job and a
+Yarn-1-exit-code-bitmask gate (fail on high/critical bits) in the sdk-test job —
+deliberately not gating low/moderate so a new advisory in a transitive dep doesn't
+block unrelated PRs.
+
+Observed (2026-07-10): `npm audit` in `app/` — 0 vulnerabilities. `corepack yarn
+audit` at root — 0 vulnerabilities. 48/48 SDK tests under mocha 11 (including a
+deliberate failing-test run confirming forced `diff@8` still renders assertion
+diffs). 34/34 dApp tests (32 prior + 2 new wallet-list pins). Root + app typecheck
+clean. `next build` clean; served production build returned HTTP 200. No Rust or
+on-chain program changes.
 
 ## Post-MVP Roadmap (proposed — none started, none approved)
 
