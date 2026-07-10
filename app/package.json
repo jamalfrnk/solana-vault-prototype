@@ -1,0 +1,36 @@
+{
+  "name": "solana-vault-prototype-app",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "next": "16.2.10",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "@solana/web3.js": "^1.98.4",
+    "@solana/wallet-adapter-base": "^0.9.27",
+    "@solana/wallet-adapter-react": "^0.15.39",
+    "@solana/wallet-adapter-react-ui": "^0.9.39",
+    "@solana/wallet-adapter-wallets": "^0.19.38"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@types/node": "^22.0.0",
+    "vitest": "^4.1.10",
+    "@vitejs/plugin-react": "^5.0.0",
+    "jsdom": "^25.0.0",
+    "@testing-library/react": "^16.1.0",
+    "@testing-library/dom": "^10.4.0",
+    "@testing-library/jest-dom": "^6.6.0",
+    "vite-tsconfig-paths": "^5.1.0"
+  }
+}

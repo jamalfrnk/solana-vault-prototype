@@ -1,0 +1,52 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family:
+    system-ui,
+    -apple-system,
+    Segoe UI,
+    Roboto,
+    sans-serif;
+  color: #111;
+  background: #fff;
+}
+
+main {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+button {
+  font: inherit;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+label {
+  display: block;
+  margin-top: 1rem;
+  font-weight: 600;
+}
+
+input {
+  display: block;
+  font: inherit;
+  padding: 0.4rem;
+  margin-top: 0.25rem;
+  margin-bottom: 0.5rem;
+}
+
+form {
+  margin-top: 1rem;
+}
+
+[role="alert"] {
+  color: #a4262c;
+}

@@ -5,6 +5,12 @@ test-ledger/
 node_modules/
 coverage/
 
+# Next.js app (M14)
+app/.next/
+app/out/
+app/next-env.d.ts
+*.tsbuildinfo
+
 # Anchor / Solana tooling artifacts
 **/*.rs.bk
 .yarn

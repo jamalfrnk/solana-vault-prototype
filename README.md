@@ -2,19 +2,21 @@
 
 ## Status
 
-**Milestone 13 complete — TypeScript SDK package added; production hardening pass and
-all instructions verified on Solana devnet (M10).**
+**Milestone 14 complete — minimal dApp shell added on top of the SDK; production
+hardening pass and all instructions verified on Solana devnet (M10).**
 
-All 13 milestones merged. The vault is fully implemented, tested, hardened, and
+All 14 milestones merged. The vault is fully implemented, tested, hardened, and
 demonstrated on-chain: `initialize`, `deposit`, `withdraw`, `pause`, and `unpause`
 confirmed on Solana devnet (2026-06-26). M11 added a CI pipeline (fmt, build, clippy,
 test, audit) gating every PR. M12 closed four MVP-accepted risks (custody ATA
 pre-creation DoS, unchecked mint freeze authority, `vault_authority` confused-deputy
 exposure, hand-calculated account size) and added instruction events. M13 added a
 TypeScript SDK (`sdk/`) — PDA derivation, instruction builders, account decoders, and
-Anchor error parsing, all IDL-free and locally testable (48 tests). 41/41 Rust tests and
-48/48 SDK tests pass. Architecture is ACCEPTED. Interview walkthrough at
-`docs/INTERVIEW_WALKTHROUGH.md`.
+Anchor error parsing, all IDL-free and locally testable. M14 added a minimal Next.js
+dApp (`app/`) on top of the SDK: connect wallet, enter a mint, view vault state,
+deposit, withdraw, view shares, an admin pause/unpause panel, and a cluster warning
+banner. 41/41 Rust tests, 48/48 SDK tests, and 32/32 dApp tests pass. Architecture is
+ACCEPTED. Interview walkthrough at `docs/INTERVIEW_WALKTHROUGH.md`.
 
 This is an interview-grade educational prototype. It is **not** audited, **not**
 production-safe, **not** mainnet-ready, and **not** formally verified. This hardening
@@ -177,6 +179,44 @@ keypair — so its correctness rests on the 48 offline unit tests plus manual re
 an observed run. Treat it the same way `devnet_demo.ts`'s own prerequisites are treated:
 run it yourself with a funded `~/.config/solana/id.json` before trusting it live.
 
+## dApp (M14)
+
+`app/` is a minimal Next.js (App Router) dApp built on top of `sdk/` — connect wallet,
+enter a mint, view vault state, deposit, withdraw, view shares, an admin pause/unpause
+panel, and a cluster warning banner. Deliberately not a polished product: no charts, no
+analytics, plain CSS only.
+
+```bash
+cd app
+npm install
+npm run dev     # http://localhost:3000
+npm run test    # 32 tests, offline, mocked wallet + SDK, no live RPC
+npm run build
+```
+
+(Or from the repo root: `npm run app:dev` / `npm run app:test` / `npm run app:build`.)
+
+Two things worth knowing:
+
+- **The cluster warning banner is scoped down.** wallet-adapter has no reliable,
+  portable API to query which cluster a connected wallet is actually on, so the banner
+  states the app's *configured* cluster (devnet) rather than attempting a fragile
+  wallet-cluster-comparison heuristic. Confirm your wallet's network manually before
+  transacting.
+- **The admin pause/unpause panel's authority check is cosmetic only.** It's hidden
+  client-side unless the connected wallet matches `vaultState.pauseAuthority`, but that
+  proves nothing on its own — real enforcement is the on-chain constraint already tested
+  in the Rust program (M4/M7/M12).
+
+Manual browser verification (real `next dev`, a real headless-Chromium pass) confirmed:
+the landing page loads with no console errors; the wallet modal opens and lists exactly
+Phantom and Solflare; an invalid mint address shows an inline error; and a syntactically
+valid but nonexistent mint navigates to `/vault/[mint]` and renders a genuine,
+non-mocked "vault not found" result from a real devnet RPC call. **Not verified**: an
+actual wallet-extension-approved transaction — no wallet extension or funded devnet
+keypair is available in this development environment. Connect a real wallet yourself to
+exercise deposit/withdraw/pause end to end.
+
 ## Development workflow
 
 - One milestone and one feature branch at a time; no feature work on `main`.
@@ -247,6 +287,17 @@ sdk/
     client.ts                  VaultClient convenience wrapper (M13)
     index.ts                    Barrel export (M13)
   tests/                       48 offline unit tests — no IDL, no live cluster (M13)
+app/
+  package.json             Next.js/React/wallet-adapter dependencies (nested, npm) (M14)
+  app/
+    layout.tsx               Providers + ClusterWarningBanner (M14)
+    page.tsx                  Landing: wallet connect + mint entry form (M14)
+    vault/[mint]/page.tsx      Vault detail route (M14)
+  components/                 WalletConnectButton, ClusterWarningBanner, MintAddressForm,
+                               VaultDetail, DepositForm, WithdrawForm, AdminPausePanel,
+                               UserSharesDisplay (M14)
+  lib/solana/                 connection.ts, wallets.ts, mint.ts (M14)
+  __tests__/                  32 offline unit tests — mocked wallet + SDK, no live cluster (M14)
 scripts/
   devnet_demo.ts            M10 devnet demonstration script
   sdk_devnet_smoke.ts       M13 SDK devnet smoke script (not yet executed — see SDK section below)
@@ -280,7 +331,7 @@ A devcontainer is configured. To start a reproducible environment:
 
 ## Testing strategy
 
-> See `TEST_PLAN.md`. All 41 Rust tests and 48 SDK tests pass.
+> See `TEST_PLAN.md`. All 41 Rust tests, 48 SDK tests, and 32 dApp tests pass.
 
 Program tests run entirely via LiteSVM (in-process SVM, no network required):
 
@@ -298,6 +349,13 @@ toolchain and no live cluster required:
 
 ```
 corepack yarn test:sdk
+```
+
+dApp tests (`app/__tests__/`) run independently via Vitest + React Testing Library,
+also no Rust/Solana/Anchor toolchain and no live cluster required:
+
+```
+cd app && npm run test
 ```
 
 ## Roadmap
@@ -320,6 +378,7 @@ See `ROADMAP.md`. All milestones complete.
 | 11 — CI/CD pipeline | complete |
 | 12 — Production hardening pass | complete |
 | 13 — SDK package | complete |
+| 14 — dApp shell | complete |
 
 ## Interview walkthrough
 

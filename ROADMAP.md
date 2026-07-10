@@ -21,6 +21,7 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 | 11 | CI/CD pipeline | `[x]` complete |
 | 12 | Production hardening pass | `[x]` complete |
 | 13 | SDK package | `[x]` complete |
+| 14 | dApp shell | `[x]` complete |
 
 ## Milestone 0 — Repository bootstrap (complete)
 
@@ -255,6 +256,72 @@ gating every future PR the same way `build-and-test`/`audit` already do.
 Observed (2026-07-09): `corepack yarn test:sdk` — 48/48 pass, offline, no RPC, no
 compiled program. `corepack yarn typecheck` — clean. No Rust files touched this
 milestone (nothing to regress). PR pending.
+
+## Milestone 14 — dApp Shell (complete)
+
+Added `app/` — a minimal Next.js (App Router) dApp on `feature/dapp-shell`: connect
+wallet, enter a mint, view vault state, deposit, withdraw, view shares, an admin
+pause/unpause panel, and a cluster warning banner. Built entirely on the M13 SDK, no
+IDL, same relative-import pattern `scripts/*.ts` already use (`@vault-sdk` path alias
+→ `sdk/src`). Nested `app/package.json` (npm, not yarn — `Anchor.toml`'s yarn
+declaration governs the root/Anchor graph, not this nested app), since a Next.js app's
+runtime dependencies and build/dev/start scripts are a genuine requirement, unlike the
+SDK's deliberately-skipped workspace.
+
+`@solana/wallet-adapter-react`/`-react-ui`/`-wallets`: peer dependency on
+`@solana/web3.js ^1.98.0` matches the SDK's pin exactly — zero type-conversion shim
+between wallet-adapter and the SDK's instruction builders. Deliberately not using
+Solana's newer `@solana/kit` stack, which would replace `web3.js` v1 types entirely and
+require converting every SDK call site — same "don't build a new speculative surface"
+reasoning M13 used to skip a yarn workspace. Wallet list deliberately small: Phantom +
+Solflare only, not wallet-adapter-wallets' full 30+ list.
+
+`AdminPausePanel`'s `pauseAuthority` check is documented in the component as **cosmetic
+only** — hidden client-side unless the connected wallet matches
+`vaultState.pauseAuthority`, but that proves nothing on its own; real enforcement is the
+on-chain constraint already tested in the Rust program (M4/M7/M12). `ClusterWarningBanner`
+is scoped down to a static "app is configured for devnet" notice rather than attempting
+wallet-cluster-mismatch detection — wallet-adapter has no reliable, portable API for
+that; documented as a known limitation, not silently downgraded.
+
+This is the first milestone with real visual/browser verification: this environment has
+no Solana wallet extension or funded devnet keypair, so nothing requiring a signed
+transaction could be observed — but a real `next dev` server plus an ad hoc Playwright
+script (ephemeral, not committed to the repo) drove an actual headless Chromium against
+it. That pass caught two real bugs neither the 32 Vitest/RTL tests nor `next build`
+surfaced:
+
+- `next.config.ts`'s `turbopack.root` was set to `app/` itself to silence a
+  multiple-lockfiles warning, which then silently broke the legitimate cross-directory
+  `sdk/` import — Turbopack enforces its configured root as a hard module-resolution
+  boundary. Root now points at the repo root instead.
+- `ClusterWarningBanner` rendered "devnetbefore" with no space between the interpolated
+  cluster name and the following word, even on a single unbroken JSX source line — SWC's
+  JSX compiler trims leading whitespace from a text segment immediately following a
+  `{expression}`. Fixed with an explicit `{" "}` expression. Confirmed via the raw
+  server-rendered React children array (`["...to", " ", "devnet", " ", "before..."]`
+  after the fix), not just a screenshot — jsdom's `textContent`-based unit test
+  assertions would not have caught this class of bug at all.
+
+Also added minor form/label/input CSS spacing after visually reviewing the rendered
+page — labels and inputs had zero gap between them.
+
+Manual verification confirmed: landing page loads with zero console errors; wallet
+modal opens and lists exactly Phantom and Solflare; invalid mint shows an inline error;
+a syntactically valid but nonexistent mint navigates to `/vault/[mint]` and renders a
+genuine (non-mocked) "vault not found" result from a real devnet RPC call — the one
+live, observed, non-mocked check achievable without a wallet extension.
+**Not verified**: an actual wallet-extension-approved transaction (deposit/withdraw/pause)
+— explicitly left for the user, same honesty pattern as `scripts/sdk_devnet_smoke.ts`.
+
+New `app-test` CI job added to `ci.yml`, Node-only (no Agave/Anchor toolchain install):
+`npm ci` + `typecheck` + `build` + `test`. `build` is included, not just unit tests,
+since it's exactly what would have caught the `turbopack.root` regression above.
+
+Observed (2026-07-09): `npm --prefix app run test` — 32/32 pass, offline, mocked wallet
++ SDK, no live RPC. `npm --prefix app run typecheck` — clean. `npm --prefix app run
+build` — clean, from a fresh `npm ci` install matching the committed `package-lock.json`
+(simulating exactly what CI runs). No Rust files touched this milestone. PR pending.
 
 ## Notes
 

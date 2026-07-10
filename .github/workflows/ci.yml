@@ -106,3 +106,31 @@ jobs:
 
       - name: SDK tests
         run: corepack yarn test:sdk
+
+  app-test:
+    name: dApp tests (Node, no Solana/Anchor toolchain)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: root yarn install
+        run: corepack yarn install --frozen-lockfile
+
+      - name: npm install
+        run: npm --prefix app ci
+
+      - name: typecheck
+        run: npm --prefix app run typecheck
+
+      - name: build
+        run: npm --prefix app run build
+
+      - name: test
+        run: npm --prefix app run test
