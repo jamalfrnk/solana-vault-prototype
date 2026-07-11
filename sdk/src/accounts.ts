@@ -40,13 +40,16 @@ export interface VaultState {
  */
 export function decodeVaultState(data: Buffer): VaultState {
   checkDiscriminator(data, "VaultState", VAULT_STATE_LEN);
+  // DataView, not Buffer.readBigUInt64LE: browser Buffer polyfills lack the
+  // BigInt methods (Node-only). DataView is standard ES2020.
+  const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
   return {
     pauseAuthority: new PublicKey(data.subarray(8, 40)),
     mint: new PublicKey(data.subarray(40, 72)),
     vaultBump: data.readUInt8(72),
     authorityBump: data.readUInt8(73),
-    totalAssets: data.readBigUInt64LE(74),
-    totalShares: data.readBigUInt64LE(82),
+    totalAssets: dv.getBigUint64(74, true),
+    totalShares: dv.getBigUint64(82, true),
     isPaused: data.readUInt8(90) !== 0,
   };
 }
@@ -64,10 +67,11 @@ export interface UserPosition {
  */
 export function decodeUserPosition(data: Buffer): UserPosition {
   checkDiscriminator(data, "UserPosition", USER_POSITION_LEN);
+  const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
   return {
     owner: new PublicKey(data.subarray(8, 40)),
     vault: new PublicKey(data.subarray(40, 72)),
-    shares: data.readBigUInt64LE(72),
+    shares: dv.getBigUint64(72, true),
     bump: data.readUInt8(80),
   };
 }
