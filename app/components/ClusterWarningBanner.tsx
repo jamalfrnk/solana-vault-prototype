@@ -7,7 +7,12 @@ import { CONFIGURED_CLUSTER } from "../lib/solana/connection";
  */
 export function ClusterWarningBanner() {
   return (
-    <div role="status" style={{ background: "#fff3cd", padding: "0.5rem 1rem", fontSize: "0.9rem" }}>
+    <div
+      role="status"
+      // Explicit dark text: the app theme is dark (light text inherited from
+      // body would be unreadable on this light-amber banner background).
+      style={{ background: "#fff3cd", color: "#3a2e00", padding: "0.5rem 1rem", fontSize: "0.9rem" }}
+    >
       This app is configured for <strong>{CONFIGURED_CLUSTER}</strong>. Confirm your wallet is also set to{" "}
       {CONFIGURED_CLUSTER}
       {" "}before transacting — this app cannot verify your wallet&apos;s network automatically.

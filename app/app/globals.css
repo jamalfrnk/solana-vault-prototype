@@ -10,8 +10,8 @@ body {
     Segoe UI,
     Roboto,
     sans-serif;
-  color: #111;
-  background: #fff;
+  color: #e6e8ee;
+  background: #070a14;
 }
 
 main {
@@ -20,8 +20,22 @@ main {
   padding: 2rem 1rem;
 }
 
+a {
+  color: #7aa2ff;
+}
+
 button {
   font: inherit;
+  background: #1d2742;
+  color: #e6e8ee;
+  border: 1px solid #33406a;
+  border-radius: 6px;
+  padding: 0.45rem 1.1rem;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  background: #253154;
 }
 
 button:disabled {
@@ -41,6 +55,15 @@ input {
   padding: 0.4rem;
   margin-top: 0.25rem;
   margin-bottom: 0.5rem;
+  background: #10162a;
+  color: inherit;
+  border: 1px solid #2a3350;
+  border-radius: 4px;
+}
+
+input:focus {
+  outline: 2px solid #7aa2ff;
+  outline-offset: 1px;
 }
 
 form {
@@ -48,5 +71,46 @@ form {
 }
 
 [role="alert"] {
-  color: #a4262c;
+  color: #ff8389;
+}
+
+/* ==== Starfield background (M17) ====
+   Fixed and behind everything; parallax transform is applied per layer from
+   StarfieldBackground via rAF-throttled mousemove. */
+
+.starfield {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background: radial-gradient(ellipse 120% 80% at 50% -10%, #131c38 0%, #0b1024 45%, #070a14 100%);
+}
+
+.starfield-layer {
+  position: absolute;
+  /* Oversized so parallax shifts never expose an unstarred edge. */
+  inset: -48px;
+  will-change: transform;
+}
+
+.starfield-star {
+  position: absolute;
+  border-radius: 50%;
+  background: #fff;
+  animation-name: starfield-twinkle;
+  animation-iteration-count: infinite;
+  animation-timing-function: ease-in-out;
+}
+
+@keyframes starfield-twinkle {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .starfield-star {
+    animation: none;
+  }
 }
