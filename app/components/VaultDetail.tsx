@@ -6,6 +6,7 @@ import { VaultClient, VaultState, UserPosition } from "@vault-sdk";
 
 import { parseMintAddress } from "../lib/solana/mint";
 import { fetchMintDecimals } from "../lib/solana/amounts";
+import { useVaultAnimation } from "../hooks/useVaultAnimation";
 import { DepositForm } from "./DepositForm";
 import { WithdrawForm } from "./WithdrawForm";
 import { AdminPausePanel } from "./AdminPausePanel";
@@ -82,6 +83,15 @@ export function VaultDetail({ mintInput }: { mintInput: string }) {
     }
   }, [vaultClient, connected, publicKey]);
 
+  const { stage, openVault } = useVaultAnimation();
+
+  /** Confirmed deposit/withdraw: refresh authoritative balances FIRST, then
+   *  run the celebration — the opened vault must show current numbers. */
+  const celebrateConfirmed = useCallback(async () => {
+    await refresh();
+    openVault();
+  }, [refresh, openVault]);
+
   if (!mint) {
     return <p role="alert">Invalid mint address.</p>;
   }
@@ -107,6 +117,7 @@ export function VaultDetail({ mintInput }: { mintInput: string }) {
             totalAssets={vaultState.totalAssets}
             isPaused={vaultState.isPaused}
             decimals={displayDecimals}
+            stage={stage}
           />
           <VaultStatusPanel
             totalAssets={vaultState.totalAssets}
@@ -130,13 +141,13 @@ export function VaultDetail({ mintInput }: { mintInput: string }) {
             vaultClient={vaultClient!}
             isPaused={vaultState.isPaused}
             decimals={displayDecimals}
-            onConfirmed={refresh}
+            onConfirmed={celebrateConfirmed}
           />
           <WithdrawForm
             vaultClient={vaultClient!}
             userShares={userPosition?.shares ?? 0n}
             decimals={displayDecimals}
-            onConfirmed={refresh}
+            onConfirmed={celebrateConfirmed}
           />
           <AdminPausePanel
             vaultClient={vaultClient!}

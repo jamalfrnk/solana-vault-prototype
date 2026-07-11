@@ -10,9 +10,16 @@ describe("InteractiveVault", () => {
       <InteractiveVault totalAssets={100_000_000n} isPaused={false} decimals={6} />,
     );
     const scene = container.querySelector(".vault-scene");
-    expect(scene?.getAttribute("data-open")).to.equal("false");
+    expect(scene?.getAttribute("data-stage")).to.equal("closed");
     expect(screen.getByTestId("vault-door")).to.exist;
     expect(screen.getByTestId("vault-interior").textContent).to.include("100");
+  });
+
+  it("reflects the animation stage on the scene", () => {
+    const { container } = render(
+      <InteractiveVault totalAssets={0n} isPaused={false} decimals={6} stage="open" />,
+    );
+    expect(container.querySelector(".vault-scene")?.getAttribute("data-stage")).to.equal("open");
   });
 
   it("is decorative: hidden from assistive tech", () => {

@@ -1,9 +1,11 @@
+import { VaultStage } from "../../hooks/useVaultAnimation";
 import { VaultDoor } from "./VaultDoor";
 import { VaultInterior } from "./VaultInterior";
 
 /**
- * The vault visual shell (M17 Phase 3 — static, closed). The door layer
- * fully covers the interior; Phase 4 drives `open` to animate the reveal.
+ * The vault visual shell (M17). `stage` comes from useVaultAnimation and
+ * drives the CSS opening sequence via [data-stage]; the default is a static
+ * closed door.
  *
  * Decorative by design: aria-hidden, because every fact shown inside (the
  * balance) is also rendered as real text in VaultStatusPanel. The deposit /
@@ -14,15 +16,15 @@ export function InteractiveVault({
   totalAssets,
   isPaused,
   decimals,
-  open = false,
+  stage = "closed",
 }: {
   totalAssets: bigint;
   isPaused: boolean;
   decimals: number;
-  open?: boolean;
+  stage?: VaultStage;
 }) {
   return (
-    <div className="vault-scene" data-open={open ? "true" : "false"} aria-hidden="true">
+    <div className="vault-scene" data-stage={stage} aria-hidden="true">
       <div className="vault-frame">
         <VaultInterior totalAssets={totalAssets} decimals={decimals} />
         <VaultDoor isPaused={isPaused} />
