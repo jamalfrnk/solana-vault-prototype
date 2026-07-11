@@ -36,12 +36,16 @@ describe("InteractiveVault", () => {
     expect(container.querySelector(".vault-led")?.getAttribute("data-paused")).to.equal("true");
   });
 
-  it("draws eight bolts and a three-spoke wheel", () => {
+  it("draws the reference-photo anatomy: rivets, dial, eight-armed wheel, left hinges", () => {
     const { container } = render(
       <InteractiveVault totalAssets={0n} isPaused={false} decimals={6} />,
     );
-    expect(container.querySelectorAll(".vault-bolt")).to.have.lengthOf(8);
-    expect(container.querySelectorAll(".vault-spoke")).to.have.lengthOf(3);
+    expect(container.querySelectorAll(".vault-rivet")).to.have.lengthOf(14); // frame edge
+    expect(container.querySelectorAll(".vault-rivet-ring-slot")).to.have.lengthOf(12); // ring
+    expect(screen.getByTestId("vault-dial")).to.exist;
+    expect(screen.getByTestId("vault-wheel")).to.exist;
+    expect(container.querySelectorAll(".vault-wheel-rod")).to.have.lengthOf(4); // 8 arms
+    expect(container.querySelectorAll(".vault-hinge")).to.have.lengthOf(2);
   });
 });
 
