@@ -13,18 +13,28 @@ vi.mock("@solana/wallet-adapter-react", () => ({
 import { WithdrawForm } from "../components/WithdrawForm";
 import type { VaultClient } from "../../sdk/src";
 
-const buildWithdrawIxMock = vi.fn().mockReturnValue({});
+const buildWithdrawIxMock = vi.fn().mockReturnValue({ keys: [], programId: {}, data: {} });
 const fakeVaultClient = {
   buildWithdrawIx: buildWithdrawIxMock,
 } as unknown as VaultClient;
 
 const userPublicKey = Keypair.generate().publicKey;
 
+function makeConnection(overrides: Record<string, unknown> = {}) {
+  return {
+    getLatestBlockhash: vi
+      .fn()
+      .mockResolvedValue({ blockhash: "fakehash", lastValidBlockHeight: 100 }),
+    confirmTransaction: vi.fn().mockResolvedValue({ value: { err: null } }),
+    ...overrides,
+  };
+}
+
 describe("WithdrawForm", () => {
   beforeEach(() => {
     sendTransactionMock.mockReset();
     buildWithdrawIxMock.mockClear();
-    useConnectionMock.mockReturnValue({ connection: {} });
+    useConnectionMock.mockReturnValue({ connection: makeConnection() });
     useWalletMock.mockReturnValue({
       connected: true,
       publicKey: userPublicKey,
@@ -33,52 +43,95 @@ describe("WithdrawForm", () => {
   });
 
   it("is disabled with a reason when the user has zero shares", () => {
-    render(<WithdrawForm vaultClient={fakeVaultClient} userShares={0n} />);
+    render(<WithdrawForm vaultClient={fakeVaultClient} userShares={0n} decimals={0} />);
     expect(screen.getByRole("button", { name: /withdraw/i })).to.have.property("disabled", true);
     expect(screen.getByText(/no shares/i)).to.exist;
   });
 
   it("is disabled with a message when requesting more shares than owned", () => {
-    render(<WithdrawForm vaultClient={fakeVaultClient} userShares={100n} />);
+    render(<WithdrawForm vaultClient={fakeVaultClient} userShares={100n} decimals={0} />);
     fireEvent.change(screen.getByLabelText(/shares/i), { target: { value: "500" } });
     expect(screen.getByRole("button", { name: /withdraw/i })).to.have.property("disabled", true);
     expect(screen.getByText(/exceeds your balance/i)).to.exist;
   });
 
   it("is enabled for a valid share amount", () => {
-    render(<WithdrawForm vaultClient={fakeVaultClient} userShares={100n} />);
+    render(<WithdrawForm vaultClient={fakeVaultClient} userShares={100n} decimals={0} />);
     fireEvent.change(screen.getByLabelText(/shares/i), { target: { value: "50" } });
     expect(screen.getByRole("button", { name: /withdraw/i })).to.have.property("disabled", false);
   });
 
   it("is disabled with a reason when the wallet is not connected", () => {
-    useWalletMock.mockReturnValue({ connected: false, publicKey: null, sendTransaction: sendTransactionMock });
-    render(<WithdrawForm vaultClient={fakeVaultClient} userShares={100n} />);
+    useWalletMock.mockReturnValue({
+      connected: false,
+      publicKey: null,
+      sendTransaction: sendTransactionMock,
+    });
+    render(<WithdrawForm vaultClient={fakeVaultClient} userShares={100n} decimals={0} />);
     expect(screen.getByRole("button", { name: /withdraw/i })).to.have.property("disabled", true);
     expect(screen.getByText(/connect your wallet/i)).to.exist;
   });
 
-  it("shows a success message when the transaction succeeds", async () => {
-    sendTransactionMock.mockResolvedValue("fakesig456");
-    render(<WithdrawForm vaultClient={fakeVaultClient} userShares={100n} />);
+  it("scales share-denominated input by decimals", async () => {
+    sendTransactionMock.mockResolvedValue("sig-w-scale");
+    render(<WithdrawForm vaultClient={fakeVaultClient} userShares={10_000_000n} decimals={6} />);
+
+    fireEvent.change(screen.getByLabelText(/shares/i), { target: { value: "2.5" } });
+    fireEvent.click(screen.getByRole("button", { name: /withdraw/i }));
+
+    await waitFor(() => {
+      expect(buildWithdrawIxMock).toHaveBeenCalledWith(userPublicKey, 2_500_000n);
+    });
+  });
+
+  it("shows success with amount and explorer link only after on-chain confirmation", async () => {
+    sendTransactionMock.mockResolvedValue("sig-w-confirmed");
+    const onConfirmed = vi.fn();
+    render(
+      <WithdrawForm
+        vaultClient={fakeVaultClient}
+        userShares={100n}
+        decimals={0}
+        onConfirmed={onConfirmed}
+      />,
+    );
 
     fireEvent.change(screen.getByLabelText(/shares/i), { target: { value: "50" } });
     fireEvent.click(screen.getByRole("button", { name: /withdraw/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/success/i)).to.exist;
+      expect(screen.getByText(/withdrawal confirmed/i)).to.exist;
     });
+    expect(screen.getByText(/withdrew 50 shares/i)).to.exist;
+    expect(screen.getByRole("link", { name: /explorer/i }))
+      .to.have.property("href")
+      .that.includes("sig-w-confirmed");
+    expect(onConfirmed).toHaveBeenCalledTimes(1);
     expect(buildWithdrawIxMock).toHaveBeenCalledWith(userPublicKey, 50n);
   });
 
-  it("shows a decoded VaultError message when the transaction fails", async () => {
+  it("treats wallet rejection as cancellation, not success or error", async () => {
+    sendTransactionMock.mockRejectedValue(new Error("User rejected the request"));
+    render(<WithdrawForm vaultClient={fakeVaultClient} userShares={100n} decimals={0} />);
+
+    fireEvent.change(screen.getByLabelText(/shares/i), { target: { value: "50" } });
+    fireEvent.click(screen.getByRole("button", { name: /withdraw/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/cancelled in wallet/i)).to.exist;
+    });
+    expect(screen.queryByText(/withdrawal confirmed/i)).to.equal(null);
+    expect(screen.queryByRole("alert")).to.equal(null);
+  });
+
+  it("shows a decoded VaultError message when the program rejects the transaction", async () => {
     sendTransactionMock.mockRejectedValue({
       logs: [
         "Program FYqCCoAnM9tUYRcSRbeLbUE9LBPv8bN2uyuhcz46pSgq invoke [1]",
         "Program log: AnchorError thrown in programs/solana-vault-prototype/src/instructions/withdraw.rs:64. Error Code: InsufficientShares. Error Number: 6001. Error Message: Insufficient shares for withdrawal.",
       ],
     });
-    render(<WithdrawForm vaultClient={fakeVaultClient} userShares={100n} />);
+    render(<WithdrawForm vaultClient={fakeVaultClient} userShares={100n} decimals={0} />);
 
     fireEvent.change(screen.getByLabelText(/shares/i), { target: { value: "50" } });
     fireEvent.click(screen.getByRole("button", { name: /withdraw/i }));
@@ -86,5 +139,29 @@ describe("WithdrawForm", () => {
     await waitFor(() => {
       expect(screen.getByRole("alert").textContent).to.match(/insufficient shares/i);
     });
+  });
+
+  it("does not submit a duplicate transaction on rapid double click", async () => {
+    let resolveSend: (sig: string) => void = () => {};
+    sendTransactionMock.mockImplementation(
+      () => new Promise<string>((resolve) => (resolveSend = resolve)),
+    );
+    render(<WithdrawForm vaultClient={fakeVaultClient} userShares={100n} decimals={0} />);
+
+    fireEvent.change(screen.getByLabelText(/shares/i), { target: { value: "50" } });
+    const button = screen.getByRole("button", { name: /withdraw/i });
+    fireEvent.click(button);
+    fireEvent.click(button);
+
+    // The lifecycle awaits getLatestBlockhash before invoking the wallet, so
+    // wait until the (single) sendTransaction call exists before resolving it.
+    await waitFor(() => {
+      expect(sendTransactionMock).toHaveBeenCalledTimes(1);
+    });
+    resolveSend("sig-w-single");
+    await waitFor(() => {
+      expect(screen.getByText(/withdrawal confirmed/i)).to.exist;
+    });
+    expect(sendTransactionMock).toHaveBeenCalledTimes(1);
   });
 });
