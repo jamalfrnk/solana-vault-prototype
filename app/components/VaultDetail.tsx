@@ -134,6 +134,7 @@ export function VaultDetail({ mintInput }: { mintInput: string }) {
         vaultClient={vaultClient!}
         pauseAuthority={vaultState.pauseAuthority}
         isPaused={vaultState.isPaused}
+        onConfirmed={refresh}
       />
     </section>
   );
