@@ -1,22 +1,30 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { Transaction } from "@solana/web3.js";
-import { parseVaultError, VaultClient } from "@vault-sdk";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { VaultClient } from "@vault-sdk";
+
+import { useTransactionLifecycle } from "../hooks/useTransactionLifecycle";
+import { parseTokenAmount } from "../lib/solana/amounts";
+import { TransactionStatus } from "./TransactionStatus";
 
 export function DepositForm({
   vaultClient,
   isPaused,
+  decimals,
+  onConfirmed,
 }: {
   vaultClient: VaultClient;
   isPaused: boolean;
+  /** Mint decimals — user input is token-denominated and scaled by this. */
+  decimals: number;
+  /** Refreshes authoritative balances after on-chain confirmation. */
+  onConfirmed?: () => Promise<void> | void;
 }) {
-  const { connection } = useConnection();
-  const { connected, publicKey, sendTransaction } = useWallet();
+  const { connected, publicKey } = useWallet();
   const [amount, setAmount] = useState("");
-  const [status, setStatus] = useState<"idle" | "pending" | "success">("idle");
-  const [error, setError] = useState<string | null>(null);
+  const [confirmedAmount, setConfirmedAmount] = useState<string | null>(null);
+  const { state, run, busy } = useTransactionLifecycle();
 
   const disabledReason = !connected
     ? "Connect your wallet to deposit."
@@ -26,40 +34,41 @@ export function DepositForm({
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!connected || !publicKey || isPaused) return;
+    if (disabledReason || !publicKey || busy) return;
 
-    setStatus("pending");
-    setError(null);
-    try {
-      const ix = vaultClient.buildDepositIx(publicKey, BigInt(amount));
-      const tx = new Transaction().add(ix);
-      await sendTransaction(tx, connection);
-      setStatus("success");
-    } catch (err) {
-      const parsed = parseVaultError(err);
-      setError(parsed.code !== undefined ? parsed.message : "Deposit failed. Please try again.");
-      setStatus("idle");
-    }
+    const parsed = parseTokenAmount(amount, decimals);
+    const submittedAmount = amount.trim();
+    await run({
+      validate: () => parsed.problem,
+      buildIx: () => vaultClient.buildDepositIx(publicKey, parsed.baseUnits),
+      onConfirmed: async () => {
+        setConfirmedAmount(submittedAmount);
+        await onConfirmed?.();
+      },
+    });
   }
 
   return (
     <form onSubmit={handleSubmit}>
       <h3>Deposit</h3>
-      <label htmlFor="deposit-amount">Amount</label>
+      <label htmlFor="deposit-amount">Amount (tokens)</label>
       <input
         id="deposit-amount"
         name="deposit-amount"
-        type="number"
-        min="0"
+        type="text"
+        inputMode="decimal"
         value={amount}
         onChange={(e) => setAmount(e.target.value)}
       />
-      <button type="submit" disabled={disabledReason !== null}>
+      <button type="submit" disabled={disabledReason !== null || busy}>
         Deposit
       </button>
       {disabledReason && <p>{disabledReason}</p>}
-      {status === "success" && <p role="status">Deposit success.</p>}
-      {error && <p role="alert">{error}</p>}
+      <TransactionStatus
+        op="deposit"
+        state={state}
+        successDetail={confirmedAmount ? `Deposited ${confirmedAmount} tokens.` : undefined}
+      />
     </form>
   );
 }
