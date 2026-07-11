@@ -6,6 +6,7 @@ import { VaultClient, VaultState, UserPosition } from "@vault-sdk";
 
 import { parseMintAddress } from "../lib/solana/mint";
 import { fetchMintDecimals } from "../lib/solana/amounts";
+import { fetchMintDecimals, formatTokenAmount } from "../lib/solana/amounts";
 import { DepositForm } from "./DepositForm";
 import { WithdrawForm } from "./WithdrawForm";
 import { AdminPausePanel } from "./AdminPausePanel";
@@ -146,6 +147,37 @@ export function VaultDetail({ mintInput }: { mintInput: string }) {
           />
         </div>
       </div>
+      <dl>
+        <dt>Total assets</dt>
+        <dd>{formatTokenAmount(vaultState.totalAssets, displayDecimals)}</dd>
+        <dt>Total shares</dt>
+        <dd>{formatTokenAmount(vaultState.totalShares, displayDecimals)}</dd>
+        <dt>Status</dt>
+        <dd>{vaultState.isPaused ? "Paused" : "Active"}</dd>
+      </dl>
+      {!connected && <p>Connect your wallet to deposit, withdraw, or view your shares.</p>}
+
+      <UserSharesDisplay
+        shares={connected ? (userPosition?.shares ?? 0n) : null}
+        decimals={displayDecimals}
+      />
+      <DepositForm
+        vaultClient={vaultClient!}
+        isPaused={vaultState.isPaused}
+        decimals={displayDecimals}
+        onConfirmed={refresh}
+      />
+      <WithdrawForm
+        vaultClient={vaultClient!}
+        userShares={userPosition?.shares ?? 0n}
+        decimals={displayDecimals}
+        onConfirmed={refresh}
+      />
+      <AdminPausePanel
+        vaultClient={vaultClient!}
+        pauseAuthority={vaultState.pauseAuthority}
+        isPaused={vaultState.isPaused}
+      />
     </section>
   );
 }
