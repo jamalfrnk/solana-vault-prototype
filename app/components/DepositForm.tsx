@@ -49,7 +49,7 @@ export function DepositForm({
   }
 
   return (
-    <form onSubmit={handleSubmit}>
+    <form onSubmit={handleSubmit} className="panel">
       <h3>Deposit</h3>
       <label htmlFor="deposit-amount">Amount (tokens)</label>
       <input

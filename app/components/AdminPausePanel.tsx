@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { PublicKey, Transaction } from "@solana/web3.js";
-import { parseVaultError, VaultClient } from "@vault-sdk";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { PublicKey } from "@solana/web3.js";
+import { VaultClient } from "@vault-sdk";
+
+import { useTransactionLifecycle } from "../hooks/useTransactionLifecycle";
+import { TransactionStatus } from "./TransactionStatus";
 
 /**
  * Cosmetic gate only: this panel is hidden unless the connected wallet matches
@@ -16,40 +18,42 @@ export function AdminPausePanel({
   vaultClient,
   pauseAuthority,
   isPaused,
+  onConfirmed,
 }: {
   vaultClient: VaultClient;
   pauseAuthority: PublicKey;
   isPaused: boolean;
+  /** Refreshes authoritative vault state after confirmation — without this the
+   *  button label / LED / status froze on the pre-transaction value (the M17
+   *  "unpause doesn't work" bug: the tx landed, the UI never followed). */
+  onConfirmed?: () => Promise<void> | void;
 }) {
-  const { connection } = useConnection();
-  const { connected, publicKey, sendTransaction } = useWallet();
-  const [error, setError] = useState<string | null>(null);
+  const { connected, publicKey } = useWallet();
+  const { state, run, busy } = useTransactionLifecycle();
 
   if (!connected || !publicKey || !publicKey.equals(pauseAuthority)) {
     return null;
   }
 
+  const op = isPaused ? "unpause" : "pause";
+
   async function handleClick() {
-    setError(null);
-    try {
-      const ix = isPaused
-        ? vaultClient.buildUnpauseIx(publicKey!)
-        : vaultClient.buildPauseIx(publicKey!);
-      const tx = new Transaction().add(ix);
-      await sendTransaction(tx, connection);
-    } catch (err) {
-      const parsed = parseVaultError(err);
-      setError(parsed.code !== undefined ? parsed.message : "Action failed. Please try again.");
-    }
+    if (busy) return;
+    await run({
+      validate: () => null,
+      buildIx: () =>
+        isPaused ? vaultClient.buildUnpauseIx(publicKey!) : vaultClient.buildPauseIx(publicKey!),
+      onConfirmed,
+    });
   }
 
   return (
-    <section>
+    <section className="panel">
       <h3>Admin</h3>
-      <button type="button" onClick={handleClick}>
+      <button type="button" onClick={handleClick} disabled={busy}>
         {isPaused ? "Unpause" : "Pause"}
       </button>
-      {error && <p role="alert">{error}</p>}
+      <TransactionStatus op={op} state={state} />
     </section>
   );
 }

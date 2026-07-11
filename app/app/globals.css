@@ -4,49 +4,205 @@
 
 body {
   margin: 0;
-  font-family:
-    system-ui,
-    -apple-system,
-    Segoe UI,
-    Roboto,
-    sans-serif;
-  color: #111;
-  background: #fff;
+  font-family: var(--font-body, system-ui), system-ui, sans-serif;
+  font-size: 17px;
+  line-height: 1.55;
+  color: #e6e8ee;
+  background: radial-gradient(ellipse 120% 80% at 50% -10%, #131c38 0%, #0b1024 45%, #070a14 100%)
+    fixed;
 }
 
 main {
-  max-width: 640px;
+  max-width: 1180px;
   margin: 0 auto;
-  padding: 2rem 1rem;
+  padding: 2.5rem 1.5rem 4rem;
 }
+
+h1,
+h2,
+h3,
+dt {
+  font-family: var(--font-display, system-ui), system-ui, sans-serif;
+  letter-spacing: 0.06em;
+}
+
+h1 {
+  font-size: clamp(2rem, 4.5vw, 3.2rem);
+  text-transform: uppercase;
+  background: linear-gradient(100deg, #8fb3ff, #e6e8ee 55%, #79f2c0);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  margin-bottom: 0.5rem;
+}
+
+h2 {
+  font-size: clamp(1.4rem, 2.6vw, 2rem);
+  text-transform: uppercase;
+}
+
+h3 {
+  font-size: 1.05rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: #8fb3ff;
+  margin-top: 0;
+}
+
+a {
+  color: #7aa2ff;
+}
+
+/* --- ATM-style controls --- */
 
 button {
   font: inherit;
+  font-family: var(--font-display, system-ui), system-ui, sans-serif;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  background: linear-gradient(120deg, #1d2742, #24365f);
+  color: #e6e8ee;
+  border: 1px solid #3d5ba8;
+  border-radius: 10px;
+  padding: 0.75rem 1.5rem;
+  cursor: pointer;
+  transition:
+    box-shadow 0.15s ease,
+    transform 0.1s ease;
+}
+
+button:hover:not(:disabled) {
+  box-shadow: 0 0 16px rgba(122, 162, 255, 0.45);
+}
+
+button:active:not(:disabled) {
+  transform: translateY(1px);
 }
 
 button:disabled {
   cursor: not-allowed;
-  opacity: 0.5;
+  opacity: 0.45;
+}
+
+button:focus-visible {
+  outline: 2px solid #7aa2ff;
+  outline-offset: 2px;
 }
 
 label {
   display: block;
-  margin-top: 1rem;
+  margin-top: 1.1rem;
   font-weight: 600;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #9fb0d8;
 }
 
 input {
   display: block;
+  width: 100%;
   font: inherit;
-  padding: 0.4rem;
-  margin-top: 0.25rem;
-  margin-bottom: 0.5rem;
+  font-size: 1.15rem;
+  padding: 0.7rem 0.9rem;
+  margin-top: 0.4rem;
+  margin-bottom: 0.75rem;
+  background: rgba(8, 12, 26, 0.85);
+  color: #e6e8ee;
+  border: 1px solid #2a3350;
+  border-radius: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+input:focus {
+  outline: 2px solid #7aa2ff;
+  outline-offset: 1px;
+  border-color: #3d5ba8;
 }
 
 form {
-  margin-top: 1rem;
+  margin-top: 0;
+}
+
+form button[type="submit"] {
+  width: 100%;
+  margin-top: 0.5rem;
 }
 
 [role="alert"] {
-  color: #a4262c;
+  color: #ff8389;
+}
+
+[role="status"] {
+  color: #9fe8c4;
+}
+
+/* --- Panel ("dialogue box") system --- */
+
+.panel {
+  background: linear-gradient(170deg, rgba(19, 27, 52, 0.85), rgba(11, 16, 34, 0.82));
+  border: 1px solid rgba(101, 131, 255, 0.28);
+  border-radius: 16px;
+  padding: 1.5rem 1.6rem;
+  box-shadow:
+    inset 0 1px 0 rgba(160, 185, 255, 0.14),
+    0 8px 28px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(7px);
+}
+
+.panel + .panel {
+  margin-top: 1.4rem;
+}
+
+/* --- Vault dashboard grid --- */
+
+.vault-dashboard {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 2rem;
+  align-items: start;
+  margin-top: 1.5rem;
+}
+
+.vault-dashboard-side > * + * {
+  margin-top: 1.4rem;
+}
+
+.vault-dashboard-main > * + * {
+  margin-top: 1.4rem;
+}
+
+@media (max-width: 900px) {
+  .vault-dashboard {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* --- Home hero --- */
+
+.home-hero {
+  max-width: 720px;
+  margin: 3.5rem auto 0;
+  text-align: center;
+  padding: 2.5rem 2.25rem;
+}
+
+.home-hero p {
+  font-size: 1.15rem;
+  color: #b6c2e2;
+}
+
+.home-hero form {
+  text-align: left;
+  margin-top: 1.5rem;
+}
+
+/* --- Crypto network background canvas --- */
+
+.crypto-network {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
 }

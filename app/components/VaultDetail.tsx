@@ -5,11 +5,14 @@ import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { VaultClient, VaultState, UserPosition } from "@vault-sdk";
 
 import { parseMintAddress } from "../lib/solana/mint";
-import { fetchMintDecimals, formatTokenAmount } from "../lib/solana/amounts";
+import { fetchMintDecimals } from "../lib/solana/amounts";
+import { useVaultAnimation } from "../hooks/useVaultAnimation";
 import { DepositForm } from "./DepositForm";
 import { WithdrawForm } from "./WithdrawForm";
 import { AdminPausePanel } from "./AdminPausePanel";
 import { UserSharesDisplay } from "./UserSharesDisplay";
+import { InteractiveVault } from "./vault/InteractiveVault";
+import { VaultStatusPanel } from "./vault/VaultStatusPanel";
 
 type LoadState = "loading" | "loaded";
 
@@ -80,6 +83,15 @@ export function VaultDetail({ mintInput }: { mintInput: string }) {
     }
   }, [vaultClient, connected, publicKey]);
 
+  const { stage, openVault } = useVaultAnimation();
+
+  /** Confirmed deposit/withdraw: refresh authoritative balances FIRST, then
+   *  run the celebration — the opened vault must show current numbers. */
+  const celebrateConfirmed = useCallback(async () => {
+    await refresh();
+    openVault();
+  }, [refresh, openVault]);
+
   if (!mint) {
     return <p role="alert">Invalid mint address.</p>;
   }
@@ -99,37 +111,52 @@ export function VaultDetail({ mintInput }: { mintInput: string }) {
   return (
     <section>
       <h2>Vault</h2>
-      <dl>
-        <dt>Total assets</dt>
-        <dd>{formatTokenAmount(vaultState.totalAssets, displayDecimals)}</dd>
-        <dt>Total shares</dt>
-        <dd>{formatTokenAmount(vaultState.totalShares, displayDecimals)}</dd>
-        <dt>Status</dt>
-        <dd>{vaultState.isPaused ? "Paused" : "Active"}</dd>
-      </dl>
-      {!connected && <p>Connect your wallet to deposit, withdraw, or view your shares.</p>}
-
-      <UserSharesDisplay
-        shares={connected ? (userPosition?.shares ?? 0n) : null}
-        decimals={displayDecimals}
-      />
-      <DepositForm
-        vaultClient={vaultClient!}
-        isPaused={vaultState.isPaused}
-        decimals={displayDecimals}
-        onConfirmed={refresh}
-      />
-      <WithdrawForm
-        vaultClient={vaultClient!}
-        userShares={userPosition?.shares ?? 0n}
-        decimals={displayDecimals}
-        onConfirmed={refresh}
-      />
-      <AdminPausePanel
-        vaultClient={vaultClient!}
-        pauseAuthority={vaultState.pauseAuthority}
-        isPaused={vaultState.isPaused}
-      />
+      <div className="vault-dashboard">
+        <div className="vault-dashboard-main">
+          <InteractiveVault
+            totalAssets={vaultState.totalAssets}
+            isPaused={vaultState.isPaused}
+            decimals={displayDecimals}
+            stage={stage}
+          />
+          <VaultStatusPanel
+            totalAssets={vaultState.totalAssets}
+            totalShares={vaultState.totalShares}
+            isPaused={vaultState.isPaused}
+            decimals={displayDecimals}
+          />
+        </div>
+        <div className="vault-dashboard-side">
+          {!connected && (
+            <p className="panel">Connect your wallet to deposit, withdraw, or view your shares.</p>
+          )}
+          <div className="panel">
+            <h3>Your position</h3>
+            <UserSharesDisplay
+              shares={connected ? (userPosition?.shares ?? 0n) : null}
+              decimals={displayDecimals}
+            />
+          </div>
+          <DepositForm
+            vaultClient={vaultClient!}
+            isPaused={vaultState.isPaused}
+            decimals={displayDecimals}
+            onConfirmed={celebrateConfirmed}
+          />
+          <WithdrawForm
+            vaultClient={vaultClient!}
+            userShares={userPosition?.shares ?? 0n}
+            decimals={displayDecimals}
+            onConfirmed={celebrateConfirmed}
+          />
+          <AdminPausePanel
+            vaultClient={vaultClient!}
+            pauseAuthority={vaultState.pauseAuthority}
+            isPaused={vaultState.isPaused}
+            onConfirmed={refresh}
+          />
+        </div>
+      </div>
     </section>
   );
 }
