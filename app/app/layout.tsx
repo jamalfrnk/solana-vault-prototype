@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import "./globals.css";
+import "./vault.css";
 import { Providers } from "./providers";
 import { ClusterWarningBanner } from "../components/ClusterWarningBanner";
 

@@ -63,8 +63,12 @@ describe("VaultDetail", () => {
     });
     render(<VaultDetail mintInput={mint} />);
     await waitFor(() => {
-      expect(screen.getAllByText("1000000")).to.have.lengthOf(2); // totalAssets + totalShares
+      // totalAssets + totalShares in the status panel, plus the balance shown
+      // inside the (decorative) vault interior.
+      expect(screen.getAllByText("1000000")).to.have.lengthOf(3);
     });
+    expect(screen.getByTestId("vault-door")).to.exist;
+    expect(screen.getByTestId("vault-interior")).to.exist;
   });
 
   it("does not fetch a user position when the wallet is disconnected", async () => {

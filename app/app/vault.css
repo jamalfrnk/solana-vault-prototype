@@ -1,0 +1,167 @@
+/* ==== Interactive vault visual (M17 Phase 3) ====
+   Entirely CSS-drawn — no images, no animation libraries. The door layer
+   fully covers the interior while closed; Phase 4 animates the reveal via
+   the [data-open] attribute on .vault-scene. */
+
+.vault-scene {
+  margin: 1.5rem auto;
+  width: min(100%, 420px);
+}
+
+.vault-frame {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border-radius: 18px;
+  background: linear-gradient(145deg, #3a3f47, #23272e 60%, #1a1d22);
+  box-shadow:
+    inset 0 2px 6px rgba(255, 255, 255, 0.08),
+    inset 0 -6px 14px rgba(0, 0, 0, 0.55),
+    0 10px 30px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+
+/* --- Interior (revealed in Phase 4; sits beneath the door) --- */
+
+.vault-interior {
+  position: absolute;
+  inset: 7%;
+  border-radius: 12px;
+  background: radial-gradient(circle at 50% 30%, #2b2417, #14110a 70%);
+  box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.8);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  color: #e8c064;
+}
+
+.vault-balance-label {
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #b39755;
+}
+
+.vault-balance {
+  font-size: 1.6rem;
+  font-weight: 700;
+  text-shadow: 0 0 12px rgba(232, 192, 100, 0.45);
+  overflow-wrap: anywhere;
+  padding: 0 0.5rem;
+  text-align: center;
+}
+
+/* --- Door --- */
+
+.vault-door {
+  position: absolute;
+  inset: 4%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 32%, #9aa3ad, #6b737d 45%, #454c55 80%, #33383f);
+  box-shadow:
+    inset 0 3px 8px rgba(255, 255, 255, 0.35),
+    inset 0 -8px 18px rgba(0, 0, 0, 0.45),
+    0 6px 18px rgba(0, 0, 0, 0.5);
+  border: 6px solid #2c3138;
+}
+
+/* Each bolt is a full-size rotated wrapper whose ::before dot sits at the
+   top edge — rotating the wrapper walks the dot around the door rim. */
+.vault-bolt {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.vault-bolt::before {
+  content: "";
+  position: absolute;
+  top: 3.5%;
+  left: 50%;
+  width: 7%;
+  aspect-ratio: 1;
+  margin-left: -3.5%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #d7dde3, #7d868f 60%, #565e66);
+  box-shadow:
+    inset 0 -1px 2px rgba(0, 0, 0, 0.5),
+    0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+/* --- Central wheel --- */
+
+.vault-wheel {
+  position: absolute;
+  inset: 30%;
+  border-radius: 50%;
+  border: 6px solid #333a41;
+  background: radial-gradient(circle at 40% 35%, #7d868f, #565e66 70%, #454c55);
+  box-shadow:
+    inset 0 2px 5px rgba(255, 255, 255, 0.25),
+    inset 0 -4px 8px rgba(0, 0, 0, 0.4);
+}
+
+.vault-spoke {
+  position: absolute;
+  top: 50%;
+  left: 6%;
+  right: 6%;
+  height: 9%;
+  margin-top: -4.5%;
+  border-radius: 999px;
+  background: linear-gradient(#8f98a2, #5c646d);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+.vault-wheel::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 26%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 32%, #aeb6bf, #6b737d 65%, #4c535b);
+  box-shadow:
+    inset 0 -2px 4px rgba(0, 0, 0, 0.45),
+    0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+/* --- Lock status LED --- */
+
+.vault-led {
+  position: absolute;
+  top: 7.5%;
+  left: 50%;
+  width: 4.5%;
+  aspect-ratio: 1;
+  margin-left: -2.25%;
+  border-radius: 50%;
+  background: #39d353;
+  box-shadow: 0 0 10px rgba(57, 211, 83, 0.8);
+}
+
+.vault-led[data-paused="true"] {
+  background: #e3b341;
+  box-shadow: 0 0 10px rgba(227, 179, 65, 0.85);
+}
+
+/* --- Status panel (real, screen-reader-visible vault facts) --- */
+
+.vault-status-panel dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.35rem 1.25rem;
+  margin: 1rem 0;
+}
+
+.vault-status-panel dt {
+  font-weight: 600;
+}
+
+.vault-status-panel dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}

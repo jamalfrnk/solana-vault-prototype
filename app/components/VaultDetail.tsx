@@ -5,11 +5,13 @@ import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { VaultClient, VaultState, UserPosition } from "@vault-sdk";
 
 import { parseMintAddress } from "../lib/solana/mint";
-import { fetchMintDecimals, formatTokenAmount } from "../lib/solana/amounts";
+import { fetchMintDecimals } from "../lib/solana/amounts";
 import { DepositForm } from "./DepositForm";
 import { WithdrawForm } from "./WithdrawForm";
 import { AdminPausePanel } from "./AdminPausePanel";
 import { UserSharesDisplay } from "./UserSharesDisplay";
+import { InteractiveVault } from "./vault/InteractiveVault";
+import { VaultStatusPanel } from "./vault/VaultStatusPanel";
 
 type LoadState = "loading" | "loaded";
 
@@ -99,14 +101,17 @@ export function VaultDetail({ mintInput }: { mintInput: string }) {
   return (
     <section>
       <h2>Vault</h2>
-      <dl>
-        <dt>Total assets</dt>
-        <dd>{formatTokenAmount(vaultState.totalAssets, displayDecimals)}</dd>
-        <dt>Total shares</dt>
-        <dd>{formatTokenAmount(vaultState.totalShares, displayDecimals)}</dd>
-        <dt>Status</dt>
-        <dd>{vaultState.isPaused ? "Paused" : "Active"}</dd>
-      </dl>
+      <InteractiveVault
+        totalAssets={vaultState.totalAssets}
+        isPaused={vaultState.isPaused}
+        decimals={displayDecimals}
+      />
+      <VaultStatusPanel
+        totalAssets={vaultState.totalAssets}
+        totalShares={vaultState.totalShares}
+        isPaused={vaultState.isPaused}
+        decimals={displayDecimals}
+      />
       {!connected && <p>Connect your wallet to deposit, withdraw, or view your shares.</p>}
 
       <UserSharesDisplay
