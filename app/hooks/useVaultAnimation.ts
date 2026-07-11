@@ -18,7 +18,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 export type VaultStage = "closed" | "unlocking" | "opening" | "open" | "closing";
 
-export const UNLOCK_MS = 1100;
+/** Combination dial (2.3s: three turns right, two left, one right) + handle turn (0.6s). */
+export const UNLOCK_MS = 2900;
 export const SWING_MS = 900;
 export const DWELL_MS = 5000;
 export const CLOSE_MS = 900;
