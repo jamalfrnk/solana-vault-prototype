@@ -101,41 +101,51 @@ export function VaultDetail({ mintInput }: { mintInput: string }) {
   return (
     <section>
       <h2>Vault</h2>
-      <InteractiveVault
-        totalAssets={vaultState.totalAssets}
-        isPaused={vaultState.isPaused}
-        decimals={displayDecimals}
-      />
-      <VaultStatusPanel
-        totalAssets={vaultState.totalAssets}
-        totalShares={vaultState.totalShares}
-        isPaused={vaultState.isPaused}
-        decimals={displayDecimals}
-      />
-      {!connected && <p>Connect your wallet to deposit, withdraw, or view your shares.</p>}
-
-      <UserSharesDisplay
-        shares={connected ? (userPosition?.shares ?? 0n) : null}
-        decimals={displayDecimals}
-      />
-      <DepositForm
-        vaultClient={vaultClient!}
-        isPaused={vaultState.isPaused}
-        decimals={displayDecimals}
-        onConfirmed={refresh}
-      />
-      <WithdrawForm
-        vaultClient={vaultClient!}
-        userShares={userPosition?.shares ?? 0n}
-        decimals={displayDecimals}
-        onConfirmed={refresh}
-      />
-      <AdminPausePanel
-        vaultClient={vaultClient!}
-        pauseAuthority={vaultState.pauseAuthority}
-        isPaused={vaultState.isPaused}
-        onConfirmed={refresh}
-      />
+      <div className="vault-dashboard">
+        <div className="vault-dashboard-main">
+          <InteractiveVault
+            totalAssets={vaultState.totalAssets}
+            isPaused={vaultState.isPaused}
+            decimals={displayDecimals}
+          />
+          <VaultStatusPanel
+            totalAssets={vaultState.totalAssets}
+            totalShares={vaultState.totalShares}
+            isPaused={vaultState.isPaused}
+            decimals={displayDecimals}
+          />
+        </div>
+        <div className="vault-dashboard-side">
+          {!connected && (
+            <p className="panel">Connect your wallet to deposit, withdraw, or view your shares.</p>
+          )}
+          <div className="panel">
+            <h3>Your position</h3>
+            <UserSharesDisplay
+              shares={connected ? (userPosition?.shares ?? 0n) : null}
+              decimals={displayDecimals}
+            />
+          </div>
+          <DepositForm
+            vaultClient={vaultClient!}
+            isPaused={vaultState.isPaused}
+            decimals={displayDecimals}
+            onConfirmed={refresh}
+          />
+          <WithdrawForm
+            vaultClient={vaultClient!}
+            userShares={userPosition?.shares ?? 0n}
+            decimals={displayDecimals}
+            onConfirmed={refresh}
+          />
+          <AdminPausePanel
+            vaultClient={vaultClient!}
+            pauseAuthority={vaultState.pauseAuthority}
+            isPaused={vaultState.isPaused}
+            onConfirmed={refresh}
+          />
+        </div>
+      </div>
     </section>
   );
 }

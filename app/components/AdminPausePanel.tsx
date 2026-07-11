@@ -48,7 +48,7 @@ export function AdminPausePanel({
   }
 
   return (
-    <section>
+    <section className="panel">
       <h3>Admin</h3>
       <button type="button" onClick={handleClick} disabled={busy}>
         {isPaused ? "Unpause" : "Pause"}

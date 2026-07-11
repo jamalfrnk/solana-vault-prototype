@@ -26,6 +26,8 @@ export function InteractiveVault({
       <div className="vault-frame">
         <VaultInterior totalAssets={totalAssets} decimals={decimals} />
         <VaultDoor isPaused={isPaused} />
+        <span className="vault-hinge vault-hinge-top" />
+        <span className="vault-hinge vault-hinge-bottom" />
       </div>
     </div>
   );

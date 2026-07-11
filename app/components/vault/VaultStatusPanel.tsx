@@ -17,7 +17,7 @@ export function VaultStatusPanel({
   decimals: number;
 }) {
   return (
-    <div className="vault-status-panel">
+    <div className="panel vault-status-panel">
       <dl>
         <dt>Total assets</dt>
         <dd>{formatTokenAmount(totalAssets, decimals)}</dd>

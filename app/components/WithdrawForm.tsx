@@ -54,7 +54,7 @@ export function WithdrawForm({
   }
 
   return (
-    <form onSubmit={handleSubmit}>
+    <form onSubmit={handleSubmit} className="panel">
       <h3>Withdraw</h3>
       <label htmlFor="withdraw-shares">Shares</label>
       <input
