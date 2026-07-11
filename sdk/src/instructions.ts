@@ -21,7 +21,10 @@ function meta(pubkey: PublicKey, isSigner: boolean, isWritable: boolean): Accoun
 function amountData(name: string, amount: bigint): Buffer {
   const data = Buffer.alloc(16);
   instructionDiscriminator(name).copy(data, 0);
-  data.writeBigUInt64LE(amount, 8);
+  // DataView, not Buffer.writeBigUInt64LE: browser bundlers substitute a Buffer
+  // polyfill that lacks the BigInt methods (Node-only), which crashed every
+  // deposit/withdraw built in the dApp. DataView is standard ES2020.
+  new DataView(data.buffer, data.byteOffset, data.byteLength).setBigUint64(8, amount, true);
   return data;
 }
 
