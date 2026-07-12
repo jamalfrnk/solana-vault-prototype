@@ -31,6 +31,26 @@ describe("DollarConfetti", () => {
     expect(screen.queryByTestId("confetti")).to.equal(null);
   });
 
+  it("is suppressed entirely under prefers-reduced-motion", () => {
+    const original = window.matchMedia;
+    window.matchMedia = ((query: string) => ({
+      matches: query.includes("prefers-reduced-motion"),
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      onchange: null,
+      dispatchEvent: () => false,
+    })) as typeof window.matchMedia;
+    try {
+      render(<DollarConfetti burstKey="sig-reduced" />);
+      expect(screen.queryByTestId("confetti")).to.equal(null);
+    } finally {
+      window.matchMedia = original;
+    }
+  });
+
   it("is deterministic for the same signature (no replay variation on re-render)", () => {
     const first = render(<DollarConfetti burstKey="sig-same" />);
     const a = Array.from(first.container.querySelectorAll(".confetti-piece")).map(
