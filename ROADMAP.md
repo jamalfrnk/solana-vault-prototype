@@ -23,7 +23,8 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 | 13 | SDK package | `[x]` complete |
 | 14 | dApp shell | `[x]` complete |
 | 15 | Dependency security remediation | `[x]` complete |
-| 16 | Governance-ready pause authority | `[~]` in progress |
+| 16 | Governance-ready pause authority | `[x]` complete |
+| 17 | Interactive vault UI | `[~]` in review (PR pending) |
 
 ## Milestone 0 — Repository bootstrap (complete)
 
@@ -370,7 +371,7 @@ diffs). 34/34 dApp tests (32 prior + 2 new wallet-list pins). Root + app typeche
 clean. `next build` clean; served production build returned HTTP 200. No Rust or
 on-chain program changes. Merged as PR #21.
 
-## Milestone 16 — Governance-Ready Pause Authority (in progress)
+## Milestone 16 — Governance-Ready Pause Authority (complete)
 
 Second post-MVP milestone, approved by Malcolm 2026-07-10, on
 `feature/governance-authority`. **No program changes** — the milestone proves and
@@ -402,6 +403,37 @@ Observed (2026-07-10, CI run 29128852767 on PR #22): all four jobs green on the
 first run — `tests/test_governance.rs` 5 passed / 0 failed (46 Rust tests total),
 fmt + clippy clean, cargo audit clean, 48/48 SDK, 34/34 dApp. PR #22 open for
 review.
+
+## Milestone 17 — Interactive Vault UI (in review)
+
+Third post-MVP milestone, approved by Malcolm 2026-07-10, on
+`feat/interactive-vault-ui`. Full design brief in the M17 review thread;
+architecture documentation in `docs/UI_VAULT.md`. Includes the mid-milestone
+SDK hotfix (browser Buffer compatibility, PR #23) that live dApp testing
+surfaced, and the pause-panel stale-state fix.
+
+Delivered across the brief's phases: a discriminated-union transaction
+lifecycle (success = confirmed on-chain, never merely submitted; classified
+error taxonomy; wallet rejection = cancellation; duplicate-submit guard;
+token-denominated amounts scaled by mint decimals; authoritative balance
+refresh before success renders); an ATM-style dashboard layout with Orbitron/
+Exo 2 typography and a cursor-reactive canvas background of the top-15
+cryptocurrencies as brand-colored ticker badges connected by proximity lines
+(verified live 2026-07-11, no bundled trademark assets); a CSS-drawn vault
+modeled on Malcolm's reference photo (square gunmetal slab, left barrel
+hinges, rivets, numbered combination dial above an eight-armed ship's wheel)
+whose confirmed-transaction sequence dials the 3-right/2-left/1-right code,
+turns the handle, swings the door right-to-left, and reveals the balance; and
+signature-deduped success effects — a runtime-synthesized cash-register
+cha-ching (no audio asset, nothing to license; mute toggle persisted) and
+green dollar confetti — firing once per confirmed transaction at the reveal
+moment. prefers-reduced-motion collapses all of it to fades with no
+information loss.
+
+Observed (2026-07-11): 88/88 dApp tests (34 at M14 close), typecheck clean,
+next build clean, live devnet verification of deposit/withdraw/pause through
+Phantom during development. No Rust or SDK interface changes beyond the
+hotfixed encode/decode internals.
 
 ## Post-MVP Roadmap (proposed — none started, none approved)
 
