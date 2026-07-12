@@ -18,8 +18,9 @@ export function WithdrawForm({
   userShares: bigint;
   /** Shares carry the same decimals as the underlying mint. */
   decimals: number;
-  /** Refreshes authoritative balances after on-chain confirmation. */
-  onConfirmed?: () => Promise<void> | void;
+  /** Runs after on-chain confirmation with the tx signature — balance
+   *  refresh + celebration effects, deduped by signature upstream. */
+  onConfirmed?: (signature: string) => Promise<void> | void;
 }) {
   const { connected, publicKey } = useWallet();
   const [sharesIn, setSharesIn] = useState("");
@@ -46,9 +47,9 @@ export function WithdrawForm({
         parsed.problem ??
         (parsed.baseUnits > userShares ? "Requested amount exceeds your balance." : null),
       buildIx: () => vaultClient.buildWithdrawIx(publicKey, parsed.baseUnits),
-      onConfirmed: async () => {
+      onConfirmed: async (signature) => {
         setConfirmedShares(submittedShares);
-        await onConfirmed?.();
+        await onConfirmed?.(signature);
       },
     });
   }

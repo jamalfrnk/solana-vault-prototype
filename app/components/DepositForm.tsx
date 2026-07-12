@@ -18,8 +18,9 @@ export function DepositForm({
   isPaused: boolean;
   /** Mint decimals — user input is token-denominated and scaled by this. */
   decimals: number;
-  /** Refreshes authoritative balances after on-chain confirmation. */
-  onConfirmed?: () => Promise<void> | void;
+  /** Runs after on-chain confirmation with the tx signature — balance
+   *  refresh + celebration effects, deduped by signature upstream. */
+  onConfirmed?: (signature: string) => Promise<void> | void;
 }) {
   const { connected, publicKey } = useWallet();
   const [amount, setAmount] = useState("");
@@ -41,9 +42,9 @@ export function DepositForm({
     await run({
       validate: () => parsed.problem,
       buildIx: () => vaultClient.buildDepositIx(publicKey, parsed.baseUnits),
-      onConfirmed: async () => {
+      onConfirmed: async (signature) => {
         setConfirmedAmount(submittedAmount);
-        await onConfirmed?.();
+        await onConfirmed?.(signature);
       },
     });
   }

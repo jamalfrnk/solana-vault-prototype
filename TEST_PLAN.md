@@ -1,8 +1,10 @@
 # Test Plan
 
-**Status: M16 in review — 46 Rust tests (41 through M12 + 5 governance-authority
-tests added in M16, observed passing in CI run 29128852767 on 2026-07-10), 48 SDK
-tests (M13), 34 dApp tests (M14/M15).**
+**Status: M17 in review — 46 Rust tests (41 through M12 + 5 governance-authority
+tests added in M16, observed passing in CI run 29128852767 on 2026-07-10), 49 SDK
+tests (48 M13 + 1 browser-compat regression), 88 dApp tests (34 at M14 close;
+M17 added lifecycle, animation, sound, confetti, background, and dashboard
+coverage — see `docs/UI_VAULT.md` for the testing strategy).**
 
 ## Repository hygiene (complete)
 

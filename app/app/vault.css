@@ -1,14 +1,15 @@
 /* ==== Interactive vault visual (M17) ====
-   Entirely CSS-drawn — no images, no animation libraries. The door layer
-   fully covers the interior while closed; Phase 4 animates the reveal via
-   the [data-open] attribute on .vault-scene. */
+   Entirely CSS-drawn, modeled on the reference photo: square gunmetal door
+   hinged on the LEFT, dome rivets on the frame edge and circular ring, a
+   numbered combination dial above an eight-armed ship's-wheel handle.
+   The door layer fully covers the interior while closed; the opening
+   sequence is driven by [data-stage] set from useVaultAnimation. */
 
 .vault-scene {
   margin: 1.5rem auto 0;
   width: min(100%, 560px);
 }
 
-/* Grounding shadow beneath the vault body. */
 .vault-scene::after {
   content: "";
   display: block;
@@ -19,82 +20,28 @@
   border-radius: 50%;
 }
 
+/* --- Outer frame / wall bezel --- */
+
 .vault-frame {
   position: relative;
   aspect-ratio: 1 / 1;
-  border-radius: 22px;
-  /* Brushed-steel body: vertical grain over the base gradient. */
-  background:
-    repeating-linear-gradient(
-      90deg,
-      rgba(255, 255, 255, 0.03) 0 2px,
-      transparent 2px 5px
-    ),
-    linear-gradient(145deg, #434a54, #262b33 60%, #191d23);
-  border: 3px solid #12151b;
+  border-radius: 14px;
+  background: linear-gradient(150deg, #3c4149, #23272d 55%, #17191d);
+  border: 3px solid #0e1013;
   box-shadow:
-    inset 0 2px 8px rgba(255, 255, 255, 0.1),
+    inset 0 2px 8px rgba(255, 255, 255, 0.09),
     inset 0 -8px 18px rgba(0, 0, 0, 0.6),
     0 18px 44px rgba(0, 0, 0, 0.55);
   overflow: hidden;
+  perspective: 1400px;
 }
 
-/* Corner rivets on the frame. */
-.vault-frame::before,
-.vault-frame::after {
-  content: "";
-  position: absolute;
-  width: 3.2%;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #c8ced5, #6b737d 65%, #4c535b);
-  box-shadow:
-    inset 0 -1px 2px rgba(0, 0, 0, 0.5),
-    0 1px 2px rgba(0, 0, 0, 0.45);
-}
-
-.vault-frame::before {
-  top: 2.5%;
-  left: 2.5%;
-  /* Second rivet via a huge offset shadow trick is brittle — the other two
-     corners are covered by .vault-hinge styling on the right side. */
-}
-
-.vault-frame::after {
-  bottom: 2.5%;
-  left: 2.5%;
-}
-
-/* --- Hinges (right side — the door swings from here in Phase 4) --- */
-
-.vault-hinge {
-  position: absolute;
-  right: 0.8%;
-  width: 4.5%;
-  height: 14%;
-  border-radius: 5px;
-  background: linear-gradient(90deg, #8f98a2, #5c646d 55%, #454c55);
-  box-shadow:
-    inset 0 2px 3px rgba(255, 255, 255, 0.3),
-    inset 0 -2px 4px rgba(0, 0, 0, 0.5),
-    -2px 2px 6px rgba(0, 0, 0, 0.4);
-  z-index: 2;
-}
-
-.vault-hinge-top {
-  top: 22%;
-}
-
-.vault-hinge-bottom {
-  bottom: 22%;
-}
-
-/* --- Interior (revealed in Phase 4; sits beneath the door) --- */
+/* --- Interior (revealed when the door opens) --- */
 
 .vault-interior {
   position: absolute;
-  inset: 6%;
-  border-radius: 14px;
+  inset: 4%;
+  border-radius: 10px;
   background:
     repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.02) 0 2px, transparent 2px 14px),
     radial-gradient(circle at 50% 30%, #2b2417, #14110a 70%);
@@ -105,6 +52,13 @@
   justify-content: center;
   gap: 0.3rem;
   color: #e8c064;
+  transition: filter 0.6s ease;
+  filter: brightness(0.55);
+}
+
+.vault-scene[data-stage="opening"] .vault-interior,
+.vault-scene[data-stage="open"] .vault-interior {
+  filter: brightness(1);
 }
 
 .vault-balance-label {
@@ -125,82 +79,209 @@
   text-align: center;
 }
 
-/* --- Door --- */
+/* --- The door: a square slab hinged on the LEFT --- */
 
 .vault-door {
   position: absolute;
-  inset: 3.5%;
-  border-radius: 50%;
-  /* Machined-metal face: fine radial grain over the metallic gradient. */
+  inset: 2.5%;
+  border-radius: 10px;
+  /* Crackled gunmetal: fine grain over a dark steel gradient. */
   background:
-    repeating-conic-gradient(rgba(255, 255, 255, 0.035) 0deg 3deg, transparent 3deg 7deg),
-    radial-gradient(circle at 38% 32%, #a4adb7, #6b737d 45%, #454c55 80%, #30353c);
+    repeating-linear-gradient(115deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(25deg, rgba(0, 0, 0, 0.12) 0 1px, transparent 1px 5px),
+    linear-gradient(150deg, #6a7078, #4a5058 45%, #363b42 80%, #2b2f35);
+  border: 2px solid #1a1d21;
   box-shadow:
-    inset 0 4px 10px rgba(255, 255, 255, 0.38),
-    inset 0 -10px 22px rgba(0, 0, 0, 0.5),
+    inset 0 3px 8px rgba(255, 255, 255, 0.22),
+    inset 0 -8px 18px rgba(0, 0, 0, 0.5),
     0 8px 24px rgba(0, 0, 0, 0.55);
-  border: 8px solid #262b32;
+  transform-origin: 5% 50%;
+  transition: transform 0.9s cubic-bezier(0.6, 0, 0.3, 1);
+  will-change: transform;
   z-index: 1;
 }
 
-/* Recessed inner panel ring — gives the door its two-tier depth. */
-.vault-door::before {
-  content: "";
-  position: absolute;
-  inset: 13%;
-  border-radius: 50%;
-  border: 3px solid rgba(0, 0, 0, 0.35);
-  box-shadow:
-    inset 0 3px 8px rgba(0, 0, 0, 0.4),
-    0 1px 2px rgba(255, 255, 255, 0.18);
-  pointer-events: none;
+.vault-scene[data-stage="opening"] .vault-door,
+.vault-scene[data-stage="open"] .vault-door {
+  /* Swings right-to-left toward the viewer, on the left hinges. */
+  transform: rotateY(-76deg);
 }
 
-/* Each bolt is a full-size rotated wrapper whose ::before dot sits at the
-   top edge — rotating the wrapper walks the dot around the door rim. */
-.vault-bolt {
+/* --- Rivets --- */
+
+.vault-rivet,
+.vault-rivet-ring-slot::before {
+  width: 3%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #d3d9df, #7d868f 60%, #4c535b);
+  box-shadow:
+    inset 0 -1.5px 2px rgba(0, 0, 0, 0.55),
+    inset 0 1px 1.5px rgba(255, 255, 255, 0.5),
+    0 1.5px 2.5px rgba(0, 0, 0, 0.45);
+}
+
+.vault-rivet {
+  position: absolute;
+  transform: translate(-50%, -50%);
+}
+
+/* Ring rivets ride rotated full-size wrappers, dot at the top center. */
+.vault-rivet-ring-slot {
   position: absolute;
   inset: 0;
   pointer-events: none;
 }
 
-.vault-bolt::before {
+.vault-rivet-ring-slot::before {
   content: "";
   position: absolute;
-  top: 3%;
+  top: -1.4%;
   left: 50%;
-  width: 7.5%;
-  aspect-ratio: 1;
-  margin-left: -3.75%;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #dde3e9, #7d868f 60%, #50575f);
-  box-shadow:
-    inset 0 -2px 3px rgba(0, 0, 0, 0.55),
-    inset 0 1px 2px rgba(255, 255, 255, 0.5),
-    0 2px 3px rgba(0, 0, 0, 0.45);
+  margin-left: -1.5%;
 }
 
-/* --- Central wheel --- */
+/* --- Raised circular ring --- */
+
+.vault-door-ring {
+  position: absolute;
+  inset: 9%;
+  border-radius: 50%;
+  border: 6px solid rgba(20, 23, 27, 0.85);
+  background: linear-gradient(150deg, #596068, #3d434b 60%, #2f343b);
+  box-shadow:
+    inset 0 3px 8px rgba(255, 255, 255, 0.18),
+    inset 0 -6px 14px rgba(0, 0, 0, 0.45),
+    0 4px 14px rgba(0, 0, 0, 0.4);
+}
+
+/* --- Machined inner disc (concentric grooves like the photo) --- */
+
+.vault-door-disc {
+  position: absolute;
+  inset: 6.5%;
+  border-radius: 50%;
+  background:
+    repeating-radial-gradient(
+      circle,
+      rgba(255, 255, 255, 0.03) 0 1px,
+      transparent 1px 7px
+    ),
+    radial-gradient(circle at 42% 34%, #5d646c, #454b53 55%, #33383f 85%, #2a2e34);
+  border: 3px solid rgba(18, 21, 25, 0.7);
+  box-shadow:
+    inset 0 4px 10px rgba(255, 255, 255, 0.14),
+    inset 0 -8px 18px rgba(0, 0, 0, 0.5);
+}
+
+/* --- Combination dial (spins the 3-right / 2-left / 1-right code) --- */
+
+.vault-dial {
+  position: absolute;
+  top: 8%;
+  left: 37.5%;
+  width: 25%;
+  aspect-ratio: 1;
+}
+
+.vault-dial-face {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle, #0e1114 58%, #17191d 60% 100%);
+  border: 3px solid #23272c;
+  box-shadow:
+    inset 0 2px 5px rgba(255, 255, 255, 0.1),
+    0 3px 8px rgba(0, 0, 0, 0.6);
+  will-change: transform;
+}
+
+/* Tick marks around the dial's numbered band. */
+.vault-dial-face::before {
+  content: "";
+  position: absolute;
+  inset: 4%;
+  border-radius: 50%;
+  background: repeating-conic-gradient(
+    rgba(235, 240, 245, 0.85) 0deg 2deg,
+    transparent 2deg 30deg
+  );
+  -webkit-mask: radial-gradient(circle, transparent 55%, #000 58% 82%, transparent 85%);
+  mask: radial-gradient(circle, transparent 55%, #000 58% 82%, transparent 85%);
+}
+
+.vault-dial-knob {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 44%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background:
+    repeating-conic-gradient(rgba(0, 0, 0, 0.25) 0deg 6deg, transparent 6deg 24deg),
+    radial-gradient(circle at 38% 32%, #c3cad1, #7d868f 60%, #565e66);
+  box-shadow:
+    inset 0 -2px 4px rgba(0, 0, 0, 0.5),
+    0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+@keyframes vault-combo {
+  0% {
+    transform: rotate(0deg);
+  }
+  40% {
+    transform: rotate(1080deg); /* three turns right */
+  }
+  45% {
+    transform: rotate(1080deg); /* settle on the first number */
+  }
+  74% {
+    transform: rotate(360deg); /* two turns left */
+  }
+  79% {
+    transform: rotate(360deg); /* settle on the second number */
+  }
+  100% {
+    transform: rotate(720deg); /* one turn right — unlocked */
+  }
+}
+
+.vault-scene[data-stage="unlocking"] .vault-dial-face {
+  animation: vault-combo 2.3s ease-in-out forwards;
+}
+
+.vault-scene[data-stage="opening"] .vault-dial-face,
+.vault-scene[data-stage="open"] .vault-dial-face {
+  transform: rotate(720deg);
+}
+
+/* --- Ship's-wheel handle (turns to withdraw the bolts after the code) --- */
 
 .vault-wheel {
   position: absolute;
-  inset: 28%;
+  top: 33%;
+  left: 26%;
+  width: 48%;
+  aspect-ratio: 1;
   border-radius: 50%;
-  border: 8px solid #333a41;
-  background: radial-gradient(circle at 40% 35%, #848d96, #565e66 70%, #454c55);
+  border: 7px solid #383e45;
+  background: transparent;
   box-shadow:
-    inset 0 3px 6px rgba(255, 255, 255, 0.3),
-    inset 0 -5px 10px rgba(0, 0, 0, 0.45),
-    0 4px 12px rgba(0, 0, 0, 0.4);
+    inset 0 2px 5px rgba(255, 255, 255, 0.15),
+    inset 0 -3px 7px rgba(0, 0, 0, 0.4),
+    0 3px 9px rgba(0, 0, 0, 0.45);
+  will-change: transform;
 }
 
-.vault-spoke {
+/* Four rods through the center = eight handle arms. */
+.vault-wheel-rod {
   position: absolute;
   top: 50%;
-  left: 4%;
-  right: 4%;
-  height: 10%;
-  margin-top: -5%;
+  left: -9%;
+  right: -9%;
+  height: 7%;
+  margin-top: -3.5%;
   border-radius: 999px;
   background: linear-gradient(#9aa3ad, #5c646d);
   box-shadow:
@@ -208,8 +289,31 @@
     0 2px 3px rgba(0, 0, 0, 0.4);
 }
 
-.vault-wheel::after {
+/* Knobbed handle ends protruding past the rim, both ends of each rod. */
+.vault-wheel-rod::before,
+.vault-wheel-rod::after {
   content: "";
+  position: absolute;
+  top: 50%;
+  width: 16%;
+  aspect-ratio: 1 / 2.1;
+  transform: translateY(-50%);
+  border-radius: 999px;
+  background: radial-gradient(circle at 35% 30%, #c3cad1, #7d868f 60%, #50575f);
+  box-shadow:
+    inset 0 -2px 3px rgba(0, 0, 0, 0.5),
+    0 2px 3px rgba(0, 0, 0, 0.4);
+}
+
+.vault-wheel-rod::before {
+  left: -6%;
+}
+
+.vault-wheel-rod::after {
+  right: -6%;
+}
+
+.vault-wheel-hub {
   position: absolute;
   top: 50%;
   left: 50%;
@@ -224,15 +328,44 @@
     0 2px 4px rgba(0, 0, 0, 0.45);
 }
 
-/* --- Lock status LED --- */
+@keyframes vault-handle {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.vault-scene[data-stage="unlocking"] .vault-wheel {
+  /* The handle turns only after the combination is dialed (2.3s). */
+  animation: vault-handle 0.6s ease-in-out 2.3s forwards;
+}
+
+.vault-scene[data-stage="opening"] .vault-wheel,
+.vault-scene[data-stage="open"] .vault-wheel {
+  transform: rotate(360deg);
+}
+
+/* Small lower knob, as in the photo. */
+.vault-door-knob {
+  position: absolute;
+  bottom: 6%;
+  left: 47%;
+  width: 6%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 32%, #b9c1c9, #6b737d 65%, #474e56);
+  box-shadow:
+    inset 0 -2px 4px rgba(0, 0, 0, 0.5),
+    0 2px 4px rgba(0, 0, 0, 0.45);
+}
+
+/* --- Lock status LED (discreet, top-right of the disc) --- */
 
 .vault-led {
   position: absolute;
-  top: 7%;
-  left: 50%;
-  width: 5%;
+  top: 10%;
+  right: 12%;
+  width: 4.5%;
   aspect-ratio: 1;
-  margin-left: -2.5%;
   border-radius: 50%;
   background: #39d353;
   box-shadow:
@@ -247,52 +380,6 @@
     inset 0 -1px 2px rgba(0, 0, 0, 0.35);
 }
 
-/* ==== Opening sequence (M17 Phase 4) ====
-   Driven purely by [data-stage] on .vault-scene, set from useVaultAnimation:
-   closed → unlocking (wheel spins, bolts retract, LED goes processing-blue)
-   → opening/open (door swings on its right-side hinges) → closing → closed.
-   Confirmation logic never waits on any of this. */
-
-.vault-frame {
-  perspective: 1400px;
-}
-
-.vault-door {
-  transform-origin: 94% 50%;
-  transition: transform 0.9s cubic-bezier(0.6, 0, 0.3, 1);
-  will-change: transform;
-}
-
-.vault-scene[data-stage="opening"] .vault-door,
-.vault-scene[data-stage="open"] .vault-door {
-  transform: rotateY(76deg);
-}
-
-.vault-wheel {
-  transition: transform 1.05s cubic-bezier(0.45, 0.05, 0.4, 1);
-  will-change: transform;
-}
-
-.vault-scene[data-stage="unlocking"] .vault-wheel,
-.vault-scene[data-stage="opening"] .vault-wheel,
-.vault-scene[data-stage="open"] .vault-wheel {
-  transform: rotate(240deg);
-}
-
-.vault-bolt::before {
-  transition:
-    transform 0.55s ease-in 0.35s,
-    opacity 0.55s ease-in 0.35s;
-}
-
-.vault-scene[data-stage="unlocking"] .vault-bolt::before,
-.vault-scene[data-stage="opening"] .vault-bolt::before,
-.vault-scene[data-stage="open"] .vault-bolt::before {
-  /* Local frame of each rotated wrapper: +Y points at the door center. */
-  transform: translateY(90%) scale(0.55);
-  opacity: 0;
-}
-
 .vault-scene[data-stage="unlocking"] .vault-led {
   background: #7aa2ff;
   box-shadow: 0 0 12px rgba(122, 162, 255, 0.9);
@@ -305,38 +392,71 @@
   }
 }
 
-.vault-interior {
-  transition: filter 0.6s ease;
-  filter: brightness(0.55);
+/* --- Barrel hinges (left side, like the photo) --- */
+
+.vault-hinge {
+  position: absolute;
+  left: 0.6%;
+  width: 5.5%;
+  height: 19%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #a6aeb7, #6b737d 45%, #454c55 80%, #33383f);
+  box-shadow:
+    inset 0 3px 4px rgba(255, 255, 255, 0.35),
+    inset 0 -3px 5px rgba(0, 0, 0, 0.55),
+    2px 3px 8px rgba(0, 0, 0, 0.5);
+  z-index: 2;
 }
 
-.vault-scene[data-stage="opening"] .vault-interior,
-.vault-scene[data-stage="open"] .vault-interior {
-  filter: brightness(1);
+/* Hinge caps. */
+.vault-hinge::before,
+.vault-hinge::after {
+  content: "";
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  height: 14%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #8f98a2, #565e66);
+  box-shadow: inset 0 -1px 2px rgba(0, 0, 0, 0.5);
 }
+
+.vault-hinge::before {
+  top: -8%;
+}
+
+.vault-hinge::after {
+  bottom: -8%;
+}
+
+.vault-hinge-top {
+  top: 16%;
+}
+
+.vault-hinge-bottom {
+  bottom: 16%;
+}
+
+/* ==== Reduced motion: the sequence collapses to a fade ==== */
 
 @media (prefers-reduced-motion: reduce) {
   .vault-door,
+  .vault-dial-face,
   .vault-wheel,
-  .vault-bolt::before,
   .vault-interior {
     transition: opacity 0.3s ease !important;
+    animation: none !important;
   }
 
+  .vault-scene[data-stage="unlocking"] .vault-dial-face,
+  .vault-scene[data-stage="opening"] .vault-dial-face,
+  .vault-scene[data-stage="open"] .vault-dial-face,
   .vault-scene[data-stage="unlocking"] .vault-wheel,
   .vault-scene[data-stage="opening"] .vault-wheel,
   .vault-scene[data-stage="open"] .vault-wheel {
     transform: none;
   }
 
-  .vault-scene[data-stage="unlocking"] .vault-bolt::before,
-  .vault-scene[data-stage="opening"] .vault-bolt::before,
-  .vault-scene[data-stage="open"] .vault-bolt::before {
-    transform: none;
-    opacity: 1;
-  }
-
-  /* The swing becomes a plain fade. */
   .vault-scene[data-stage="opening"] .vault-door,
   .vault-scene[data-stage="open"] .vault-door {
     transform: none;
@@ -345,6 +465,63 @@
 
   .vault-scene[data-stage="unlocking"] .vault-led {
     animation: none;
+  }
+}
+
+/* ==== Celebration overlay (M17 Phase 5) ==== */
+
+.vault-celebration-wrap {
+  position: relative;
+}
+
+.confetti {
+  position: absolute;
+  inset: -4% -10%;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.confetti-piece,
+.confetti-dollar {
+  position: absolute;
+  top: -6%;
+  opacity: 0;
+  animation: confetti-fall var(--dur) ease-in var(--delay) forwards;
+  will-change: transform, opacity;
+}
+
+.confetti-piece {
+  width: 10px;
+  height: 16px;
+  border-radius: 2px;
+  background: var(--c);
+}
+
+.confetti-dollar {
+  font-weight: 700;
+  font-size: 19px;
+  color: var(--c);
+  text-shadow: 0 0 7px rgba(46, 204, 113, 0.55);
+}
+
+@keyframes confetti-fall {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--dx), 640px, 0) rotate(var(--rot));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .confetti {
+    display: none;
   }
 }
 

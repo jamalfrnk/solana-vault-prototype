@@ -1,18 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { VaultClient, VaultState, UserPosition } from "@vault-sdk";
 
 import { parseMintAddress } from "../lib/solana/mint";
 import { fetchMintDecimals } from "../lib/solana/amounts";
 import { useVaultAnimation } from "../hooks/useVaultAnimation";
+import { useSoundEffect } from "../hooks/useSoundEffect";
 import { DepositForm } from "./DepositForm";
 import { WithdrawForm } from "./WithdrawForm";
 import { AdminPausePanel } from "./AdminPausePanel";
 import { UserSharesDisplay } from "./UserSharesDisplay";
 import { InteractiveVault } from "./vault/InteractiveVault";
 import { VaultStatusPanel } from "./vault/VaultStatusPanel";
+import { DollarConfetti } from "./vault/DollarConfetti";
 
 type LoadState = "loading" | "loaded";
 
@@ -84,13 +86,34 @@ export function VaultDetail({ mintInput }: { mintInput: string }) {
   }, [vaultClient, connected, publicKey]);
 
   const { stage, openVault } = useVaultAnimation();
+  const { play: playChaChing, muted, toggleMuted } = useSoundEffect();
+  const [pendingCelebration, setPendingCelebration] = useState<string | null>(null);
+  const [confettiBurst, setConfettiBurst] = useState<string | null>(null);
+  const celebratedSignatures = useRef<Set<string>>(new Set());
 
   /** Confirmed deposit/withdraw: refresh authoritative balances FIRST, then
-   *  run the celebration — the opened vault must show current numbers. */
-  const celebrateConfirmed = useCallback(async () => {
-    await refresh();
-    openVault();
-  }, [refresh, openVault]);
+   *  run the celebration — the opened vault must show current numbers. The
+   *  signature keys every effect: one door sequence, one cha-ching, one
+   *  confetti burst per confirmed transaction, re-renders included. */
+  const celebrateConfirmed = useCallback(
+    async (signature: string) => {
+      await refresh();
+      if (celebratedSignatures.current.has(signature)) return;
+      celebratedSignatures.current.add(signature);
+      setPendingCelebration(signature);
+      openVault();
+    },
+    [refresh, openVault],
+  );
+
+  /** Sound + confetti fire at the reveal — the moment the door is open. */
+  useEffect(() => {
+    if (stage === "open" && pendingCelebration) {
+      playChaChing();
+      setConfettiBurst(pendingCelebration);
+      setPendingCelebration(null);
+    }
+  }, [stage, pendingCelebration, playChaChing]);
 
   if (!mint) {
     return <p role="alert">Invalid mint address.</p>;
@@ -113,12 +136,15 @@ export function VaultDetail({ mintInput }: { mintInput: string }) {
       <h2>Vault</h2>
       <div className="vault-dashboard">
         <div className="vault-dashboard-main">
-          <InteractiveVault
-            totalAssets={vaultState.totalAssets}
-            isPaused={vaultState.isPaused}
-            decimals={displayDecimals}
-            stage={stage}
-          />
+          <div className="vault-celebration-wrap">
+            <InteractiveVault
+              totalAssets={vaultState.totalAssets}
+              isPaused={vaultState.isPaused}
+              decimals={displayDecimals}
+              stage={stage}
+            />
+            <DollarConfetti burstKey={confettiBurst} />
+          </div>
           <VaultStatusPanel
             totalAssets={vaultState.totalAssets}
             totalShares={vaultState.totalShares}
@@ -155,6 +181,9 @@ export function VaultDetail({ mintInput }: { mintInput: string }) {
             isPaused={vaultState.isPaused}
             onConfirmed={refresh}
           />
+          <button type="button" onClick={toggleMuted} aria-pressed={muted}>
+            Sound: {muted ? "off" : "on"}
+          </button>
         </div>
       </div>
     </section>
