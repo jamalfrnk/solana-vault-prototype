@@ -1,0 +1,23 @@
+{
+  "name": "solana-vault-prototype-sdk",
+  "version": "0.1.0",
+  "description": "TypeScript client for the solana-vault-prototype Anchor program — PDA derivation, instruction builders, account decoders, and Anchor error parsing, with no runtime dependency on a generated IDL.",
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jamalfrnk/solana-vault-prototype.git",
+    "directory": "sdk"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json"
+  },
+  "peerDependencies": {
+    "@solana/web3.js": "^1.98.0",
+    "@anchor-lang/core": "^1.0.2"
+  }
+}

@@ -11,6 +11,9 @@ app/out/
 app/next-env.d.ts
 *.tsbuildinfo
 
+# SDK package build output (M19)
+sdk/dist/
+
 # Anchor / Solana tooling artifacts
 **/*.rs.bk
 .yarn
