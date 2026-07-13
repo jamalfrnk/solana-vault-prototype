@@ -26,6 +26,7 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 | 16 | Governance-ready pause authority | `[x]` complete |
 | 17 | Interactive vault UI | `[x]` complete |
 | 18 | Authority rotation (`set_pause_authority`) | `[x]` complete |
+| 19 | SDK v2 — publishable package + IDL discriminator verification | `[~]` in progress |
 
 ## Milestone 0 — Repository bootstrap (complete)
 
@@ -479,6 +480,71 @@ Observed (2026-07-13, CI run 29224127072 on PR #28): all four jobs green —
 in `tests/test_rotation.rs`), `cargo audit`, SDK tests, dApp tests. Merged
 into `main` as `6d329e3` (PR #28, 2026-07-13).
 
+## Milestone 19 — SDK v2: Publishable Package + IDL Discriminator Verification (in progress)
+
+Fifth post-MVP milestone, on `feature/sdk-v2`. The roadmap candidate this
+picks up bundled two different things — "versioned npm publish" and
+"IDL-based codegen ... replacing the current hand-derived-discriminator
+approach" — and they're deliberately split apart here after confirming the
+split with Malcolm before implementing:
+
+1. **Package structure (delivered)**: `sdk/` is now a real, versioned,
+   buildable npm package — `sdk/package.json` (`solana-vault-prototype-sdk`,
+   `0.1.0`, `peerDependencies` on `@solana/web3.js`/`@anchor-lang/core`
+   rather than regular deps, matching the pattern M14 already established for
+   avoiding duplicate-instance `instanceof PublicKey` bugs),
+   `sdk/tsconfig.build.json` (emits `dist/*.js` + `.d.ts`), a root Yarn
+   workspace (`"workspaces": ["sdk"]`, `app/` stays separately npm-managed,
+   untouched), and `sdk/README.md`. `npm publish` itself is explicitly **not**
+   automated this milestone — no npm credentials are assumed; Malcolm runs it
+   manually whenever he's ready.
+2. **IDL discriminator verification, not replacement (delivered)**:
+   `sdk/src/discriminator.ts`'s hand-derived discriminators
+   (`sha256("global:<name>")` / `sha256("account:<Name>")`) are already
+   tested, working code for an interview-grade prototype whose whole point is
+   auditability — rewriting them to be IDL-generated was judged a bigger,
+   riskier change for no functional benefit. Instead: the `build-and-test`
+   CI job's Anchor CLI (installed since M11, previously unused for this) now
+   runs `anchor build` instead of bare `cargo build-sbf` — a strict superset
+   that also emits `target/idl/solana_vault_prototype.json` — and uploads it
+   as an artifact. A new `idl-verify` job downloads it and runs
+   `scripts/verify_idl_discriminators.ts`, which diffs the IDL's own embedded
+   discriminator bytes against every SDK-computed value for all 7
+   instructions and both accounts. This turns M13's one-time research claim
+   ("verified against Anchor's actual codegen... independently recomputed")
+   into a check that runs on every CI push. Scoped to discriminators only —
+   full account byte-layout (field order/offsets) verification against the
+   IDL is a possible future addition, not required to close this milestone's
+   gap.
+
+A previously-masked repo gap surfaced while writing the verification script:
+`tsconfig.json`'s `"types"` array (`["mocha", "chai"]`) silently excluded
+Node's ambient globals (`fs`, `path`, `Buffer`, `process`, `console`)
+repo-wide — every existing script that compiled clean only did so because it
+happened to import `@solana/web3.js`, whose own `.d.ts` carries a `///
+<reference types="node" />` that pulled Node's types in as a side effect for
+the whole program. `@types/node` was present in `node_modules` but only as an
+undeclared transitive dependency, not a real, pinned one. Fixed by adding
+`@types/node@^22.0.0` (pinned to the Node line this project actually targets
+— CI's `node-version: "22"`, matching the resolved local version too) as a
+real devDependency and adding `"node"` to `tsconfig.json`'s `"types"` array.
+
+Development-environment note: same gap as every milestone since M13 — no
+Solana/Anchor toolchain on this machine, so `anchor build` and
+`scripts/verify_idl_discriminators.ts` against a real IDL could not be run
+locally. The verification script's pass/fail logic was instead validated
+against two synthetic fixtures (a byte-correct fake IDL and one with a
+deliberately tampered discriminator byte) before trusting it in CI — it
+correctly passed the former and failed loudly with a byte-level diff on the
+latter. SDK-side work (`yarn install`, `yarn sdk:build`, `yarn test:sdk`
+53/53, `yarn typecheck`, `app/` typecheck/build) was run and observed passing
+locally.
+
+Not yet done: CI has not run `anchor build` for real yet — this branch's
+first CI run is the actual confirmation that `anchor build` behaves as
+expected and the IDL's JSON shape matches what the script assumes. Will be
+updated with observed CI results before this milestone is marked complete.
+
 ## Post-MVP Roadmap (proposed — none started, none approved)
 
 Milestones 0–14 are the MVP `PROJECT_CONTEXT.md` scoped from day one: a hardened,
@@ -498,7 +564,7 @@ branch.
 | Third-party security audit | formal-audit claims | The one item that actually removes the "not audited" disclaimer — everything else in this table should probably wait until after it. |
 | Mainnet operational readiness | mainnet deployment, production custody claims | Key management, monitoring, alerting, incident runbook — operational maturity, not new instructions. |
 | Yield strategy integration | yield strategies, lending integrations | Deploying idle custody assets into an approved venue. Highest blast radius on this list; should follow, not precede, the audit. |
-| SDK v2 / published package | — | Versioned npm publish, IDL-based codegen once a machine with the Anchor CLI is available, replacing the current hand-derived-discriminator approach. |
+| SDK v2 / published package | — | Picked up as **M19**. Publishable package structure delivered; discriminator provenance verified against a generated IDL in CI rather than rewritten (confirmed with Malcolm — the existing hand-derived, already-tested code stays as-is). `npm publish` itself stays a manual step; no credentials assumed. |
 | dApp productization | frontend application (already relaxed by M14) | Transaction history, broader wallet support, real analytics — M14 was deliberately plain CSS, no charts. |
 
 ## Notes

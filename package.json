@@ -1,10 +1,15 @@
 {
+  "private": true,
   "license": "ISC",
+  "workspaces": [
+    "sdk"
+  ],
   "scripts": {
     "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
     "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check",
     "test:sdk": "ts-mocha -p tsconfig.json \"sdk/tests/**/*.test.ts\"",
     "typecheck": "tsc --noEmit -p tsconfig.json",
+    "sdk:build": "corepack yarn workspace solana-vault-prototype-sdk run build",
     "app:dev": "npm --prefix app run dev",
     "app:build": "npm --prefix app run build",
     "app:test": "npm --prefix app run test",
@@ -24,6 +29,7 @@
     "@types/bn.js": "^5.1.0",
     "@types/chai": "^4.3.0",
     "@types/mocha": "^10.0.10",
+    "@types/node": "^22.0.0",
     "chai": "^4.3.4",
     "mocha": "^11.7.6",
     "prettier": "^2.6.2",

@@ -1,14 +1,14 @@
 # Test Plan
 
 **Status: M17 complete (PR #27, merged 2026-07-12); M18 complete (PR #28,
-merged 2026-07-13) —
+merged 2026-07-13); M19 in progress —
 55 Rust tests (46 through M16 + 9 authority-rotation tests added in M18, in
 `tests/test_rotation.rs`; observed passing in CI run 29224127072 on
 2026-07-13), 53 SDK tests (49 through M17 + 4 M18 rotation-builder/decode
-tests, observed passing locally 2026-07-12 and in the same CI run), 88 dApp
-tests (34 at M14 close; M17 added lifecycle, animation, sound, confetti,
-background, and dashboard coverage — see `docs/UI_VAULT.md` for the testing
-strategy; unchanged this milestone).**
+tests, observed passing locally 2026-07-12 and in the same CI run; unchanged
+by M19), 88 dApp tests (34 at M14 close; M17 added lifecycle, animation,
+sound, confetti, background, and dashboard coverage — see `docs/UI_VAULT.md`
+for the testing strategy; unchanged since M17).**
 
 ## Repository hygiene (complete)
 
@@ -194,6 +194,43 @@ CI, same pattern as M13–M17.
 
 Observed (2026-07-13, CI run 29224127072 on PR #28): `fmt, clippy, build-sbf,
 test` job green in 2m1s — all 55 Rust tests passed, including all 9 above.
+
+## IDL discriminator verification (M19)
+
+`sdk/src/discriminator.ts` computes every Anchor discriminator by hand
+(`sha256("global:<name>")` / `sha256("account:<Name>")`) rather than reading a
+generated IDL — a deliberate M13 choice so the SDK has no build-time
+dependency on the Anchor CLI. Until M19, those hand-derived values were only
+ever checked against Anchor's real codegen once, by research, at M13.
+
+The `build-and-test` CI job now runs `anchor build` (a strict superset of the
+prior `cargo build-sbf` — same compiled program, plus IDL extraction to
+`target/idl/solana_vault_prototype.json`) and uploads the generated IDL as an
+artifact. A new `idl-verify` job downloads it and runs
+`scripts/verify_idl_discriminators.ts`, which diffs the IDL's own embedded
+discriminator bytes against every SDK-computed value — all 7 instructions
+and both accounts.
+
+- [ ] `anchor build` succeeds in CI and produces `target/idl/solana_vault_prototype.json`.
+      — not yet CI-observed; there is no Anchor CLI on this dev machine to
+        confirm the IDL's exact JSON shape firsthand. First real CI run on
+        this branch is the actual confirmation (same pattern as every
+        Rust-side check since M13).
+- [x] All 7 instruction discriminators (`initialize`, `deposit`, `withdraw`,
+      `pause`, `unpause`, `propose_pause_authority`, `accept_pause_authority`)
+      and both account discriminators (`VaultState`, `UserPosition`) match
+      the generated IDL.
+      — Logic verified locally against synthetic fixtures (a byte-correct
+        IDL, and one with a deliberately tampered discriminator) before
+        trusting it in CI: `scripts/verify_idl_discriminators.ts` correctly
+        passes the correct fixture and fails loudly with a byte-level diff on
+        the tampered one. Not yet run against a real `anchor build` output.
+
+Scope note: this verifies discriminators only, not full account byte-layout
+(field order/offsets). The roadmap candidate's "IDL-based codegen" phrase was
+read as two separable things — package structure (delivered fully) and
+discriminator provenance (verified, not rewritten) — confirmed with Malcolm
+before implementing; see `ROADMAP.md`'s Milestone 19 section.
 
 ## Anchor scaffold baseline (complete — M2)
 

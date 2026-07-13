@@ -111,12 +111,20 @@ npx ts-node scripts/devnet_demo.ts
 account decoders, and Anchor error parsing — with **no runtime dependency on
 `target/idl/*.json`**. Every Anchor discriminator is computed directly via
 `sha256("global:<name>")` / `sha256("account:<Name>")`, matching Anchor's own
-codegen, which makes the SDK fully testable without the Anchor CLI installed.
+codegen, which makes the SDK fully testable without the Anchor CLI installed. Since
+M19, that match is verified on every CI run (not just by one-time research): CI runs
+`anchor build` and diffs the real generated IDL's discriminator bytes against the
+SDK's computed ones.
+
+`sdk/` is now a versioned, buildable package (`solana-vault-prototype-sdk`, see
+`sdk/README.md`) — **not yet published to npm**. Until then, import it directly from
+the repo as shown below.
 
 ```bash
 corepack yarn install
-corepack yarn test:sdk    # 48 tests, offline, no RPC, no compiled program
+corepack yarn test:sdk    # 53 tests, offline, no RPC, no compiled program
 corepack yarn typecheck
+corepack yarn sdk:build   # emits sdk/dist/*.js + *.d.ts
 ```
 
 ```ts
