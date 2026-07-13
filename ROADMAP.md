@@ -26,7 +26,7 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 | 16 | Governance-ready pause authority | `[x]` complete |
 | 17 | Interactive vault UI | `[x]` complete |
 | 18 | Authority rotation (`set_pause_authority`) | `[x]` complete |
-| 19 | SDK v2 — publishable package + IDL discriminator verification | `[~]` in progress |
+| 19 | SDK v2 — publishable package + IDL discriminator verification | `[x]` complete |
 
 ## Milestone 0 — Repository bootstrap (complete)
 
@@ -480,7 +480,7 @@ Observed (2026-07-13, CI run 29224127072 on PR #28): all four jobs green —
 in `tests/test_rotation.rs`), `cargo audit`, SDK tests, dApp tests. Merged
 into `main` as `6d329e3` (PR #28, 2026-07-13).
 
-## Milestone 19 — SDK v2: Publishable Package + IDL Discriminator Verification (in progress)
+## Milestone 19 — SDK v2: Publishable Package + IDL Discriminator Verification (complete)
 
 Fifth post-MVP milestone, on `feature/sdk-v2`. The roadmap candidate this
 picks up bundled two different things — "versioned npm publish" and
@@ -540,10 +540,23 @@ latter. SDK-side work (`yarn install`, `yarn sdk:build`, `yarn test:sdk`
 53/53, `yarn typecheck`, `app/` typecheck/build) was run and observed passing
 locally.
 
-Not yet done: CI has not run `anchor build` for real yet — this branch's
-first CI run is the actual confirmation that `anchor build` behaves as
-expected and the IDL's JSON shape matches what the script assumes. Will be
-updated with observed CI results before this milestone is marked complete.
+First real CI run caught a real issue, same pattern as M11/M12: `anchor
+build` (unlike bare `cargo build-sbf`) checks `target/deploy/*-keypair.json`
+against `declare_id!()` — but this repo deliberately never commits a program
+keypair (`SECURITY_CHECKLIST.md`), so CI generates a fresh random one every
+run that can never match the real deployed program ID. Fixed with `anchor
+build --ignore-keys`, the exact escape hatch the error message itself names
+— it skips only that consistency check, without rewriting `declare_id!()`
+(which `anchor keys sync` would have done, silently diverging the source
+from the real deployed devnet address) and without needing to commit a
+keypair. CI never deploys, so the check had nothing to protect here.
+
+Observed (2026-07-13, CI run 29232763139 on PR #30, after the `--ignore-keys`
+fix): all five jobs green, including the new `idl-verify` job for the first
+time — `anchor build` succeeded and produced a real IDL, and
+`scripts/verify_idl_discriminators.ts` confirmed all 7 instruction and 2
+account discriminators match it exactly, for real, not by assumption. Merged
+into `main` as squash commit `bfdd40f` (PR #30, 2026-07-13).
 
 ## Post-MVP Roadmap (proposed — none started, none approved)
 
