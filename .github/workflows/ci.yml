@@ -50,8 +50,14 @@ jobs:
       - name: cargo fmt --check
         run: cargo fmt --all -- --check
 
+      # --ignore-keys: this repo never commits a program keypair (see
+      # SECURITY_CHECKLIST.md), so CI has no target/deploy/*-keypair.json
+      # matching the real deployed program ID in declare_id!(). Unlike
+      # `anchor keys sync`, this does not rewrite declare_id!() — it only
+      # skips anchor build's own keypair-consistency check. CI never deploys,
+      # so that check has nothing to protect here.
       - name: anchor build (cargo build-sbf + IDL)
-        run: anchor build
+        run: anchor build --ignore-keys
 
       - name: cargo clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
