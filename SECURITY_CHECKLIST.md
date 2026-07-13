@@ -292,15 +292,51 @@ analog); full rationale in `ARCHITECTURE.md` → "Governance-ready pause authori
       — M16: `test_pause_with_pda_authority_rejects_keypair_impostor`,
         `test_initialize_pda_payer_authority_separation_still_enforced`.
 
-Known limitation (tracked, not fixed here): `pause_authority` is **immutable after
-initialize** — no rotation instruction exists. A multisig-held vault must be
-initialized through the multisig from day one; a compromised or lost authority cannot
-be rotated without redeploying. A two-step `set_pause_authority` is the natural next
-on-chain milestone (see `ROADMAP.md` post-MVP candidates).
+Known limitation at M16 (closed by M18 below): `pause_authority` was **immutable
+after initialize** — no rotation instruction existed. A multisig-held vault had to be
+initialized through the multisig from day one; a compromised or lost authority could
+not be rotated without redeploying. `propose_pause_authority` / `accept_pause_authority`
+(M18) close this gap.
 
 Observed: CI run 29128852767 (2026-07-10), `tests/test_governance.rs` — 5 passed,
 0 failed. (No local Rust toolchain on the M16 development machine; CI is the
 observation source.)
+
+## Authority rotation (M18)
+
+Two-step `propose_pause_authority` / `accept_pause_authority` replace the M16-documented
+gap ("`pause_authority` is a one-shot initialize-time decision") with a rotation path that
+requires the destination key to prove liveness before it gains exclusive pause power.
+Full design rationale in `ARCHITECTURE.md` → "Two-step pause-authority rotation (M18)".
+Proven by 9 tests in `tests/test_rotation.rs`, including a rotation into an off-curve
+multisig PDA using the same M16 sigverify-off `invoke_signed` analog.
+
+- [x] Only the current `pause_authority` may propose a new one.
+      — M18: `test_propose_wrong_authority_fails`.
+- [x] A proposal alone grants no privilege — the active authority is unchanged and the
+      proposed key cannot exercise pause control until it accepts.
+      — M18: `test_propose_records_pending_without_rotating`.
+- [x] The default (all-zero) pubkey is rejected as a proposal — it is the "no pending"
+      sentinel and would otherwise soft-brick acceptance permanently.
+      — M18: `test_propose_rejects_default_pubkey`.
+- [x] Re-proposing overwrites any existing pending proposal (supports both changing
+      one's mind and the proposeSelf-then-accept cancel path).
+      — M18: `test_repropose_overwrites_pending`, `test_cancel_by_proposing_current_authority`.
+- [x] Only the proposed key may accept, and it must sign — proving the destination is
+      live (or, for a governance PDA, that its program executed `invoke_signed`) before
+      it receives exclusive pause power.
+      — M18: `test_accept_wrong_signer_fails` (rejects both a stranger and the current
+        authority attempting to accept on the proposed key's behalf).
+- [x] Accepting with no pending proposal fails.
+      — M18: `test_accept_without_pending_fails`.
+- [x] End-to-end rotation: the new authority gains full pause/unpause control, the old
+      authority is locked out, and `pending_pause_authority` clears on acceptance.
+      — M18: `test_accept_rotates_authority_end_to_end`.
+- [x] A keypair-run vault can rotate INTO an off-curve multisig PDA authority without
+      redeploying — the M16 gap, closed.
+      — M18: `test_rotate_into_multisig_pda`.
+- [x] Both instructions emit their events (`PauseAuthorityProposed`, `PauseAuthorityRotated`).
+      — M18: `test_rotation_events_emitted`.
 
 ## Secrets
 

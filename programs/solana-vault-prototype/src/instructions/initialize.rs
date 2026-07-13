@@ -65,6 +65,7 @@ pub fn handler(ctx: Context<Initialize>) -> Result<()> {
     vs.total_assets = 0;
     vs.total_shares = 0;
     vs.is_paused = false;
+    vs.pending_pause_authority = Pubkey::default();
     vs.reserved = [0u8; 22];
 
     emit!(VaultInitialized {

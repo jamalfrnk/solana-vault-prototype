@@ -3,7 +3,7 @@ import { Connection, PublicKey } from "@solana/web3.js";
 import { accountDiscriminator } from "./discriminator";
 import { deriveUserPositionPda, deriveVaultStatePda } from "./pdas";
 
-const VAULT_STATE_LEN = 113;
+const VAULT_STATE_LEN = 145;
 const USER_POSITION_LEN = 81;
 
 function checkDiscriminator(data: Buffer, expectedName: string, expectedLen: number): void {
@@ -29,6 +29,9 @@ export interface VaultState {
   totalAssets: bigint;
   totalShares: bigint;
   isPaused: boolean;
+  /** M18 two-step rotation: the proposed next authority, or the default
+   *  (all-zero) PublicKey when no rotation is pending. */
+  pendingPauseAuthority: PublicKey;
 }
 
 /**
@@ -51,6 +54,7 @@ export function decodeVaultState(data: Buffer): VaultState {
     totalAssets: dv.getBigUint64(74, true),
     totalShares: dv.getBigUint64(82, true),
     isPaused: data.readUInt8(90) !== 0,
+    pendingPauseAuthority: new PublicKey(data.subarray(91, 123)),
   };
 }
 

@@ -24,7 +24,8 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 | 14 | dApp shell | `[x]` complete |
 | 15 | Dependency security remediation | `[x]` complete |
 | 16 | Governance-ready pause authority | `[x]` complete |
-| 17 | Interactive vault UI | `[~]` in review (PR pending) |
+| 17 | Interactive vault UI | `[x]` complete |
+| 18 | Authority rotation (`set_pause_authority`) | `[~]` in review (PR #28) |
 
 ## Milestone 0 — Repository bootstrap (complete)
 
@@ -435,6 +436,49 @@ next build clean, live devnet verification of deposit/withdraw/pause through
 Phantom during development. No Rust or SDK interface changes beyond the
 hotfixed encode/decode internals.
 
+Merged as PR #27 on 2026-07-12.
+
+## Milestone 18 — Authority Rotation (`set_pause_authority`) (in review)
+
+Fourth post-MVP milestone, on `feature/authority-rotation`. Closes the gap
+M16 documented: `pause_authority` was a one-shot, initialize-time decision
+with no recovery path for a lost or compromised key, and no way for a
+keypair-run vault to hand off to governance later without redeploying.
+
+Adds a two-step `propose_pause_authority` / `accept_pause_authority`
+instruction pair (not a one-step setter): the proposed key must sign
+acceptance, proving it is live before it receives exclusive pause power.
+`VaultState` gains a `pending_pause_authority: Pubkey` field (appended after
+`is_paused` to preserve pre-M18 field offsets; still a breaking account-size
+change with no migration — accepted for a devnet prototype). New events
+`PauseAuthorityProposed` / `PauseAuthorityRotated`. Cancel path reuses the
+same two instructions (propose self, then accept) rather than adding a third.
+The final of 9 new tests reuses M16's `with_sigverify(false)` `invoke_signed`
+analog to prove a keypair-run vault can rotate its authority into an
+off-curve multisig PDA — the concrete scenario M16 could document but not
+yet exercise. Full design rationale in `ARCHITECTURE.md`'s "Two-step
+pause-authority rotation (M18)" section.
+
+SDK gained `buildProposePauseAuthorityIx`/`buildAcceptPauseAuthorityIx`
+instruction builders, `VaultClient` wrapper methods, and
+`pendingPauseAuthority` decoding in `decodeVaultState` (`VAULT_STATE_LEN`
+113→145). No dApp changes this milestone — rotation is exposed at the
+program/SDK layer only; a UI is a candidate for a later pass, not required
+to close this gap.
+
+Development-environment note: this machine's local Rust toolchain fails at
+the `link.exe` step (environment-wide MSVC linker breakage, not code-specific
+— `cargo fmt` succeeds since it doesn't link, but `check`/`build-sbf`/`test`/
+`clippy` all fail before reaching the code). Rust-side verification was
+deferred to CI, same pattern as M13–M17. SDK-side verification (53/53
+`corepack yarn test:sdk`, root + `app/` typecheck) was run locally and
+observed passing.
+
+Observed (2026-07-13, CI run 29224127072 on PR #28): all four jobs green —
+`fmt, clippy, build-sbf, test` (2m1s; includes all 55 Rust tests, the 9 new
+in `tests/test_rotation.rs`), `cargo audit`, SDK tests, dApp tests. PR #28
+open for review.
+
 ## Post-MVP Roadmap (proposed — none started, none approved)
 
 Milestones 0–14 are the MVP `PROJECT_CONTEXT.md` scoped from day one: a hardened,
@@ -450,7 +494,7 @@ branch.
 | Multi-asset vault support | multi-asset support | Today's design is deliberately single-mint; generalizing the PDA seed and account layout is the largest architectural change on this list. |
 | Fee mechanism | tokenomics | Management/performance fees with tested, checked-arithmetic accounting — the same rigor M5/M6/M12 applied to deposit/withdraw. |
 | Governance-controlled authority | governance, multisig | Picked up as **M16**. Replace the single `pause_authority` keypair with a multisig or DAO-controlled account — no change to the on-chain constraint itself, only to who can sign it. |
-| Authority rotation (`set_pause_authority`) | governance | Two-step propose/accept rotation so the authority isn't a one-shot initialize-time decision — the gap M16's tests made explicit. First new instruction since M7; needs the full M4-style test treatment. |
+| Authority rotation (`set_pause_authority`) | governance | Picked up as **M18**. Two-step propose/accept rotation so the authority isn't a one-shot initialize-time decision — the gap M16's tests made explicit. First new instructions since M7. |
 | Third-party security audit | formal-audit claims | The one item that actually removes the "not audited" disclaimer — everything else in this table should probably wait until after it. |
 | Mainnet operational readiness | mainnet deployment, production custody claims | Key management, monitoring, alerting, incident runbook — operational maturity, not new instructions. |
 | Yield strategy integration | yield strategies, lending integrations | Deploying idle custody assets into an approved venue. Highest blast radius on this list; should follow, not precede, the audit. |

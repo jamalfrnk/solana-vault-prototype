@@ -10,6 +10,13 @@ pub struct VaultState {
     pub total_assets: u64,
     pub total_shares: u64,
     pub is_paused: bool,
+    /// Two-step rotation (M18): the proposed next pause authority, or
+    /// `Pubkey::default()` when no rotation is pending. Appended AFTER
+    /// `is_paused` so every pre-M18 field keeps its byte offset — but note
+    /// this still grows the account: vaults initialized under the pre-M18
+    /// layout are NOT compatible with this program version (accepted for a
+    /// devnet prototype; documented in ARCHITECTURE.md).
+    pub pending_pause_authority: Pubkey,
     pub reserved: [u8; 22],
 }
 

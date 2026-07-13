@@ -18,4 +18,8 @@ pub enum VaultError {
     FreezeAuthorityPresent,
     #[msg("vault_authority PDA is not owned by the System Program")]
     InvalidVaultAuthorityOwner,
+    #[msg("No pending pause authority to accept")]
+    NoPendingAuthority,
+    #[msg("Proposed pause authority is invalid (default pubkey)")]
+    InvalidNewAuthority,
 }
