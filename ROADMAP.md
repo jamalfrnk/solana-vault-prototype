@@ -25,7 +25,7 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 | 15 | Dependency security remediation | `[x]` complete |
 | 16 | Governance-ready pause authority | `[x]` complete |
 | 17 | Interactive vault UI | `[x]` complete |
-| 18 | Authority rotation (`set_pause_authority`) | `[~]` in review (PR #28) |
+| 18 | Authority rotation (`set_pause_authority`) | `[x]` complete |
 
 ## Milestone 0 — Repository bootstrap (complete)
 
@@ -438,7 +438,7 @@ hotfixed encode/decode internals.
 
 Merged as PR #27 on 2026-07-12.
 
-## Milestone 18 — Authority Rotation (`set_pause_authority`) (in review)
+## Milestone 18 — Authority Rotation (`set_pause_authority`) (complete)
 
 Fourth post-MVP milestone, on `feature/authority-rotation`. Closes the gap
 M16 documented: `pause_authority` was a one-shot, initialize-time decision
@@ -476,8 +476,8 @@ observed passing.
 
 Observed (2026-07-13, CI run 29224127072 on PR #28): all four jobs green —
 `fmt, clippy, build-sbf, test` (2m1s; includes all 55 Rust tests, the 9 new
-in `tests/test_rotation.rs`), `cargo audit`, SDK tests, dApp tests. PR #28
-open for review.
+in `tests/test_rotation.rs`), `cargo audit`, SDK tests, dApp tests. Merged
+into `main` as `6d329e3` (PR #28, 2026-07-13).
 
 ## Post-MVP Roadmap (proposed — none started, none approved)
 
