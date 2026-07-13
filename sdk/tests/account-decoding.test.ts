@@ -16,9 +16,10 @@ function buildVaultStateBuffer(fields: {
   totalAssets: bigint;
   totalShares: bigint;
   isPaused: boolean;
+  pendingPauseAuthority?: PublicKey;
   discriminator?: Buffer;
 }): Buffer {
-  const buf = Buffer.alloc(113);
+  const buf = Buffer.alloc(145);
   (fields.discriminator ?? accountDiscriminator("VaultState")).copy(buf, 0);
   fields.pauseAuthority.toBuffer().copy(buf, 8);
   fields.mint.toBuffer().copy(buf, 40);
@@ -27,7 +28,8 @@ function buildVaultStateBuffer(fields: {
   buf.writeBigUInt64LE(fields.totalAssets, 74);
   buf.writeBigUInt64LE(fields.totalShares, 82);
   buf.writeUInt8(fields.isPaused ? 1 : 0, 90);
-  // [91,113) reserved — left zeroed, not exposed by the decoded type.
+  (fields.pendingPauseAuthority ?? PublicKey.default).toBuffer().copy(buf, 91);
+  // [123,145) reserved — left zeroed, not exposed by the decoded type.
   return buf;
 }
 
@@ -70,6 +72,24 @@ describe("accounts", () => {
       expect(decoded.totalAssets).to.equal(1_234_567_890n);
       expect(decoded.totalShares).to.equal(987_654_321n);
       expect(decoded.isPaused).to.equal(false);
+      expect(decoded.pendingPauseAuthority.equals(PublicKey.default)).to.equal(true);
+    });
+
+    it("decodes a pending pause-authority proposal (M18)", () => {
+      const pendingPauseAuthority = randomPubkey();
+      const buf = buildVaultStateBuffer({
+        pauseAuthority: randomPubkey(),
+        mint: randomPubkey(),
+        vaultBump: 1,
+        authorityBump: 1,
+        totalAssets: 0n,
+        totalShares: 0n,
+        isPaused: false,
+        pendingPauseAuthority,
+      });
+      expect(decodeVaultState(buf).pendingPauseAuthority.toBase58()).to.equal(
+        pendingPauseAuthority.toBase58(),
+      );
     });
 
     it("decodes is_paused = true correctly", () => {

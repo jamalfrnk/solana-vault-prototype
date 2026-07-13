@@ -20,6 +20,8 @@ import {
   buildWithdrawIx,
   buildPauseIx,
   buildUnpauseIx,
+  buildProposePauseAuthorityIx,
+  buildAcceptPauseAuthorityIx,
 } from "../src/instructions";
 import { VaultClient } from "../src/client";
 import { Connection } from "@solana/web3.js";
@@ -173,6 +175,43 @@ describe("instructions", () => {
     });
   });
 
+  describe("buildProposePauseAuthorityIx / buildAcceptPauseAuthorityIx", () => {
+    const pauseAuthority = randomPubkey();
+    const newPauseAuthority = randomPubkey();
+    const mint = randomPubkey();
+    const vaultState = deriveVaultStatePda(mint);
+
+    it("propose: 2-account order, data is discriminator + 32-byte new authority (40 bytes)", () => {
+      const ix = buildProposePauseAuthorityIx({
+        pauseAuthority,
+        mint,
+        newAuthority: newPauseAuthority,
+      });
+      assertKeys(ix.keys, [
+        { pubkey: pauseAuthority, isSigner: true, isWritable: false },
+        { pubkey: vaultState.address, isSigner: false, isWritable: true },
+      ]);
+      expect(ix.data).to.have.lengthOf(40);
+      expect(ix.data.subarray(0, 8).toString("hex")).to.equal(
+        instructionDiscriminator("propose_pause_authority").toString("hex"),
+      );
+      expect(new PublicKey(ix.data.subarray(8, 40)).toBase58()).to.equal(
+        newPauseAuthority.toBase58(),
+      );
+    });
+
+    it("accept: 2-account order, data is discriminator only", () => {
+      const ix = buildAcceptPauseAuthorityIx({ newPauseAuthority, mint });
+      assertKeys(ix.keys, [
+        { pubkey: newPauseAuthority, isSigner: true, isWritable: false },
+        { pubkey: vaultState.address, isSigner: false, isWritable: true },
+      ]);
+      expect(ix.data.toString("hex")).to.equal(
+        instructionDiscriminator("accept_pause_authority").toString("hex"),
+      );
+    });
+  });
+
   describe("VaultClient delegation", () => {
     const connection = new Connection("http://localhost:8899");
     const mint = randomPubkey();
@@ -201,9 +240,33 @@ describe("instructions", () => {
         })),
       );
     });
+
+    it("buildProposePauseAuthorityIx/buildAcceptPauseAuthorityIx delegate to the free-function builders with the same result", () => {
+      const pauseAuthority = randomPubkey();
+      const newAuthority = randomPubkey();
+
+      const proposeViaClient = client.buildProposePauseAuthorityIx(pauseAuthority, newAuthority);
+      const proposeViaFreeFunction = buildProposePauseAuthorityIx({
+        pauseAuthority,
+        mint,
+        newAuthority,
+      });
+      expect(proposeViaClient.data.toString("hex")).to.equal(
+        proposeViaFreeFunction.data.toString("hex"),
+      );
+
+      const acceptViaClient = client.buildAcceptPauseAuthorityIx(newAuthority);
+      const acceptViaFreeFunction = buildAcceptPauseAuthorityIx({
+        newPauseAuthority: newAuthority,
+        mint,
+      });
+      expect(acceptViaClient.data.toString("hex")).to.equal(
+        acceptViaFreeFunction.data.toString("hex"),
+      );
+    });
   });
 
-  it("all five instructions have pairwise-distinct data discriminators", () => {
+  it("all seven instructions have pairwise-distinct data discriminators", () => {
     const mint = randomPubkey();
     const user = randomPubkey();
     const pauseAuthority = randomPubkey();
@@ -214,6 +277,8 @@ describe("instructions", () => {
       buildWithdrawIx({ user, mint, sharesIn: 1n }),
       buildPauseIx({ pauseAuthority, mint }),
       buildUnpauseIx({ pauseAuthority, mint }),
+      buildProposePauseAuthorityIx({ pauseAuthority, mint, newAuthority: user }),
+      buildAcceptPauseAuthorityIx({ newPauseAuthority: user, mint }),
     ];
     const prefixes = ixs.map((ix) => ix.data.subarray(0, 8).toString("hex"));
     expect(new Set(prefixes).size).to.equal(prefixes.length);

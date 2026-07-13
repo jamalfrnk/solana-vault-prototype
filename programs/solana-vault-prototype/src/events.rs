@@ -38,3 +38,17 @@ pub struct Unpaused {
     pub vault: Pubkey,
     pub pause_authority: Pubkey,
 }
+
+#[event]
+pub struct PauseAuthorityProposed {
+    pub vault: Pubkey,
+    pub current_authority: Pubkey,
+    pub proposed_authority: Pubkey,
+}
+
+#[event]
+pub struct PauseAuthorityRotated {
+    pub vault: Pubkey,
+    pub old_authority: Pubkey,
+    pub new_authority: Pubkey,
+}

@@ -9,9 +9,11 @@ import {
 
 import { deriveVaultAuthorityPda, deriveVaultStatePda, PdaResult } from "./pdas";
 import {
+  buildAcceptPauseAuthorityIx,
   buildDepositIx,
   buildInitializeIx,
   buildPauseIx,
+  buildProposePauseAuthorityIx,
   buildUnpauseIx,
   buildWithdrawIx,
 } from "./instructions";
@@ -54,6 +56,19 @@ export class VaultClient {
 
   buildUnpauseIx(pauseAuthority: PublicKey): TransactionInstruction {
     return buildUnpauseIx({ pauseAuthority, mint: this.mint });
+  }
+
+  /** M18: current authority proposes the next one (two-step rotation, step 1). */
+  buildProposePauseAuthorityIx(
+    pauseAuthority: PublicKey,
+    newAuthority: PublicKey,
+  ): TransactionInstruction {
+    return buildProposePauseAuthorityIx({ pauseAuthority, newAuthority, mint: this.mint });
+  }
+
+  /** M18: the proposed authority accepts, completing the rotation (step 2). */
+  buildAcceptPauseAuthorityIx(newPauseAuthority: PublicKey): TransactionInstruction {
+    return buildAcceptPauseAuthorityIx({ newPauseAuthority, mint: this.mint });
   }
 
   fetchVaultState(): Promise<VaultState | null> {

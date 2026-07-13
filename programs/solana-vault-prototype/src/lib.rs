@@ -43,4 +43,15 @@ pub mod solana_vault_prototype {
     pub fn unpause(ctx: Context<Unpause>) -> Result<()> {
         pause::unpause_handler(ctx)
     }
+
+    pub fn propose_pause_authority(
+        ctx: Context<ProposePauseAuthority>,
+        new_authority: Pubkey,
+    ) -> Result<()> {
+        rotate::propose_handler(ctx, new_authority)
+    }
+
+    pub fn accept_pause_authority(ctx: Context<AcceptPauseAuthority>) -> Result<()> {
+        rotate::accept_handler(ctx)
+    }
 }

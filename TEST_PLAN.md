@@ -1,10 +1,13 @@
 # Test Plan
 
-**Status: M17 in review — 46 Rust tests (41 through M12 + 5 governance-authority
-tests added in M16, observed passing in CI run 29128852767 on 2026-07-10), 49 SDK
-tests (48 M13 + 1 browser-compat regression), 88 dApp tests (34 at M14 close;
-M17 added lifecycle, animation, sound, confetti, background, and dashboard
-coverage — see `docs/UI_VAULT.md` for the testing strategy).**
+**Status: M17 complete (PR #27, merged 2026-07-12); M18 in progress — 55 Rust
+tests (46 through M16 + 9 authority-rotation tests added in M18, in
+`tests/test_rotation.rs`; not yet CI-observed on this machine — see M18 note
+below), 53 SDK tests (49 through M17 + 4 M18 rotation-builder/decode tests,
+observed passing locally 2026-07-12), 88 dApp tests (34 at M14 close; M17
+added lifecycle, animation, sound, confetti, background, and dashboard
+coverage — see `docs/UI_VAULT.md` for the testing strategy; unchanged this
+milestone).**
 
 ## Repository hygiene (complete)
 
@@ -148,6 +151,45 @@ program's `invoke_signed` grants in a real execute CPI. See `ARCHITECTURE.md`'s
 Observed: CI run 29128852767 (2026-07-10), `tests/test_governance.rs` — 5 passed,
 0 failed. (No local Rust toolchain on the M16 development machine; CI is the
 observation source, same pattern as pre-M13 milestones.)
+
+## Authority-rotation tests (9 tests — M18)
+
+All in `tests/test_rotation.rs`. The final test reuses M16's
+`LiteSVM::with_sigverify(false)` pattern to prove a keypair-run vault can
+rotate its authority into an off-curve multisig PDA. See `ARCHITECTURE.md`'s
+"Two-step pause-authority rotation (M18)" section for the design being proven.
+
+- [x] `propose_pause_authority` records the pending authority without
+      changing the active one; the proposed key has no pause privilege yet.
+      — `test_propose_records_pending_without_rotating`.
+- [x] Only the current authority may propose.
+      — `test_propose_wrong_authority_fails`.
+- [x] Proposing the default (all-zero) pubkey is rejected.
+      — `test_propose_rejects_default_pubkey`.
+- [x] Re-proposing overwrites the pending authority.
+      — `test_repropose_overwrites_pending`.
+- [x] Full happy path: propose → accept → new authority controls pause, old
+      authority is locked out, pending clears.
+      — `test_accept_rotates_authority_end_to_end`.
+- [x] Only the proposed key may accept — not a stranger, not the current
+      authority.
+      — `test_accept_wrong_signer_fails`.
+- [x] Accepting with no pending proposal fails.
+      — `test_accept_without_pending_fails`.
+- [x] Cancel path: propose self, accept, authority unchanged and pending clears.
+      — `test_cancel_by_proposing_current_authority`.
+- [x] A keypair-run vault rotates into an off-curve multisig PDA authority,
+      which then controls pause — the M16 gap, closed.
+      — `test_rotate_into_multisig_pda`.
+- [x] Both instructions emit their events.
+      — `test_rotation_events_emitted`.
+
+Development-environment note: this machine's local Rust toolchain fails at
+the linker step (`link.exe` cannot link build-script binaries — an
+environment-wide MSVC issue, not code-specific) and has no `cargo-build-sbf`,
+so `tests/test_rotation.rs` has not been run locally. `cargo fmt --all --
+--check` passes locally; full build/clippy/test verification is deferred to
+CI, same pattern as M13–M17.
 
 ## Anchor scaffold baseline (complete — M2)
 

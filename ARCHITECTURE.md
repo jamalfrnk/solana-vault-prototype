@@ -40,7 +40,15 @@ controls (pause/unpause) are gated by an explicit `pause_authority` keypair stor
 | `total_assets` | `u64` | Token units held in custody |
 | `total_shares` | `u64` | Sum of all UserPosition.shares |
 | `is_paused` | `bool` | Blocks deposit and withdraw when true |
+| `pending_pause_authority` | `Pubkey` | M18: proposed next `pause_authority`, or `Pubkey::default()` when no rotation is pending |
 | `reserved` | `[u8; 22]` | Future expansion |
+
+Field order matters here: `pending_pause_authority` was appended after
+`is_paused` (not inserted between existing fields) so every pre-M18 field
+keeps its byte offset. This still grows the account by 32 bytes — a vault
+initialized under the pre-M18 layout is not binary-compatible with this
+program version. Accepted for a devnet prototype with no migration path;
+see "Two-step pause-authority rotation" below.
 
 ### UserPosition
 
@@ -136,6 +144,35 @@ Postconditions: `assets_out > 0`.
 | `vault_state` | `Account<VaultState>` | no | yes | — |
 
 State changes: `is_paused = true` (pause) or `is_paused = false` (unpause).
+
+### `propose_pause_authority` (M18)
+
+| Account | Type | Signer | Mut | Constraint |
+|---------|------|--------|-----|------------|
+| `pause_authority` | `Signer` | yes | no | Must match `vault_state.pause_authority` |
+| `vault_state` | `Account<VaultState>` | no | yes | — |
+
+Arguments: `new_authority: Pubkey`
+Preconditions: `new_authority != Pubkey::default()` (the default value is the
+"no pending proposal" sentinel; proposing it would soft-brick acceptance).
+State changes: `vault_state.pending_pause_authority = new_authority`. Does not
+touch `pause_authority` — the active authority is unchanged until accepted.
+Re-proposing overwrites any existing pending proposal; proposing the current
+authority itself, then accepting as it, is the supported cancel path.
+
+### `accept_pause_authority` (M18)
+
+| Account | Type | Signer | Mut | Constraint |
+|---------|------|--------|-----|------------|
+| `new_pause_authority` | `Signer` | yes | no | Must match `vault_state.pending_pause_authority`; must not be `Pubkey::default()` (no pending proposal) |
+| `vault_state` | `Account<VaultState>` | no | yes | — |
+
+State changes: `pause_authority = new_pause_authority`;
+`pending_pause_authority` reset to `Pubkey::default()`. Only the proposed key
+may accept, and it must sign — proving the destination key is live (or, for a
+governance PDA, that its program actually executed an `invoke_signed` CPI)
+before it holds the only pause power. Neither the old authority nor a
+stranger can complete a rotation on the proposed key's behalf.
 
 ---
 
@@ -248,6 +285,8 @@ one.
 | `Withdrawn` | `vault`, `user`, `assets_out`, `shares_in`, `total_assets`, `total_shares` | `withdraw` |
 | `Paused` | `vault`, `pause_authority` | `pause` |
 | `Unpaused` | `vault`, `pause_authority` | `unpause` |
+| `PauseAuthorityProposed` | `vault`, `current_authority`, `proposed_authority` | `propose_pause_authority` (M18) |
+| `PauseAuthorityRotated` | `vault`, `old_authority`, `new_authority` | `accept_pause_authority` (M18) |
 
 ## Governance-ready pause authority (M16)
 
@@ -278,13 +317,43 @@ Operational subtlety worth knowing: because `initialize` requires the
 pause_authority to **sign**, a vault whose authority is a multisig PDA must be
 initialized *through* that multisig (the initialize instruction is itself a proposal
 the multisig executes; the human payer's signature propagates through the CPI as fee
-payer / rent payer). You cannot initialize with a throwaway keypair and hand the
-authority to a multisig later — **there is no rotation instruction**. `pause_authority`
-is immutable after initialize. A two-step `set_pause_authority` (propose/accept) is
-the natural next on-chain change and is listed in `ROADMAP.md`'s post-MVP candidates;
-until it exists, choosing the authority is a one-shot, initialize-time decision.
+payer / rent payer). Historically you could not initialize with a throwaway keypair
+and hand the authority to a multisig later — there was no rotation instruction. M18
+(below) closes that gap.
 
 What M16 deliberately does not claim: anything about a specific multisig program's
 internal correctness (thresholds, member management, timelocks). That is the
 governance program's contract. The claim proven here is only that *this* program's
 authority surface composes with any `invoke_signed`-based governance executor.
+
+## Two-step pause-authority rotation (M18)
+
+M16 proved the authority surface composes with governance but left a gap: with no
+rotation instruction, `pause_authority` was a one-shot, initialize-time decision — a
+vault could not start with a keypair and hand off to a multisig later, and a lost or
+compromised keypair had no recovery path short of redeploying. `propose_pause_authority`
+/ `accept_pause_authority` close it with the standard two-step propose/accept pattern
+(see instruction contracts above), on the same account (`VaultState`), not a separate
+proposal PDA — there is exactly one rotation in flight at a time, which is all a single
+`pause_authority` slot needs.
+
+Why two steps instead of one: a single-step `set_pause_authority(new)` accepts whatever
+`Pubkey` the current authority names, including a typo'd or otherwise-unreachable one —
+that key would then hold the only pause power, permanently. Requiring the destination to
+**sign acceptance** proves it is live (a real keypair that can produce a signature, or a
+governance program that can actually execute an `invoke_signed` CPI) before it receives
+exclusive control. Anchor's `Signer` constraint on `new_pause_authority` in
+`AcceptPauseAuthority` is the entire enforcement mechanism — no additional bookkeeping.
+
+Same governance composability as M16, in both directions: because acceptance is a
+`Signer` check with no on-curve assumption, a multisig vault PDA can be *proposed* and
+can *accept* by executing `accept_pause_authority` via its own `invoke_signed` — meaning
+an existing keypair-run vault can now rotate **into** governance without redeploying,
+closing the exact gap M16 documented. `tests/test_rotation.rs::test_rotate_into_multisig_pda`
+exercises this end to end using the M16 sigverify-off analog.
+
+Cancel path: there is no separate `cancel_pause_authority` instruction. The current
+authority proposes itself (`propose_pause_authority(current_authority)`), then accepts —
+`pending_pause_authority` returns to `Pubkey::default()` with the active authority
+unchanged. One instruction pair does double duty rather than adding a third instruction
+whose only job is clearing one field.

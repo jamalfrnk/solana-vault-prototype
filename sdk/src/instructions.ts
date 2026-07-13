@@ -137,3 +137,41 @@ export function buildPauseIx(p: PauseIxParams): TransactionInstruction {
 export function buildUnpauseIx(p: PauseIxParams): TransactionInstruction {
   return buildPauseLikeIx("unpause", p);
 }
+
+export interface ProposePauseAuthorityIxParams {
+  pauseAuthority: PublicKey;
+  mint: PublicKey;
+  newAuthority: PublicKey;
+}
+
+/** M18: current authority proposes the next one (two-step rotation, step 1). */
+export function buildProposePauseAuthorityIx(
+  p: ProposePauseAuthorityIxParams,
+): TransactionInstruction {
+  const vaultState = deriveVaultStatePda(p.mint);
+  const data = Buffer.alloc(40);
+  instructionDiscriminator("propose_pause_authority").copy(data, 0);
+  data.set(p.newAuthority.toBytes(), 8);
+  return new TransactionInstruction({
+    programId: PROGRAM_ID,
+    keys: [meta(p.pauseAuthority, true, false), meta(vaultState.address, false, true)],
+    data,
+  });
+}
+
+export interface AcceptPauseAuthorityIxParams {
+  newPauseAuthority: PublicKey;
+  mint: PublicKey;
+}
+
+/** M18: the proposed authority accepts, completing the rotation (step 2). */
+export function buildAcceptPauseAuthorityIx(
+  p: AcceptPauseAuthorityIxParams,
+): TransactionInstruction {
+  const vaultState = deriveVaultStatePda(p.mint);
+  return new TransactionInstruction({
+    programId: PROGRAM_ID,
+    keys: [meta(p.newPauseAuthority, true, false), meta(vaultState.address, false, true)],
+    data: instructionDiscriminator("accept_pause_authority"),
+  });
+}
