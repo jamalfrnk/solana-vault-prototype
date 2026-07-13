@@ -1,13 +1,13 @@
 # Test Plan
 
-**Status: M17 complete (PR #27, merged 2026-07-12); M18 in progress — 55 Rust
-tests (46 through M16 + 9 authority-rotation tests added in M18, in
-`tests/test_rotation.rs`; not yet CI-observed on this machine — see M18 note
-below), 53 SDK tests (49 through M17 + 4 M18 rotation-builder/decode tests,
-observed passing locally 2026-07-12), 88 dApp tests (34 at M14 close; M17
-added lifecycle, animation, sound, confetti, background, and dashboard
-coverage — see `docs/UI_VAULT.md` for the testing strategy; unchanged this
-milestone).**
+**Status: M17 complete (PR #27, merged 2026-07-12); M18 in review (PR #28) —
+55 Rust tests (46 through M16 + 9 authority-rotation tests added in M18, in
+`tests/test_rotation.rs`; observed passing in CI run 29224127072 on
+2026-07-13), 53 SDK tests (49 through M17 + 4 M18 rotation-builder/decode
+tests, observed passing locally 2026-07-12 and in the same CI run), 88 dApp
+tests (34 at M14 close; M17 added lifecycle, animation, sound, confetti,
+background, and dashboard coverage — see `docs/UI_VAULT.md` for the testing
+strategy; unchanged this milestone).**
 
 ## Repository hygiene (complete)
 
@@ -187,9 +187,12 @@ rotate its authority into an off-curve multisig PDA. See `ARCHITECTURE.md`'s
 Development-environment note: this machine's local Rust toolchain fails at
 the linker step (`link.exe` cannot link build-script binaries — an
 environment-wide MSVC issue, not code-specific) and has no `cargo-build-sbf`,
-so `tests/test_rotation.rs` has not been run locally. `cargo fmt --all --
---check` passes locally; full build/clippy/test verification is deferred to
+so `tests/test_rotation.rs` could not be run locally. `cargo fmt --all --
+--check` passed locally; full build/clippy/test verification was deferred to
 CI, same pattern as M13–M17.
+
+Observed (2026-07-13, CI run 29224127072 on PR #28): `fmt, clippy, build-sbf,
+test` job green in 2m1s — all 55 Rust tests passed, including all 9 above.
 
 ## Anchor scaffold baseline (complete — M2)
 

@@ -25,7 +25,7 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 | 15 | Dependency security remediation | `[x]` complete |
 | 16 | Governance-ready pause authority | `[x]` complete |
 | 17 | Interactive vault UI | `[x]` complete |
-| 18 | Authority rotation (`set_pause_authority`) | `[~]` in progress |
+| 18 | Authority rotation (`set_pause_authority`) | `[~]` in review (PR #28) |
 
 ## Milestone 0 — Repository bootstrap (complete)
 
@@ -438,7 +438,7 @@ hotfixed encode/decode internals.
 
 Merged as PR #27 on 2026-07-12.
 
-## Milestone 18 — Authority Rotation (`set_pause_authority`) (in progress)
+## Milestone 18 — Authority Rotation (`set_pause_authority`) (in review)
 
 Fourth post-MVP milestone, on `feature/authority-rotation`. Closes the gap
 M16 documented: `pause_authority` was a one-shot, initialize-time decision
@@ -469,14 +469,15 @@ to close this gap.
 Development-environment note: this machine's local Rust toolchain fails at
 the `link.exe` step (environment-wide MSVC linker breakage, not code-specific
 — `cargo fmt` succeeds since it doesn't link, but `check`/`build-sbf`/`test`/
-`clippy` all fail before reaching the code). Rust-side verification is
+`clippy` all fail before reaching the code). Rust-side verification was
 deferred to CI, same pattern as M13–M17. SDK-side verification (53/53
 `corepack yarn test:sdk`, root + `app/` typecheck) was run locally and
 observed passing.
 
-Not yet done: CI has not run on this branch; PR not yet opened. This entry
-will be updated with observed CI results before the milestone is marked
-complete.
+Observed (2026-07-13, CI run 29224127072 on PR #28): all four jobs green —
+`fmt, clippy, build-sbf, test` (2m1s; includes all 55 Rust tests, the 9 new
+in `tests/test_rotation.rs`), `cargo audit`, SDK tests, dApp tests. PR #28
+open for review.
 
 ## Post-MVP Roadmap (proposed — none started, none approved)
 
