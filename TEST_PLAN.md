@@ -1,7 +1,7 @@
 # Test Plan
 
 **Status: M17 complete (PR #27, merged 2026-07-12); M18 complete (PR #28,
-merged 2026-07-13); M19 in progress —
+merged 2026-07-13); M19 in review (PR #30) —
 55 Rust tests (46 through M16 + 9 authority-rotation tests added in M18, in
 `tests/test_rotation.rs`; observed passing in CI run 29224127072 on
 2026-07-13), 53 SDK tests (49 through M17 + 4 M18 rotation-builder/decode
@@ -211,20 +211,25 @@ artifact. A new `idl-verify` job downloads it and runs
 discriminator bytes against every SDK-computed value — all 7 instructions
 and both accounts.
 
-- [ ] `anchor build` succeeds in CI and produces `target/idl/solana_vault_prototype.json`.
-      — not yet CI-observed; there is no Anchor CLI on this dev machine to
-        confirm the IDL's exact JSON shape firsthand. First real CI run on
-        this branch is the actual confirmation (same pattern as every
-        Rust-side check since M13).
+- [x] `anchor build` succeeds in CI and produces `target/idl/solana_vault_prototype.json`.
+      — First attempt failed: `anchor build` (unlike bare `cargo build-sbf`)
+        checks `target/deploy/*-keypair.json` against `declare_id!()`, and
+        this repo never commits a program keypair, so CI's freshly-generated
+        one never matches. Fixed with `anchor build --ignore-keys` (the exact
+        fix the error message names), which skips only that check without
+        rewriting `declare_id!()` or needing a committed keypair. Observed
+        green in CI run 29232763139 on PR #30 (2026-07-13) after the fix.
 - [x] All 7 instruction discriminators (`initialize`, `deposit`, `withdraw`,
       `pause`, `unpause`, `propose_pause_authority`, `accept_pause_authority`)
       and both account discriminators (`VaultState`, `UserPosition`) match
       the generated IDL.
-      — Logic verified locally against synthetic fixtures (a byte-correct
-        IDL, and one with a deliberately tampered discriminator) before
-        trusting it in CI: `scripts/verify_idl_discriminators.ts` correctly
-        passes the correct fixture and fails loudly with a byte-level diff on
-        the tampered one. Not yet run against a real `anchor build` output.
+      — Logic first verified locally against synthetic fixtures (a
+        byte-correct IDL, and one with a deliberately tampered discriminator)
+        before trusting it in CI: `scripts/verify_idl_discriminators.ts`
+        correctly passed the correct fixture and failed loudly with a
+        byte-level diff on the tampered one. Then observed against a real
+        `anchor build`-generated IDL in CI run 29232763139 on PR #30
+        (2026-07-13): all 9 discriminators matched.
 
 Scope note: this verifies discriminators only, not full account byte-layout
 (field order/offsets). The roadmap candidate's "IDL-based codegen" phrase was
