@@ -1,6 +1,7 @@
 # Test Plan
 
-**Status: M17 complete (PR #27, merged 2026-07-12); M18 in review (PR #28) —
+**Status: M17 complete (PR #27, merged 2026-07-12); M18 complete (PR #28,
+merged 2026-07-13) —
 55 Rust tests (46 through M16 + 9 authority-rotation tests added in M18, in
 `tests/test_rotation.rs`; observed passing in CI run 29224127072 on
 2026-07-13), 53 SDK tests (49 through M17 + 4 M18 rotation-builder/decode
