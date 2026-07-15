@@ -256,7 +256,7 @@ different `vault_state` addresses, which produce two different `vault_authority`
 addresses. Each vault's custody is isolated — no cross-vault authority collision is
 possible.
 
-### VaultState account layout (113 bytes on the wire)
+### VaultState account layout (145 bytes on the wire)
 
 ```
 8  bytes  — Anchor discriminator
@@ -267,13 +267,15 @@ possible.
 8  bytes  — total_assets (u64)
 8  bytes  — total_shares (u64)
 1  byte   — is_paused (bool)
+32 bytes  — pending_pause_authority pubkey (all-zero when no rotation is pending)
 22 bytes  — reserved
-= 113 bytes (Borsh wire size)
+= 145 bytes (Borsh wire size)
 ```
 
-> Note: Rust's in-memory `sizeof(VaultState)` is 120 bytes due to alignment padding.
-> The `LEN` constant (113) is the Borsh wire size and is what Anchor uses for `space =`.
-> Confusing these two numbers causes silent under-allocation and on-chain corruption.
+> M18 appended `pending_pause_authority`, growing the wire layout from 113 to 145
+> bytes. Pre-M18 vault accounts are not binary-compatible and this devnet prototype
+> has no migration instruction. Account allocation is compiler-derived with Anchor's
+> `InitSpace`; do not substitute Rust's aligned in-memory `sizeof` for the Borsh size.
 
 ### Custody token account
 
@@ -409,14 +411,34 @@ signer seeds that include the `authority_bump` stored in `VaultState`.
 
 **File:** [programs/solana-vault-prototype/src/instructions/pause.rs](programs/solana-vault-prototype/src/instructions/pause.rs)
 
-Toggle `vault_state.is_paused`. Only the keypair stored in `vault_state.pause_authority`
-(set at initialization) can call either instruction. Double-pausing is idempotent and
-never returns an error — an emergency pause must never fail due to current state.
+Toggle `vault_state.is_paused`. Only the signer stored in
+`vault_state.pause_authority` can call either instruction; that signer may be a
+keypair or a governance PDA exercising signer privilege through `invoke_signed`.
+Double-pausing is idempotent and never returns an error — an emergency pause must
+never fail due to current state.
 
 **What to check:**
 - After `pause`: `vault_state.is_paused == true`
 - After `unpause`: `vault_state.is_paused == false`
 - Any `deposit` or `withdraw` call while paused returns `VaultError::VaultPaused`
+
+---
+
+### `propose_pause_authority` / `accept_pause_authority` (M18)
+
+**File:**
+[programs/solana-vault-prototype/src/instructions/rotate.rs](programs/solana-vault-prototype/src/instructions/rotate.rs)
+
+Rotation is deliberately two-step. The current authority proposes a non-default
+public key, then that proposed authority must sign acceptance before receiving pause
+power. Acceptance updates `pause_authority` and clears `pending_pause_authority`.
+This proves the destination key is live and supports rotation into a governance PDA.
+
+**What to check:**
+- A proposal changes only `pending_pause_authority`; the current authority stays active.
+- Only the pending authority may accept, and it must sign.
+- After acceptance, the new authority can pause/unpause and the old authority cannot.
+- `pending_pause_authority` returns to the all-zero public key.
 
 ---
 
@@ -500,6 +522,21 @@ Open each Explorer URL in a browser to verify the on-chain transactions.
 - After withdrawing 500 shares at 1:1 ratio: 500 tokens returned, balance should be 9 500.
 - Custody ATA should hold the remaining 500 tokens.
 
+### SDK rotation smoke (M18/M19 follow-up)
+
+The SDK-based smoke script extends the lifecycle to seven confirmed instructions:
+initialize → deposit → withdraw → pause → propose authority → accept authority →
+unpause with the new authority.
+
+```bash
+./node_modules/.bin/ts-node scripts/sdk_devnet_smoke.ts
+```
+
+It creates and funds ephemeral pause-authority keypairs from the configured devnet
+payer. The final unpause must be signed by the newly accepted authority, proving the
+rotation transferred control rather than merely recording a proposal. This script is
+manual and is not part of the offline SDK test glob or CI.
+
 ---
 
 ## 9. Development workflow
@@ -565,6 +602,19 @@ Only open the PR when all four pass.
 ---
 
 ## 10. Troubleshooting
+
+### dApp reports "Failed to load vault state"
+
+This is distinct from "Vault not found": the vault account exists or the RPC request
+failed, but the SDK could not fetch/decode a valid current `VaultState`. Check the
+displayed error first, then verify the RPC endpoint and inspect the derived vault-state
+account with `solana account <VAULT_STATE_PDA> --url devnet`.
+
+A common devnet cause after M18 is an account initialized under the old 113-byte
+layout. The current decoder requires the 145-byte layout with
+`pending_pause_authority`. This prototype has no account-migration instruction, so an
+old vault cannot be upgraded in place: deploy the current program and initialize a new
+vault for a fresh mint. Do not treat a decode/RPC failure as an uninitialized vault.
 
 ### `anchor test` fails with "Failed to spawn surfpool"
 
@@ -688,8 +738,9 @@ any production use. Full details are in [SECURITY_CHECKLIST.md](SECURITY_CHECKLI
   decimal-confusion attacks.
 - **Arithmetic:** all operations use `checked_add`, `checked_sub`, u128 intermediates
   for multiplication, and `u64::try_from` for the final cast — no silent overflow.
-- **Pause control:** `pause_authority` is set at init and cannot be changed without
-  migrating the vault; `pause_authority != payer` is enforced on-chain.
+- **Pause control:** `pause_authority != payer` is enforced on-chain, and M18's
+  two-step propose/accept rotation requires the destination signer to prove liveness
+  before it receives control.
 - **Adversarial test coverage:** 8 adversarial tests covering missing signers, wrong
   PDAs, wrong owners, cross-user position substitution, wrong token program, overflow
   boundary, and multi-user accounting cycles.
@@ -698,12 +749,13 @@ any production use. Full details are in [SECURITY_CHECKLIST.md](SECURITY_CHECKLI
 
 The four MVP-accepted risks this table originally tracked (custody ATA pre-creation
 DoS, unchecked mint freeze authority, missing `vault_authority` owner constraint,
-hand-calculated account size) were all **fixed in M12** — see `SECURITY_CHECKLIST.md`
-for the constraint-by-constraint citations. What remains:
+hand-calculated account size) were all **fixed in M12**. M18 also closed the prior
+"no pause-authority rotation" gap with two-step propose/accept rotation. See
+`SECURITY_CHECKLIST.md` for the constraint-by-constraint citations and current scope.
 
-| Risk | Impact | Mitigation for production |
-|------|--------|---------------------------|
-| No pause authority rotation | `pause_authority` is immutable after `initialize`. A lost or compromised authority cannot be replaced — a paused vault stays paused (funds still withdrawable only if unpaused). | Hold the authority in a multisig from day one (see below), and/or add a two-step `set_pause_authority` instruction (post-MVP candidate in `ROADMAP.md`). |
+The M18 account-layout change has no migration path: a pre-M18 113-byte vault account
+cannot be decoded as the current 145-byte `VaultState`. This is accepted for the
+devnet prototype and must be solved before any persistent deployment.
 
 ### Holding pause authority with a multisig (M16)
 
@@ -716,12 +768,11 @@ Operationally, with a Squads (or equivalent) multisig:
 
 1. **Create the multisig first.** Note its *vault PDA* address — that PDA, not the
    multisig account itself and not any member key, is what becomes `pause_authority`.
-2. **Initialize the vault through the multisig.** Because `initialize` requires the
-   pause_authority to sign, the initialize instruction must be executed as a multisig
-   proposal (the multisig's execute CPI gives its vault PDA the required signer
-   privilege; the human proposer pays fees/rent as the transaction's fee payer).
-   You cannot initialize with a keypair and hand over the authority later — there is
-   no rotation instruction.
+2. **Initialize through the multisig or rotate into it.** `initialize` requires the
+   pause authority to sign, so a multisig-controlled vault may be initialized through
+   the multisig's execute CPI. Alternatively, initialize with a separate authority,
+   propose the multisig vault PDA, then have the multisig execute
+   `accept_pause_authority` via `invoke_signed` before accepting deposits.
 3. **Pause/unpause are proposals too.** Each pause or unpause is a proposal that must
    reach the multisig's threshold before execution. Factor that latency into incident
    response: a 2-of-3 with responsive members pauses in minutes; a DAO vote does not.
@@ -748,7 +799,7 @@ are unaffected — the authority gates only `pause`/`unpause`.
 |------|-----------------|
 | [ARCHITECTURE.md](ARCHITECTURE.md) | PDA table, account layouts, instruction contracts, CPI flow diagrams, arithmetic formulas, invariants, state machine |
 | [SECURITY_CHECKLIST.md](SECURITY_CHECKLIST.md) | Every security property checked or deferred, with rationale |
-| [TEST_PLAN.md](TEST_PLAN.md) | Full 29-test matrix with observed pass results |
+| [TEST_PLAN.md](TEST_PLAN.md) | Rust, SDK, and dApp test matrices with observed pass results |
 | [ROADMAP.md](ROADMAP.md) | Milestone history with observed outputs for every completed milestone |
 | [LEARNING_LOG.md](LEARNING_LOG.md) | Per-milestone reflection: what was built, what was learned, what confused me, how I verified it |
 | [docs/INTERVIEW_WALKTHROUGH.md](docs/INTERVIEW_WALKTHROUGH.md) | Guided narrative for technical interviews: account model, instruction contracts, test architecture, production gaps, Q&A |
@@ -758,3 +809,4 @@ are unaffected — the authority gates only `pause`/`unpause`.
 | [programs/solana-vault-prototype/src/error.rs](programs/solana-vault-prototype/src/error.rs) | `VaultError` enum — every assertable on-chain error |
 | [programs/solana-vault-prototype/src/constants.rs](programs/solana-vault-prototype/src/constants.rs) | PDA seed byte constants — must match in program and tests |
 | [scripts/devnet_demo.ts](scripts/devnet_demo.ts) | End-to-end devnet lifecycle: mint → initialize → deposit → withdraw → pause |
+| [scripts/sdk_devnet_smoke.ts](scripts/sdk_devnet_smoke.ts) | SDK devnet lifecycle including two-step authority rotation and unpause by the new authority |

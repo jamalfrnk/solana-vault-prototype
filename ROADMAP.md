@@ -27,6 +27,7 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 | 17 | Interactive vault UI | `[x]` complete |
 | 18 | Authority rotation (`set_pause_authority`) | `[x]` complete |
 | 19 | SDK v2 — publishable package + IDL discriminator verification | `[x]` complete |
+| — | M18/M19 follow-up — dApp load errors + rotation devnet smoke | `[~]` awaiting review |
 
 ## Milestone 0 — Repository bootstrap (complete)
 
@@ -557,6 +558,35 @@ time — `anchor build` succeeded and produced a real IDL, and
 `scripts/verify_idl_discriminators.ts` confirmed all 7 instruction and 2
 account discriminators match it exactly, for real, not by assumption. Merged
 into `main` as squash commit `bfdd40f` (PR #30, 2026-07-13).
+
+## M18/M19 follow-up — dApp load errors + rotation devnet smoke (awaiting review)
+
+Approved by Malcolm 2026-07-15 as a fix-up/follow-up rather than a new numbered
+milestone, on `codex/m18-m19-follow-up`, for a separate small PR. No on-chain
+program behavior, account layout, or SDK interface changes.
+
+The dApp now distinguishes `fetchVaultState()` rejection (RPC or decode failure)
+from a successful `null` result (genuinely uninitialized vault). Rejections render
+an alert with the underlying error and legacy-layout guidance instead of the
+misleading "Vault not found" fallback. A focused `VaultDetail` test pins the
+distinction. `RUNBOOK.md` now documents the M18 145-byte layout, two-step rotation,
+and recovery guidance for pre-M18 113-byte vault accounts.
+
+The manual SDK devnet smoke now runs seven instructions: initialize → deposit →
+withdraw → pause → propose pause authority → accept pause authority → unpause with
+the new authority. The final step proves acceptance transferred pause control, not
+just that a proposal was recorded. The new authority is funded from the configured
+devnet payer so it can pay for its acceptance/unpause transactions.
+
+Observed (2026-07-15): `npm.cmd --prefix app run test -- VaultDetail.test.tsx` —
+5/5 pass. `npm.cmd --prefix app run test` — 90/90 pass. `corepack.cmd yarn
+test:sdk` — 53/53 pass. `corepack.cmd yarn typecheck` and `npm.cmd --prefix app
+run typecheck` — clean. `npm.cmd --prefix app run build` — clean.
+
+Not executed: `scripts/sdk_devnet_smoke.ts` against devnet. It intentionally
+requires a funded keypair at `~/.config/solana/id.json` and remains outside the
+offline SDK test glob/CI; its builder calls are covered by the SDK suite and the
+whole script is covered by the root TypeScript typecheck.
 
 ## Post-MVP Roadmap (proposed — none started, none approved)
 

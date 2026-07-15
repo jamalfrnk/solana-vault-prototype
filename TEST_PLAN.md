@@ -6,9 +6,10 @@ merged 2026-07-13); M19 complete (PR #30, merged 2026-07-13) —
 `tests/test_rotation.rs`; observed passing in CI run 29224127072 on
 2026-07-13), 53 SDK tests (49 through M17 + 4 M18 rotation-builder/decode
 tests, observed passing locally 2026-07-12 and in the same CI run; unchanged
-by M19), 88 dApp tests (34 at M14 close; M17 added lifecycle, animation,
+by M19), 90 dApp tests (34 at M14 close; M17 added lifecycle, animation,
 sound, confetti, background, and dashboard coverage — see `docs/UI_VAULT.md`
-for the testing strategy; unchanged since M17).**
+for the testing strategy; the M18/M19 follow-up adds explicit vault-load
+rejection coverage and is locally verified, awaiting review).**
 
 ## Repository hygiene (complete)
 
@@ -236,6 +237,30 @@ Scope note: this verifies discriminators only, not full account byte-layout
 read as two separable things — package structure (delivered fully) and
 discriminator provenance (verified, not rewritten) — confirmed with Malcolm
 before implementing; see `ROADMAP.md`'s Milestone 19 section.
+
+## M18/M19 follow-up verification (awaiting review)
+
+- [x] A rejected `fetchVaultState()` renders a `role="alert"` error state with
+      the underlying RPC/decode message and legacy-layout guidance.
+      — `app/__tests__/VaultDetail.test.tsx` asserts the error is shown and the
+        distinct "Vault not found" state is absent.
+- [x] A successful `null` fetch remains the uninitialized-vault path.
+      — Existing `VaultDetail` coverage remains green.
+- [x] The manual SDK devnet smoke covers M18 rotation end to end.
+      — `scripts/sdk_devnet_smoke.ts` now performs propose → accept → unpause
+        signed by the new authority after the original four-step lifecycle.
+- [x] Rotation builder calls match the shipped `VaultClient` method signatures.
+      — Manual source review plus 53/53 SDK builder/delegation/decode tests.
+
+Observed (2026-07-15): `npm.cmd --prefix app run test -- VaultDetail.test.tsx`
+— 5 passed / 0 failed. `npm.cmd --prefix app run test` — 90 passed / 0 failed.
+`corepack.cmd yarn test:sdk` — 53 passed / 0 failed. `corepack.cmd yarn
+typecheck` and `npm.cmd --prefix app run typecheck` — clean. `npm.cmd --prefix
+app run build` — clean.
+
+Not executed: the live devnet smoke. It requires a funded devnet keypair and is
+deliberately excluded from the offline SDK suite and CI. Root typecheck covers the
+script statically; the existing SDK suite covers all builders it composes.
 
 ## Anchor scaffold baseline (complete — M2)
 

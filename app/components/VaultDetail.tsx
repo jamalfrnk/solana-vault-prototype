@@ -16,7 +16,7 @@ import { InteractiveVault } from "./vault/InteractiveVault";
 import { VaultStatusPanel } from "./vault/VaultStatusPanel";
 import { DollarConfetti } from "./vault/DollarConfetti";
 
-type LoadState = "loading" | "loaded";
+type LoadState = "loading" | "loaded" | "error";
 
 export function VaultDetail({ mintInput }: { mintInput: string }) {
   const mint = useMemo(() => parseMintAddress(mintInput), [mintInput]);
@@ -29,6 +29,7 @@ export function VaultDetail({ mintInput }: { mintInput: string }) {
   }, [connection, mint]);
 
   const [loadState, setLoadState] = useState<LoadState>("loading");
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [vaultState, setVaultState] = useState<VaultState | null>(null);
   const [userPosition, setUserPosition] = useState<UserPosition | null>(null);
   const [decimals, setDecimals] = useState<number | null>(null);
@@ -37,12 +38,20 @@ export function VaultDetail({ mintInput }: { mintInput: string }) {
     if (!vaultClient) return;
     let cancelled = false;
     setLoadState("loading");
+    setLoadError(null);
 
-    vaultClient.fetchVaultState().then((state) => {
-      if (cancelled) return;
-      setVaultState(state);
-      setLoadState("loaded");
-    });
+    vaultClient
+      .fetchVaultState()
+      .then((state) => {
+        if (cancelled) return;
+        setVaultState(state);
+        setLoadState("loaded");
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setLoadError(err instanceof Error ? err.message : String(err));
+        setLoadState("error");
+      });
 
     return () => {
       cancelled = true;
@@ -121,6 +130,15 @@ export function VaultDetail({ mintInput }: { mintInput: string }) {
 
   if (loadState === "loading") {
     return <p>Loading vault…</p>;
+  }
+
+  if (loadState === "error") {
+    return (
+      <p role="alert">
+        Failed to load vault state: {loadError}. This can happen if the vault was
+        initialized under an older, incompatible program version — see RUNBOOK.md.
+      </p>
+    );
   }
 
   if (!vaultState) {

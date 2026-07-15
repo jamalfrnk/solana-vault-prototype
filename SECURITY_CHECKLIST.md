@@ -142,6 +142,11 @@ for production custody.
         constraints. A field added without updating space can no longer silently
         under-allocate — the size is compiler-derived, not hand-maintained. Confirmed
         byte-identical to the prior hand `LEN` (105 + 8 = 113).
+      — M18: Appending `pending_pause_authority` grows `VaultState` by 32 bytes to
+        145 bytes on the wire (137-byte `INIT_SPACE` + 8-byte discriminator). Pre-M18
+        113-byte vault accounts are intentionally not binary-compatible; this devnet
+        prototype has no migration instruction, now surfaced explicitly by the dApp
+        and `RUNBOOK.md` in the M18/M19 follow-up.
 - [x] Account reinitialization is prevented.
       — M4: Anchor `init` constraint on `vault_state` fails if the account already has
         lamports. `test_vault_initialize_duplicate_fails` verifies this. The custody ATA
