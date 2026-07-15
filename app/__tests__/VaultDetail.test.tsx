@@ -51,6 +51,17 @@ describe("VaultDetail", () => {
     });
   });
 
+  it("shows a distinct error state when fetchVaultState rejects", async () => {
+    fetchVaultStateMock.mockRejectedValue(new Error("account data is too small"));
+    render(<VaultDetail mintInput={mint} />);
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/failed to load vault state/i);
+    expect(alert).toHaveTextContent(/account data is too small/i);
+    expect(alert).toHaveTextContent(/older, incompatible program version/i);
+    expect(screen.queryByText(/vault not found/i)).not.toBeInTheDocument();
+  });
+
   it("renders vault stats when fetchVaultState resolves a VaultState", async () => {
     fetchVaultStateMock.mockResolvedValue({
       pauseAuthority: Keypair.generate().publicKey,

@@ -1,11 +1,12 @@
 /**
- * M13 SDK devnet smoke script.
+ * M13 SDK devnet smoke script (M18 rotation coverage added).
  *
- * Same flow as scripts/devnet_demo.ts (initialize -> deposit -> withdraw -> pause
- * against the already-deployed vault program) but built entirely on the new `sdk/`
- * package instead of an IDL-loaded Anchor `Program` — proves the SDK's instruction
- * builders/PDA derivation/error parsing work against a real cluster, not just the
- * offline unit tests in sdk/tests/.
+ * Flow: initialize -> deposit -> withdraw -> pause -> propose_pause_authority
+ * -> accept_pause_authority -> unpause (with the new authority, proving the
+ * rotation actually granted control, not just recorded a proposal) — built
+ * entirely on the `sdk/` package instead of an IDL-loaded Anchor `Program`,
+ * proving the SDK's instruction builders/PDA derivation/error parsing work
+ * against a real cluster, not just the offline unit tests in sdk/tests/.
  *
  * NOT executed as part of this milestone: this machine has no funded devnet keypair
  * at ~/.config/solana/id.json to confirm against. Deliberately kept outside
@@ -57,7 +58,9 @@ async function main(): Promise<void> {
   console.log(`Balance: ${(await connection.getBalance(payer.publicKey)) / LAMPORTS_PER_SOL} SOL`);
 
   const pauseAuthority = Keypair.generate();
+  const newPauseAuthority = Keypair.generate();
   console.log(`Pause authority: ${pauseAuthority.publicKey.toBase58()}`);
+  console.log(`New pause authority (rotation target): ${newPauseAuthority.publicKey.toBase58()}`);
 
   const fundTx = new Transaction().add(
     SystemProgram.transfer({
@@ -65,9 +68,14 @@ async function main(): Promise<void> {
       toPubkey: pauseAuthority.publicKey,
       lamports: 0.01 * LAMPORTS_PER_SOL,
     }),
+    SystemProgram.transfer({
+      fromPubkey: payer.publicKey,
+      toPubkey: newPauseAuthority.publicKey,
+      lamports: 0.01 * LAMPORTS_PER_SOL,
+    }),
   );
   await sendAndConfirmTransaction(connection, fundTx, [payer]);
-  console.log(`Funded pause authority (0.01 SOL from payer)`);
+  console.log(`Funded pause authority + new pause authority (0.01 SOL each from payer)`);
 
   // Create a fresh SPL mint (same manual InitializeMint pattern as devnet_demo.ts).
   const mintKp = Keypair.generate();
@@ -144,30 +152,58 @@ async function main(): Promise<void> {
       [client.buildInitializeIx(payer.publicKey, pauseAuthority.publicKey)],
       [payer, pauseAuthority],
     );
-    console.log(`\n[1/4] initialize\n  ${explorerUrl(initSig)}`);
+    console.log(`\n[1/7] initialize\n  ${explorerUrl(initSig)}`);
 
     const depositSig = await client.sendAndConfirm(
       [client.buildDepositIx(payer.publicKey, 1_000_000_000n)],
       [payer],
     );
-    console.log(`\n[2/4] deposit 1 000 tokens\n  ${explorerUrl(depositSig)}`);
+    console.log(`\n[2/7] deposit 1 000 tokens\n  ${explorerUrl(depositSig)}`);
 
     const withdrawSig = await client.sendAndConfirm(
       [client.buildWithdrawIx(payer.publicKey, 500_000_000n)],
       [payer],
     );
-    console.log(`\n[3/4] withdraw 500 shares\n  ${explorerUrl(withdrawSig)}`);
+    console.log(`\n[3/7] withdraw 500 shares\n  ${explorerUrl(withdrawSig)}`);
 
     const pauseSig = await client.sendAndConfirm(
       [client.buildPauseIx(pauseAuthority.publicKey)],
       [pauseAuthority],
     );
-    console.log(`\n[4/4] pause\n  ${explorerUrl(pauseSig)}`);
+    console.log(`\n[4/7] pause\n  ${explorerUrl(pauseSig)}`);
+
+    // M18 two-step rotation: the current authority proposes, the proposed
+    // key accepts (proving liveness by signing), then — the actual proof
+    // this granted real control, not just recorded a proposal — the vault
+    // is unpaused using the NEW authority. The old authority no longer has
+    // pause power at all after this point.
+    const proposeSig = await client.sendAndConfirm(
+      [client.buildProposePauseAuthorityIx(pauseAuthority.publicKey, newPauseAuthority.publicKey)],
+      [pauseAuthority],
+    );
+    console.log(`\n[5/7] propose_pause_authority -> ${newPauseAuthority.publicKey.toBase58()}\n  ${explorerUrl(proposeSig)}`);
+
+    const acceptSig = await client.sendAndConfirm(
+      [client.buildAcceptPauseAuthorityIx(newPauseAuthority.publicKey)],
+      [newPauseAuthority],
+    );
+    console.log(`\n[6/7] accept_pause_authority\n  ${explorerUrl(acceptSig)}`);
+
+    const unpauseSig = await client.sendAndConfirm(
+      [client.buildUnpauseIx(newPauseAuthority.publicKey)],
+      [newPauseAuthority],
+    );
+    console.log(`\n[7/7] unpause (with the NEW authority)\n  ${explorerUrl(unpauseSig)}`);
 
     const vaultState = await client.fetchVaultState();
     console.log(`\nFinal vault state:`, vaultState);
+    console.log(
+      `\nRotation confirmed: vaultState.pauseAuthority is now the new authority ` +
+        `(${vaultState?.pauseAuthority.toBase58()}), pendingPauseAuthority cleared ` +
+        `(${vaultState?.pendingPauseAuthority.toBase58()}).`,
+    );
 
-    console.log(`\n✓ All four instructions confirmed on devnet via the SDK.`);
+    console.log(`\n✓ All seven instructions confirmed on devnet via the SDK.`);
   } catch (err) {
     const parsed = parseVaultError(err);
     if (parsed.code !== undefined) {
