@@ -98,9 +98,10 @@ testing discipline, and a starting point for anyone building a real DeFi vault
 product on Solana rather than a from-scratch custody design.
 
 Concrete next-phase candidates live in `ROADMAP.md`'s Post-MVP Roadmap section and
-revisit the anti-goals list above one at a time. None are approved yet — the project
-law and work-in-progress limit below still govern how, and whether, any of them gets
-picked up.
+revisit the anti-goals list above one at a time. M20 accepts pre-audit target design
+ADRs only; it does not approve governance implementation, an audit engagement,
+mainnet deployment, or production custody. The project law and work-in-progress limit
+below still govern every later implementation milestone.
 
 ## Project law
 

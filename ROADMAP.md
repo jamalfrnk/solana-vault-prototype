@@ -27,7 +27,8 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 | 17 | Interactive vault UI | `[x]` complete |
 | 18 | Authority rotation (`set_pause_authority`) | `[x]` complete |
 | 19 | SDK v2 — publishable package + IDL discriminator verification | `[x]` complete |
-| — | M18/M19 follow-up — dApp load errors + rotation devnet smoke | `[~]` awaiting review |
+| — | M18/M19 follow-up — dApp load errors + rotation devnet smoke | `[x]` complete |
+| 20 | Pre-audit production design ADRs | `[~]` awaiting review |
 
 ## Milestone 0 — Repository bootstrap (complete)
 
@@ -559,7 +560,7 @@ time — `anchor build` succeeded and produced a real IDL, and
 account discriminators match it exactly, for real, not by assumption. Merged
 into `main` as squash commit `bfdd40f` (PR #30, 2026-07-13).
 
-## M18/M19 follow-up — dApp load errors + rotation devnet smoke (awaiting review)
+## M18/M19 follow-up — dApp load errors + rotation devnet smoke (complete)
 
 Approved by Malcolm 2026-07-15 as a fix-up/follow-up rather than a new numbered
 milestone, on `codex/m18-m19-follow-up`, for a separate small PR. No on-chain
@@ -588,7 +589,42 @@ requires a funded keypair at `~/.config/solana/id.json` and remains outside the
 offline SDK test glob/CI; its builder calls are covered by the SDK suite and the
 whole script is covered by the root TypeScript typecheck.
 
-## Post-MVP Roadmap (proposed — none started, none approved)
+Merged through PR #32 on 2026-07-15 as `3d68bbf` after all five CI jobs passed.
+
+## Milestone 20 — Pre-audit production design ADRs (awaiting review)
+
+Approved by Malcolm 2026-07-15 as a documentation-only design gate before further
+program feature work, on `codex/pre-audit-design-adrs`. M20 does not change Rust,
+Anchor accounts, the SDK, the dApp, CI, or any deployed program.
+
+ADRs 0003–0009 make the production-critical decisions explicit:
+
+- untrusted users/clients/RPC and separated pause, protocol, upgrade, treasury, and
+  operational roles;
+- `Active` → `ExitOnly` as the default incident response, with exceptional stronger-
+  authority `FullyPaused` only when withdrawals are unsafe;
+- a same-size 145-byte VaultState v1, deterministic v0 migration, and retirement rather
+  than bespoke migration of pre-M18 113-byte devnet accounts;
+- established 3-of-5 upgrade multisig with a 48-hour ordinary timelock, 4-of-5
+  emergency policy, and no immediate immutability;
+- governed per-mint configuration, one mint- and freeze-authority-free legacy SPL mint initially,
+  on-chain TVL/per-transaction caps, and staged exposure;
+- donation-excluded accounting plus a future exact-excess-only treasury recovery path;
+- explicit production invariants, incident responsibilities, launch blockers, and a
+  sequential implementation/audit/canary plan.
+
+The design deliberately reuses the current pause byte and one reserved byte so the
+current 145-byte account need not grow again. Acceptance does not mean implementation:
+all corresponding checklist and test items remain open, the non-production disclaimer
+remains in force, and each later slice requires its own approved branch and PR.
+
+Observed locally (2026-07-15): ADR-structure validation — 7/7 files valid; local-link
+validation — 15/15 files resolve; placeholder/conflict-marker search — none found;
+source-scope check — no program, SDK, dApp, or CI diff; `git diff --cached --check` —
+exit 0. Pull-request CI is recorded after publication. See `TEST_PLAN.md` for the full
+M20 documentation gate.
+
+## Post-MVP Roadmap (candidate pool — implementation requires separate approval)
 
 Milestones 0–14 are the MVP `PROJECT_CONTEXT.md` scoped from day one: a hardened,
 tested, single-asset vault plus a TypeScript SDK and a minimal dApp shell. That
@@ -604,8 +640,8 @@ branch.
 | Fee mechanism | tokenomics | Management/performance fees with tested, checked-arithmetic accounting — the same rigor M5/M6/M12 applied to deposit/withdraw. |
 | Governance-controlled authority | governance, multisig | Picked up as **M16**. Replace the single `pause_authority` keypair with a multisig or DAO-controlled account — no change to the on-chain constraint itself, only to who can sign it. |
 | Authority rotation (`set_pause_authority`) | governance | Picked up as **M18**. Two-step propose/accept rotation so the authority isn't a one-shot initialize-time decision — the gap M16's tests made explicit. First new instructions since M7. |
-| Third-party security audit | formal-audit claims | The one item that actually removes the "not audited" disclaimer — everything else in this table should probably wait until after it. |
-| Mainnet operational readiness | mainnet deployment, production custody claims | Key management, monitoring, alerting, incident runbook — operational maturity, not new instructions. |
+| Third-party security audit | formal-audit claims | M20 defines its launch gate and preparation sequence; audit procurement, execution, and remediation are not started or approved by M20. |
+| Mainnet operational readiness | mainnet deployment, production custody claims | M20 accepts the target roles, RPC, monitoring, caps, and incident gates; implementation and any mainnet canary remain separately gated. |
 | Yield strategy integration | yield strategies, lending integrations | Deploying idle custody assets into an approved venue. Highest blast radius on this list; should follow, not precede, the audit. |
 | SDK v2 / published package | — | Picked up as **M19**. Publishable package structure delivered; discriminator provenance verified against a generated IDL in CI rather than rewritten (confirmed with Malcolm — the existing hand-derived, already-tested code stays as-is). `npm publish` itself stays a manual step; no credentials assumed. |
 | dApp productization | frontend application (already relaxed by M14) | Transaction history, broader wallet support, real analytics — M14 was deliberately plain CSS, no charts. |
