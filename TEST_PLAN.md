@@ -279,7 +279,7 @@ instruction interface. Its local completion checks are documentation-oriented:
       mint allowlisting, caps, excess recovery, production multisig, audit, or mainnet
       launch is already implemented.
 - [x] `git diff --check` passes.
-- [ ] Pull-request CI passes unchanged Rust, SDK, dApp, audit, and IDL checks.
+- [x] Pull-request CI passes unchanged Rust, SDK, dApp, audit, and IDL checks.
 
 Observed locally (2026-07-15): ADR-structure validation — 7/7 files valid; local-link
 validation — 15/15 files resolve; placeholder/conflict-marker search — none found;
@@ -287,6 +287,11 @@ source-scope check — no program, SDK, dApp, or CI diff; `git diff --cached --c
 exit 0. The first local-link command mishandled repository-root paths and printed
 PowerShell errors; its base-directory logic was corrected and the complete check was
 rerun successfully before recording the result above.
+
+Observed in initial pull-request CI (2026-07-15, run 29454078682): `fmt, clippy,
+build-sbf, test` — passed in 2m53s; `cargo audit` — passed in 20s; SDK tests —
+passed in 12s; dApp tests — passed in 55s; IDL discriminator verification — passed
+in 15s. All five jobs were green on commit `43fcaeb`.
 
 The following tests are required by later implementation milestones and are not marked
 complete by this design milestone:

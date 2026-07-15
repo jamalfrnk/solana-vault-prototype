@@ -621,7 +621,12 @@ remains in force, and each later slice requires its own approved branch and PR.
 Observed locally (2026-07-15): ADR-structure validation — 7/7 files valid; local-link
 validation — 15/15 files resolve; placeholder/conflict-marker search — none found;
 source-scope check — no program, SDK, dApp, or CI diff; `git diff --cached --check` —
-exit 0. Pull-request CI is recorded after publication. See `TEST_PLAN.md` for the full
+exit 0.
+
+Observed in initial pull-request CI (2026-07-15, run 29454078682): `fmt, clippy,
+build-sbf, test` — passed in 2m53s; `cargo audit` — passed in 20s; SDK tests —
+passed in 12s; dApp tests — passed in 55s; IDL discriminator verification — passed
+in 15s. All five jobs were green on commit `43fcaeb`. See `TEST_PLAN.md` for the full
 M20 documentation gate.
 
 ## Post-MVP Roadmap (candidate pool — implementation requires separate approval)
