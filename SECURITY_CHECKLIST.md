@@ -1,6 +1,8 @@
 # Security Checklist
 
-**Status: M12 complete — M4–M12 implemented and tested. Items checked only when built, tested, and reviewed.**
+**Status: implemented controls checked through M18; M20 pre-audit target design accepted,
+but its implementation items remain unchecked. Items are checked only when built,
+tested, and reviewed.**
 
 Checked items reflect only what is true today. Implementation items remain unchecked
 until the corresponding milestone is implemented and tested. This is an interview-grade
@@ -342,6 +344,61 @@ multisig PDA using the same M16 sigverify-off `invoke_signed` analog.
       — M18: `test_rotate_into_multisig_pda`.
 - [x] Both instructions emit their events (`PauseAuthorityProposed`, `PauseAuthorityRotated`).
       — M18: `test_rotation_events_emitted`.
+
+## Pre-audit production target (M20 — accepted, not implemented)
+
+ADRs 0003–0009 define the reviewed target before further program work. They adapt
+OWASP SCSVS architecture, governance, authorization, external-interaction, business-
+logic, and denial-of-service principles to this Solana program. Acceptance is not
+implementation: every item below is intentionally unchecked and remains a launch
+blocker until its own milestone is built and verified.
+
+### Threat boundaries and roles
+
+- [ ] Frontend, SDK, RPC, token metadata, and events are treated only as untrusted
+      inputs or operational evidence; on-chain validation is authoritative.
+- [ ] Pause, protocol-governance, full-pause, upgrade, and treasury capabilities use
+      the separate governed addresses and thresholds in ADRs 0003, 0006, and 0009.
+- [ ] Production uses private primary and independent fallback RPC providers, external
+      signing, separate cluster keys, and monitored authority changes.
+
+### Pause and availability
+
+- [ ] `operational_state` implements `Active`, `ExitOnly`, and `FullyPaused` exactly as
+      ADR 0004 specifies.
+- [ ] Ordinary incident response blocks new deposits while preserving valid user exits.
+- [ ] Only the stronger emergency authority can block withdrawals, and cap/mint controls
+      never restrict exits.
+
+### Versioning and migration
+
+- [ ] Current 145-byte version-0 VaultState accounts migrate deterministically to the
+      same-size version-1 layout, with idempotence and malformed-state tests.
+- [ ] Pre-M18 113-byte devnet accounts are inventoried, drained with a compatible
+      binary, reconciled, recorded, and retired before persistent deployment.
+- [ ] SDK and CI reject unsupported layouts and verify full IDL field order/types, not
+      only discriminators.
+
+### Mint, exposure, and donations
+
+- [ ] ProtocolConfig and MintConfig enforce governed initialization, one approved
+      mint- and freeze-authority-free legacy SPL mint initially, and on-chain
+      deposit/TVL caps.
+- [ ] Cap reductions may be immediate, increases are timelocked, and staged rollout
+      never exceeds ADR 0007 without new risk approval.
+- [ ] Donations remain excluded from accounting; any `sweep_excess` transfers only the
+      exact computed excess to the configured same-mint treasury ATA while not active.
+
+### Upgrade, audit, and launch
+
+- [ ] Upgrade authority is an established 3-of-5 multisig with a 48-hour ordinary
+      timelock and no individual-key bypass; emergency execution requires 4-of-5.
+- [ ] Verifiable builds, deployed-binary verification, secret scanning, invariant
+      monitoring, incident rehearsal, external audit, and finding remediation satisfy
+      every launch gate in ADR 0009.
+- [ ] Exact production mint, base-unit caps, authority addresses, signer policies, RPC
+      endpoints, and monitoring ownership are independently verified in deployment
+      manifests without committing secrets.
 
 ## Secrets
 

@@ -21,18 +21,19 @@ vault product without building custody logic from zero.
 
 ## Status
 
-**All 14 MVP milestones are merged** — M14 (dApp shell) merged via PR #19 on
-2026-07-10; see `ROADMAP.md` for the milestone-by-milestone history and the
-Post-MVP Roadmap section for what's proposed next.
+**All 14 MVP milestones and post-MVP M15–M19 are merged.** The M18/M19 fix-up
+merged through PR #32 on 2026-07-15. M20, a documentation-only pre-audit production
+design gate, is in review; see `ROADMAP.md` for the milestone-by-milestone history.
 
 The vault is implemented, tested, and hardened, and every instruction has been
 confirmed live on Solana devnet: `initialize`, `deposit`, `withdraw`, `pause`, and
 `unpause` (2026-06-26). A CI pipeline (fmt, build, clippy, test, audit) gates every
 PR. A production-hardening pass closed four MVP-accepted risks and added instruction
 events. A TypeScript SDK (`sdk/`) and a minimal Next.js dApp (`app/`) sit on top of
-the program, both IDL-free and independently testable offline. 41/41 Rust tests,
-48/48 SDK tests, 32/32 dApp tests pass. Architecture is ACCEPTED
-(`ARCHITECTURE.md`, `docs/decisions/0002-vault-architecture.md`).
+the program, both IDL-free and independently testable offline. The current recorded
+suite contains 55 Rust tests, 53 SDK tests, and 90 dApp tests. Current architecture is
+accepted in ADR 0002; ADRs 0003–0009 accept a narrower pre-audit production target
+that is explicitly **not implemented yet**.
 
 This is an interview-grade educational prototype. It is **not** audited, **not**
 production-safe, **not** mainnet-ready, and **not** formally verified. See
@@ -53,13 +54,14 @@ not the same thing as an audit.
   example of an IDL-free SDK: PDA derivation, instruction builders, account decoders,
   and Anchor error parsing computed directly from Anchor's own discriminator scheme.
 - **Forking this as groundwork for a real product** — the vault, SDK, and dApp are a
-  tested starting point, not a finished product. `ROADMAP.md`'s Post-MVP Roadmap
-  section (below) lists the specific gaps between this prototype and a real,
-  audited, mainnet DeFi vault.
+  tested starting point, not a finished product. ADRs 0003–0009 and `ROADMAP.md`
+  record the still-unimplemented gaps between this prototype and a real, audited,
+  mainnet DeFi vault.
 
 ## Architecture
 
-> Accepted — see `ARCHITECTURE.md` and `docs/decisions/0002-vault-architecture.md`.
+> Current implementation accepted in ADR 0002. Pre-audit target accepted but not
+> implemented in ADRs 0003–0009; see `ARCHITECTURE.md`.
 
 A single vault custodies one SPL token mint:
 
@@ -216,13 +218,12 @@ targeted attack scenarios), and event emission.
 
 ## Roadmap
 
-See `ROADMAP.md` for the full milestone-by-milestone history (M0–M14) and the
-**Post-MVP Roadmap** section, which lists the specific, currently-unapproved
-candidates for what comes after the MVP — multi-asset support, a fee mechanism,
-governance-controlled authorities, a real third-party audit, mainnet operational
-readiness, yield strategy integration, and further SDK/dApp productization. None of
-them are scheduled; per this project's own rules, nothing starts until Malcolm
-approves it as the next milestone.
+See `ROADMAP.md` for the full milestone-by-milestone history. M20 accepts production-
+target design decisions only; it does not start their implementation, an audit, or a
+mainnet rollout. The remaining candidate pool includes multi-asset support, fees,
+audit execution, operational-readiness implementation, yield integration, and further
+SDK/dApp productization. Per project law, each starts only after Malcolm separately
+approves it and the preceding branch is reviewed and merged.
 
 ## Interview walkthrough
 

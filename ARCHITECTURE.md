@@ -1,10 +1,37 @@
 # Architecture
 
-**Status: ACCEPTED — see `docs/decisions/0002-vault-architecture.md`**
+**Current implementation: ACCEPTED — see `docs/decisions/0002-vault-architecture.md`**
+
+**Pre-audit production target: ACCEPTED BUT NOT IMPLEMENTED — see ADRs 0003–0009
+under `docs/decisions/`**
 
 This document describes the design of the single-asset SPL-token vault.
-Decisions are recorded in `docs/decisions/0002-vault-architecture.md` and
-reflected here as the authoritative reference for all implementation milestones.
+Current decisions are recorded in `docs/decisions/0002-vault-architecture.md` and
+reflected here as the authoritative reference for implemented behavior. Milestone 20
+approved the target production decisions before code. Those ADRs do not change the
+behavior described below: the prototype still has a boolean pause that blocks deposits
+and withdrawals, no explicit account version or migration, no protocol mint allowlist
+or caps, no excess-recovery instruction, and no configured production
+multisig/timelock.
+
+## Accepted pre-audit target (not implemented)
+
+| Area | Accepted target | ADR |
+|---|---|---|
+| Threat boundaries | Users, clients, RPC, issuer, and operational roles remain outside the on-chain trust boundary; canonical legacy SPL Token only | [0003](docs/decisions/0003-production-threat-model.md) |
+| Pause | `Active`, `ExitOnly`, and exceptional `FullyPaused`; ordinary incidents preserve withdrawals | [0004](docs/decisions/0004-exit-first-pause-semantics.md) |
+| Versioning | Same-size 145-byte VaultState v1, deterministic v0 migration, and retirement of 113-byte devnet accounts | [0005](docs/decisions/0005-account-versioning-and-migration.md) |
+| Upgrades | Established 3-of-5 multisig, 48-hour ordinary timelock, 4-of-5 emergency path, and later immutability review | [0006](docs/decisions/0006-upgrade-governance-and-immutability.md) |
+| Mint and exposure | Governance allowlist, one mint- and freeze-authority-free legacy SPL mint initially, on-chain TVL/deposit caps, and staged rollout | [0007](docs/decisions/0007-mint-policy-and-exposure-limits.md) |
+| Donations | Internal accounting remains authoritative; only exact excess may be swept to the configured treasury while not active | [0008](docs/decisions/0008-donations-and-excess-recovery.md) |
+| Operations | Separated incident roles, explicit invariants, launch blockers, and sequential implementation/audit gates | [0009](docs/decisions/0009-incident-response-and-launch-gates.md) |
+
+The target reuses the current pause byte as `operational_state` and the first current
+reserved byte as `version`, so the 145-byte VaultState does not grow. Current values
+map deterministically: `false`/`0` becomes `Active`; `true`/`1` becomes `ExitOnly`.
+Configuration and mint approval use separate versioned PDAs in the target design.
+Later milestones must implement one accepted slice at a time before this document can
+describe that slice as current behavior.
 
 ## High-level design
 
@@ -47,8 +74,10 @@ Field order matters here: `pending_pause_authority` was appended after
 `is_paused` (not inserted between existing fields) so every pre-M18 field
 keeps its byte offset. This still grows the account by 32 bytes — a vault
 initialized under the pre-M18 layout is not binary-compatible with this
-program version. Accepted for a devnet prototype with no migration path;
-see "Two-step pause-authority rotation" below.
+program version. Accepted for the current devnet prototype with no implemented
+migration path. ADR 0005 resolves the production design by retiring 113-byte devnet
+accounts and adding a same-size v0-to-v1 path for current 145-byte accounts; that path
+does not exist yet.
 
 ### UserPosition
 
@@ -243,7 +272,9 @@ Rounding direction: floor (favors vault; dust accumulates in custody).
    deposit/withdraw CPI. Custody's live token balance may be `>=` `total_assets`: a
    direct SPL transfer into custody outside the `deposit` instruction (a "donation") is
    not reflected in `total_assets` and is treated as inert dust — see
-   `SECURITY_CHECKLIST.md`'s "Direct-transfer / donation accounting" section.
+   `SECURITY_CHECKLIST.md`'s "Direct-transfer / donation accounting" section. ADR 0008
+   preserves this rule and accepts a future governance-constrained exact-excess sweep;
+   no recovery instruction exists today.
 6. `total_shares == sum(user_position.shares)` — maintained by deposit/withdraw.
 7. No deposit credits zero shares; no withdrawal pays zero assets.
 8. All arithmetic is checked; no silent overflow.

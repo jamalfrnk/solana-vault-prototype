@@ -1,21 +1,23 @@
 # Test Plan
 
 **Status: M17 complete (PR #27, merged 2026-07-12); M18 complete (PR #28,
-merged 2026-07-13); M19 complete (PR #30, merged 2026-07-13) —
+merged 2026-07-13); M19 complete (PR #30, merged 2026-07-13); M18/M19
+follow-up complete (PR #32, merged 2026-07-15); M20 pre-audit design in review —
 55 Rust tests (46 through M16 + 9 authority-rotation tests added in M18, in
 `tests/test_rotation.rs`; observed passing in CI run 29224127072 on
 2026-07-13), 53 SDK tests (49 through M17 + 4 M18 rotation-builder/decode
 tests, observed passing locally 2026-07-12 and in the same CI run; unchanged
 by M19), 90 dApp tests (34 at M14 close; M17 added lifecycle, animation,
 sound, confetti, background, and dashboard coverage — see `docs/UI_VAULT.md`
-for the testing strategy; the M18/M19 follow-up adds explicit vault-load
-rejection coverage and is locally verified, awaiting review).**
+for the testing strategy; the M18/M19 follow-up added explicit vault-load
+rejection coverage). M20 changes documentation only and does not change these test
+counts.**
 
 ## Repository hygiene (complete)
 
 - [x] `.gitignore` excludes build artifacts, wallets/keypairs, and `.env` values.
 - [x] `git diff --check` passes (no whitespace errors / conflict markers).
-- [x] No Claude attribution trailers in commits.
+- [x] No automated authorship or co-authorship trailers in commits.
 - [x] No secrets or keypairs tracked.
 
 ## Unit tests
@@ -238,7 +240,7 @@ read as two separable things — package structure (delivered fully) and
 discriminator provenance (verified, not rewritten) — confirmed with Malcolm
 before implementing; see `ROADMAP.md`'s Milestone 19 section.
 
-## M18/M19 follow-up verification (awaiting review)
+## M18/M19 follow-up verification (complete — PR #32)
 
 - [x] A rejected `fetchVaultState()` renders a `role="alert"` error state with
       the underlying RPC/decode message and legacy-layout guidance.
@@ -261,6 +263,50 @@ app run build` — clean.
 Not executed: the live devnet smoke. It requires a funded devnet keypair and is
 deliberately excluded from the offline SDK suite and CI. Root typecheck covers the
 script statically; the existing SDK suite covers all builders it composes.
+
+## M20 pre-audit design validation (in review)
+
+M20 accepts ADRs 0003–0009 and changes no program, SDK, dApp, account bytes, or
+instruction interface. Its local completion checks are documentation-oriented:
+
+- [x] Every new ADR contains status, current implementation status, context, decision,
+      alternatives, consequences, and implementation/test implications.
+- [x] `ARCHITECTURE.md`, `SECURITY_CHECKLIST.md`, `ROADMAP.md`, README, and the ADR
+      index distinguish current behavior from accepted target behavior.
+- [x] Every referenced local file exists and Markdown links use the repository's real
+      paths.
+- [x] Searches find no conflicting claim that exit-first pause, version migration,
+      mint allowlisting, caps, excess recovery, production multisig, audit, or mainnet
+      launch is already implemented.
+- [x] `git diff --check` passes.
+- [x] Pull-request CI passes unchanged Rust, SDK, dApp, audit, and IDL checks.
+
+Observed locally (2026-07-15): ADR-structure validation — 7/7 files valid; local-link
+validation — 15/15 files resolve; placeholder/conflict-marker search — none found;
+source-scope check — no program, SDK, dApp, or CI diff; `git diff --cached --check` —
+exit 0. The first local-link command mishandled repository-root paths and printed
+PowerShell errors; its base-directory logic was corrected and the complete check was
+rerun successfully before recording the result above.
+
+Observed in initial pull-request CI (2026-07-15, run 29454078682): `fmt, clippy,
+build-sbf, test` — passed in 2m53s; `cargo audit` — passed in 20s; SDK tests —
+passed in 12s; dApp tests — passed in 55s; IDL discriminator verification — passed
+in 15s. All five jobs were green on commit `43fcaeb`.
+
+The following tests are required by later implementation milestones and are not marked
+complete by this design milestone:
+
+- [ ] exact 145-byte version-0 to version-1 migration, malformed reserved data,
+      unsupported version, incompatible length, and idempotence;
+- [ ] `Active`/`ExitOnly`/`FullyPaused` transition and authority matrix;
+- [ ] deposits blocked while exits remain available in `ExitOnly`;
+- [ ] ProtocolConfig/MintConfig PDA, governed initialization, mint authority, token
+      program, cap decrease/increase authority, and cap-boundary cases;
+- [ ] exact-excess recovery, shortfall, treasury substitution, state, CPI, donation,
+      and accounting-preservation cases;
+- [ ] full IDL account field-order/type verification and SDK decoder compatibility;
+- [ ] deployment-manifest, verifiable-build, authority, monitoring, RPC-failover, load,
+      reconciliation, and incident-drill evidence.
 
 ## Anchor scaffold baseline (complete — M2)
 
