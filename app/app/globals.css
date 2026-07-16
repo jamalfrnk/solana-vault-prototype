@@ -256,9 +256,146 @@ form button[type="submit"] {
   margin-top: 1.4rem;
 }
 
+/* --- Connected-wallet balance signifiers --- */
+
+.user-balance-summary {
+  border-color: rgba(121, 242, 192, 0.36);
+}
+
+.user-balance-heading-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.user-balance-heading-row h3 {
+  margin-bottom: 0;
+}
+
+.balance-freshness {
+  flex: 0 0 auto;
+  border: 1px solid rgba(121, 242, 192, 0.45);
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+  color: #9fe8c4;
+  font-size: 0.69rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.35;
+  text-transform: uppercase;
+}
+
+.balance-freshness[data-status="error"] {
+  border-color: rgba(255, 131, 137, 0.55);
+  color: #ff9ea3;
+}
+
+.user-balance-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+.user-balance-grid > div {
+  min-width: 0;
+  border: 1px solid rgba(101, 131, 255, 0.24);
+  border-radius: 12px;
+  padding: 0.8rem;
+  background: rgba(8, 12, 26, 0.62);
+}
+
+.user-balance-grid > div:last-child {
+  grid-column: 1 / -1;
+}
+
+.user-balance-grid dt {
+  color: #9fb0d8;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  line-height: 1.35;
+  text-transform: uppercase;
+}
+
+.user-balance-grid dd {
+  margin: 0.35rem 0 0;
+  overflow-wrap: anywhere;
+  color: #f4f7ff;
+  font-family: var(--font-display, system-ui), system-ui, sans-serif;
+  font-size: clamp(1.15rem, 3vw, 1.55rem);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.user-balance-grid span,
+.balance-explainer,
+.action-availability small {
+  color: #9fb0d8;
+  font-size: 0.76rem;
+}
+
+.balance-explainer {
+  margin-bottom: 0;
+}
+
+.balance-refresh-error button {
+  padding: 0.5rem 0.8rem;
+  font-size: 0.72rem;
+}
+
+.action-availability {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 0.2rem 0.75rem;
+  border-bottom: 1px solid rgba(101, 131, 255, 0.2);
+  margin: 0 0 0.75rem;
+  padding-bottom: 0.75rem;
+}
+
+.action-availability span {
+  color: #9fb0d8;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+
+.action-availability strong {
+  overflow-wrap: anywhere;
+  color: #9fe8c4;
+  font-family: var(--font-display, system-ui), system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+.action-availability small {
+  grid-column: 1 / -1;
+  text-align: right;
+  text-transform: uppercase;
+}
+
 @media (max-width: 900px) {
   .vault-dashboard {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 520px) {
+  .user-balance-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .user-balance-grid > div:last-child {
+    grid-column: auto;
+  }
+
+  .action-availability {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .action-availability small {
+    grid-column: auto;
+    text-align: left;
   }
 }
 

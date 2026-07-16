@@ -2,16 +2,21 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { VaultClient, VaultState, UserPosition } from "@vault-sdk";
+import { VaultClient, VaultState } from "@vault-sdk";
 
 import { parseMintAddress } from "../lib/solana/mint";
 import { fetchMintDecimals } from "../lib/solana/amounts";
+import { fetchWalletAssetBalance } from "../lib/solana/balances";
+import type {
+  BalanceStatus,
+  UserBalanceSnapshot,
+} from "../lib/solana/balances";
 import { useVaultAnimation } from "../hooks/useVaultAnimation";
 import { useSoundEffect } from "../hooks/useSoundEffect";
 import { DepositForm } from "./DepositForm";
 import { WithdrawForm } from "./WithdrawForm";
 import { AdminPausePanel } from "./AdminPausePanel";
-import { UserSharesDisplay } from "./UserSharesDisplay";
+import { UserBalanceSummary } from "./UserBalanceSummary";
 import { InteractiveVault } from "./vault/InteractiveVault";
 import { VaultStatusPanel } from "./vault/VaultStatusPanel";
 import { DollarConfetti } from "./vault/DollarConfetti";
@@ -31,8 +36,11 @@ export function VaultDetail({ mintInput }: { mintInput: string }) {
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [vaultState, setVaultState] = useState<VaultState | null>(null);
-  const [userPosition, setUserPosition] = useState<UserPosition | null>(null);
+  const [balances, setBalances] = useState<UserBalanceSnapshot | null>(null);
+  const [balanceStatus, setBalanceStatus] =
+    useState<BalanceStatus>("disconnected");
   const [decimals, setDecimals] = useState<number | null>(null);
+  const balanceRequestId = useRef(0);
 
   useEffect(() => {
     if (!vaultClient) return;
@@ -69,30 +77,66 @@ export function VaultDetail({ mintInput }: { mintInput: string }) {
     };
   }, [connection, mint, vaultClient]);
 
+  const loadBalances = useCallback(
+    async (mode: "loading" | "refreshing") => {
+      const requestId = ++balanceRequestId.current;
+      if (!vaultClient || !mint || !connected || !publicKey) {
+        setBalances(null);
+        setBalanceStatus("disconnected");
+        return;
+      }
+
+      if (mode === "loading") setBalances(null);
+      setBalanceStatus(mode);
+      try {
+        const [walletAssets, position] = await Promise.all([
+          fetchWalletAssetBalance(connection, publicKey, mint),
+          vaultClient.fetchUserPosition(publicKey),
+        ]);
+        if (requestId !== balanceRequestId.current) return;
+        setBalances({ walletAssets, shares: position?.shares ?? 0n });
+        setBalanceStatus("ready");
+      } catch {
+        if (requestId !== balanceRequestId.current) return;
+        setBalanceStatus("error");
+      }
+    },
+    [connection, connected, mint, publicKey, vaultClient]
+  );
+
   useEffect(() => {
-    if (!vaultClient || !connected || !publicKey) {
-      setUserPosition(null);
-      return;
-    }
-    let cancelled = false;
-    vaultClient.fetchUserPosition(publicKey).then((position) => {
-      if (!cancelled) setUserPosition(position);
-    });
+    void loadBalances("loading");
     return () => {
-      cancelled = true;
+      balanceRequestId.current += 1;
     };
-  }, [vaultClient, connected, publicKey]);
+  }, [loadBalances]);
 
   /** Re-reads authoritative chain state after a confirmed transaction, so the
    *  UI never trusts local/optimistic values for financial numbers. */
   const refresh = useCallback(async () => {
     if (!vaultClient) return;
-    const state = await vaultClient.fetchVaultState();
-    setVaultState(state);
-    if (connected && publicKey) {
-      setUserPosition(await vaultClient.fetchUserPosition(publicKey));
+    if (!mint || !connected || !publicKey) {
+      setVaultState(await vaultClient.fetchVaultState());
+      return;
     }
-  }, [vaultClient, connected, publicKey]);
+
+    const requestId = ++balanceRequestId.current;
+    setBalanceStatus("refreshing");
+    try {
+      const [state, walletAssets, position] = await Promise.all([
+        vaultClient.fetchVaultState(),
+        fetchWalletAssetBalance(connection, publicKey, mint),
+        vaultClient.fetchUserPosition(publicKey),
+      ]);
+      if (requestId !== balanceRequestId.current) return;
+      setVaultState(state);
+      setBalances({ walletAssets, shares: position?.shares ?? 0n });
+      setBalanceStatus("ready");
+    } catch (error) {
+      if (requestId === balanceRequestId.current) setBalanceStatus("error");
+      throw error;
+    }
+  }, [connection, vaultClient, connected, mint, publicKey]);
 
   const { stage, openVault } = useVaultAnimation();
   const { play: playChaChing, muted, toggleMuted } = useSoundEffect();
@@ -101,6 +145,23 @@ export function VaultDetail({ mintInput }: { mintInput: string }) {
   );
   const [confettiBurst, setConfettiBurst] = useState<string | null>(null);
   const celebratedSignatures = useRef<Set<string>>(new Set());
+  const transactionOwner = useRef<"deposit" | "withdraw" | null>(null);
+  const [activeTransaction, setActiveTransaction] = useState<
+    "deposit" | "withdraw" | null
+  >(null);
+
+  const acquireTransaction = useCallback((owner: "deposit" | "withdraw") => {
+    if (transactionOwner.current !== null) return false;
+    transactionOwner.current = owner;
+    setActiveTransaction(owner);
+    return true;
+  }, []);
+
+  const releaseTransaction = useCallback((owner: "deposit" | "withdraw") => {
+    if (transactionOwner.current !== owner) return;
+    transactionOwner.current = null;
+    setActiveTransaction(null);
+  }, []);
 
   /** Confirmed deposit/withdraw: refresh authoritative balances FIRST, then
    *  run the celebration — the opened vault must show current numbers. The
@@ -179,24 +240,39 @@ export function VaultDetail({ mintInput }: { mintInput: string }) {
               Connect your wallet to deposit, withdraw, or view your shares.
             </p>
           )}
-          <div className="panel">
-            <h3>Your position</h3>
-            <UserSharesDisplay
-              shares={connected ? userPosition?.shares ?? 0n : null}
-              decimals={displayDecimals}
-            />
-          </div>
+          <UserBalanceSummary
+            balances={balances}
+            status={balanceStatus}
+            decimals={displayDecimals}
+            totalAssets={vaultState.totalAssets}
+            totalShares={vaultState.totalShares}
+            transactionPending={activeTransaction !== null}
+            onRetry={() => {
+              // The summary owns the visible fail-closed error state. Avoid an
+              // unhandled rejection when a manual retry encounters the same RPC outage.
+              void refresh().catch(() => {});
+            }}
+          />
           <DepositForm
             vaultClient={vaultClient!}
             operationalState={vaultState.operationalState}
             decimals={displayDecimals}
+            availableAssets={balances?.walletAssets ?? null}
+            balanceStatus={balanceStatus}
+            transactionPending={activeTransaction !== null}
+            acquireTransaction={() => acquireTransaction("deposit")}
+            releaseTransaction={() => releaseTransaction("deposit")}
             onConfirmed={celebrateConfirmed}
           />
           <WithdrawForm
             vaultClient={vaultClient!}
-            userShares={userPosition?.shares ?? 0n}
+            userShares={balances?.shares ?? null}
             operationalState={vaultState.operationalState}
             decimals={displayDecimals}
+            balanceStatus={balanceStatus}
+            transactionPending={activeTransaction !== null}
+            acquireTransaction={() => acquireTransaction("withdraw")}
+            releaseTransaction={() => releaseTransaction("withdraw")}
             onConfirmed={celebrateConfirmed}
           />
           <AdminPausePanel

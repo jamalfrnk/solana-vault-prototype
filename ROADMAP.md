@@ -33,7 +33,8 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 | 22 | Exit-first pause semantics | `[x]` complete |
 | 23 | ProtocolConfig and emergency pause controls | `[x]` complete |
 | — | M23 follow-up — isolated devnet v1 deployment + clean UI fixture | `[x]` complete |
-| — | UI follow-up — persistent header wallet control | `[~]` in review |
+| — | UI follow-up — persistent header wallet control | `[x]` complete |
+| — | UI follow-up — authoritative wallet assets and vault shares | `[~]` in review |
 
 ## Milestone 0 — Repository bootstrap (complete)
 
@@ -770,7 +771,7 @@ Observed in PR #37 CI run `29479838988`: all five jobs passed, including the
 Rust/Anchor suite, cargo audit, SDK suite and audit, dApp suite and audit, and the full
 generated-IDL verifier. Merged through PR #37 as `9ec205e` on 2026-07-16.
 
-## UI follow-up — persistent header wallet control (in review)
+## UI follow-up — persistent header wallet control (complete)
 
 Approved by Malcolm on 2026-07-16 as a small dApp-only follow-up on
 `codex/ui-header-wallet-connect`. It moves the existing wallet-adapter control from
@@ -790,7 +791,47 @@ account layouts, devnet state, keypairs, balances, or transaction authorization.
 Observed locally: root and dApp typechecks, the Next.js production build, all 96 dApp
 tests, high-severity npm audit, new component/test formatting, documentation-link
 validation, filename-only secret/artifact review, prohibited-attribution scanning,
-and whitespace checks passed. Pull-request CI remains the publication gate.
+and whitespace checks passed.
+
+Observed in PR #38 CI run `29493805747`: all five Rust, audit, SDK, dApp, and
+generated-IDL jobs passed. Merged through PR #38 as `821bf1e` on 2026-07-16.
+
+## UI follow-up — authoritative wallet assets and vault shares (in review)
+
+Approved by Malcolm on 2026-07-16 as a dApp-only production-readiness follow-up on
+`codex/share-balance-ux`:
+
+- reads deposit availability from the connected owner's canonical initialized
+  legacy-SPL ATA and withdrawal availability from that wallet's `UserPosition`;
+- labels wallet assets and non-transferable vault shares separately and estimates
+  redeemable assets with the program's exact integer floor formula;
+- preserves the last confirmed snapshot during wallet approval, confirmation, and
+  post-confirmation refresh, then replaces vault totals and both user balances
+  together only after all authoritative reads succeed;
+- rejects stale responses after wallet changes, treats only confirmed absent accounts
+  as zero, and fails closed on malformed, substituted, frozen, or unavailable token
+  account data;
+- prevents either form from exceeding its confirmed balance and uses one atomic client
+  transaction slot across deposit and withdrawal.
+
+The old shares-only panel is removed. Focused and integration coverage exercises
+disconnected, loading, ready, pending, refreshing, zero, absent-account, RPC-error,
+wallet-switch, over-balance, shared-lock, and confirmed-refresh states, raising the dApp
+suite from 96 to 117 tests. Real-browser checks at 1440×1000 and 390×844 found no
+horizontal overflow and no console warning or error. The isolated browser has no wallet
+extension; connected and transaction states are therefore covered by mocked-wallet
+integration tests rather than a live devnet transaction.
+
+This follow-up changes no program, SDK wire contract, account layout, program ID,
+devnet state, keypair, token balance, or transaction authorization. MintConfig,
+governed initialization, and on-chain exposure caps remain the next numbered program
+slice after this pull request merges.
+
+Observed locally: root and dApp typechecks, the Next.js production build, all 117 dApp
+tests, high-severity npm audit, focused source formatting, 50 local documentation links,
+milestone-only attribution/secret scans, and whitespace checks passed. Vitest retained
+the known non-fatal jsdom canvas warning; the real-browser canvas rendered and browser
+warning/error logs were empty.
 
 ## Post-MVP Roadmap (candidate pool — implementation requires separate approval)
 

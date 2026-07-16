@@ -1,9 +1,9 @@
 # Test Plan
 
-**Status: M21–M23 and the isolated devnet/UI follow-up are complete through PRs
-#34–#37; the persistent wallet-header follow-up is in review — 78 Rust tests, 89 SDK
-tests, and 96 dApp tests. Desktop and narrow-viewport browser behavior plus full local
-validation are observed; pull-request CI remains the publication gate.**
+**Status: M21–M23 and the devnet/UI and wallet-header follow-ups are complete through
+PRs #34–#38; the authoritative share-balance UX follow-up is in review — 78 Rust
+tests, 89 SDK tests, and 117 dApp tests. Desktop and narrow-viewport browser behavior
+is observed; pull-request CI remains the publication gate.**
 
 ## Repository hygiene (complete)
 
@@ -505,7 +505,7 @@ package's authoritative dependency gate.
 Observed in PR #37 CI run `29479838988`: all five jobs passed. GitHub merged PR #37
 as `9ec205e` on 2026-07-16.
 
-## Persistent header wallet control follow-up (in progress)
+## Persistent header wallet control follow-up (complete — PR #38)
 
 - [x] The shared header renders the same wallet control on `/` and
       `/vault/[mint]`; the landing panel no longer renders a duplicate control.
@@ -521,7 +521,7 @@ as `9ec205e` on 2026-07-16.
       empty on both routes.
 - [x] The complete local dApp typecheck/build/test/audit and repository hygiene gates
       pass.
-- [ ] Observe every pull-request CI job green before merge.
+- [x] Observe every pull-request CI job green before merge.
 
 No program, SDK, account-layout, program-ID, devnet-state, keypair, token-balance, or
 transaction-authorization behavior changes in this follow-up.
@@ -531,6 +531,48 @@ all 96 dApp tests, high-severity npm audit, new component/test formatting, docum
 links, prohibited-attribution and suspicious-artifact scans, and whitespace checks
 exited 0. Vitest retained its known jsdom canvas warning; it is non-fatal, and the
 real-browser canvas and console checks were clean.
+
+Observed in PR #38 CI run `29493805747`: all five jobs passed. GitHub merged PR #38
+as `821bf1e` on 2026-07-16.
+
+## Authoritative wallet-assets and vault-shares UX follow-up (in progress)
+
+- [x] The connected-wallet summary distinguishes canonical wallet-ATA assets available
+      to deposit, `UserPosition` shares available to withdraw, and the current
+      floor-rate redeemable-asset estimate.
+- [x] Disconnected and initial-loading states never present an unconfirmed zero;
+      confirmed absent ATA/position accounts present explicit zero balances.
+- [x] Token-account reads verify canonical derivation, legacy Token Program ownership,
+      exact 165-byte layout, non-executable status, embedded mint and wallet owner, and
+      initialized (not frozen) state before reading the exact `u64` balance.
+- [x] Deposit and withdrawal forms repeat the relevant last-confirmed availability,
+      fail closed on RPC/parse/refresh errors, and do not permit an amount above the
+      confirmed wallet assets or shares.
+- [x] One client-side transaction lock prevents concurrent deposit/withdraw submission;
+      pending values remain visible as last confirmed until vault totals, wallet assets,
+      and shares refresh together after confirmation.
+- [x] Wallet-change request sequencing prevents an old wallet's delayed RPC response
+      from replacing the new wallet's values.
+- [x] Unit/component/integration coverage raises the dApp suite from 96 to 117 tests and
+      covers disconnected, loading, ready, pending, refreshing, zero, missing-account,
+      malformed/substituted account, RPC-error, wallet-switch, shared-lock,
+      over-balance, and confirmed-refresh paths.
+- [x] Manual browser checks at 1440×1000 and 390×844 find no horizontal overflow; the
+      persistent wallet button and new balance/action signifiers remain readable and
+      browser warning/error logs are empty.
+- [x] The complete local typecheck/build/test/audit, documentation, secret/artifact,
+      prohibited-attribution, and whitespace gates pass.
+- [ ] Observe every pull-request CI job green before merge.
+
+No program, SDK wire contract, account layout, program ID, devnet state, keypair,
+token balance, or transaction-authorization behavior changes in this follow-up.
+
+Observed locally (2026-07-16): root and dApp typechecks exited 0; the Next.js production
+build completed all static/dynamic routes; all 117 dApp tests passed; high-severity npm
+audit reported 0 vulnerabilities; focused Prettier checks, 50 local Markdown links,
+milestone-only prohibited-attribution/secret scans, and `git diff --check` passed.
+Vitest retained the known non-fatal jsdom canvas warning; the real-browser canvas
+rendered at both tested widths and browser warning/error logs were empty.
 
 ## Anchor scaffold baseline (complete — M2)
 

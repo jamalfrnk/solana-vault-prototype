@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { Keypair } from "@solana/web3.js";
+import type { ComponentProps } from "react";
 import { OperationalState } from "../../sdk/src";
 
 const sendTransactionMock = vi.fn();
@@ -11,8 +12,25 @@ vi.mock("@solana/wallet-adapter-react", () => ({
   useConnection: () => useConnectionMock(),
 }));
 
-import { WithdrawForm } from "../components/WithdrawForm";
+import { WithdrawForm as WithdrawFormComponent } from "../components/WithdrawForm";
 import type { VaultClient } from "../../sdk/src";
+
+type WithdrawFormProps = ComponentProps<typeof WithdrawFormComponent>;
+type TestWithdrawFormProps = Omit<
+  WithdrawFormProps,
+  "balanceStatus" | "transactionPending"
+> &
+  Partial<Pick<WithdrawFormProps, "balanceStatus" | "transactionPending">>;
+
+function WithdrawForm(props: TestWithdrawFormProps) {
+  return (
+    <WithdrawFormComponent
+      balanceStatus="ready"
+      transactionPending={false}
+      {...props}
+    />
+  );
+}
 
 const buildWithdrawIxMock = vi
   .fn()
@@ -80,6 +98,52 @@ describe("WithdrawForm", () => {
     expect(screen.getByText(/exceeds your balance/i)).to.exist;
   });
 
+  it("shows the confirmed shares available to withdraw", () => {
+    render(
+      <WithdrawForm
+        vaultClient={fakeVaultClient}
+        userShares={12_500_000n}
+        operationalState={OperationalState.Active}
+        decimals={6}
+      />
+    );
+
+    expect(screen.getByText(/shares available to withdraw/i)).to.exist;
+    expect(screen.getByText("12.5")).to.exist;
+  });
+
+  it("fails closed without presenting a loading balance as zero", () => {
+    render(
+      <WithdrawForm
+        vaultClient={fakeVaultClient}
+        userShares={null}
+        operationalState={OperationalState.Active}
+        decimals={0}
+        balanceStatus="loading"
+      />
+    );
+
+    expect(screen.getByText("Loading...")).to.exist;
+    expect(screen.queryByText(/no shares/i)).to.equal(null);
+    expect(screen.getByRole("button", { name: /withdraw/i })).toBeDisabled();
+  });
+
+  it("keeps the share balance visible as last confirmed while another action is pending", () => {
+    render(
+      <WithdrawForm
+        vaultClient={fakeVaultClient}
+        userShares={50n}
+        operationalState={OperationalState.Active}
+        decimals={0}
+        transactionPending
+      />
+    );
+
+    expect(screen.getByText("50")).to.exist;
+    expect(screen.getByText(/last confirmed/i)).to.exist;
+    expect(screen.getByRole("button", { name: /withdraw/i })).toBeDisabled();
+  });
+
   it("is enabled for a valid share amount in exit-only mode", () => {
     render(
       <WithdrawForm
@@ -125,9 +189,10 @@ describe("WithdrawForm", () => {
     render(
       <WithdrawForm
         vaultClient={fakeVaultClient}
-        userShares={100n}
+        userShares={null}
         operationalState={OperationalState.Active}
         decimals={0}
+        balanceStatus="disconnected"
       />
     );
     expect(screen.getByRole("button", { name: /withdraw/i })).to.have.property(
@@ -135,6 +200,7 @@ describe("WithdrawForm", () => {
       true
     );
     expect(screen.getByText(/connect your wallet/i)).to.exist;
+    expect(screen.getByText("Connect wallet")).to.exist;
   });
 
   it("scales share-denominated input by decimals", async () => {
