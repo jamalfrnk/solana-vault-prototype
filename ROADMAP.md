@@ -37,7 +37,8 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 | — | UI follow-up — authoritative wallet assets and vault shares | `[x]` complete |
 | 24 | MintConfig, governed initialization, and exposure caps | `[x]` complete |
 | 25 | Constrained exact-excess recovery | `[x]` complete — PR #41 |
-| 26 | Release and operations evidence automation | `[~]` in review — PR #42 |
+| 26 | Release and operations evidence automation | `[x]` complete — PR #42 |
+| — | M26 follow-up — Node 24 GitHub Action refresh | `[~]` in review — PR #43 |
 
 ## Milestone 0 — Repository bootstrap (complete)
 
@@ -914,7 +915,7 @@ Observed in final PR #41 CI run `29515303554`: all five Rust/Anchor, cargo-audit
 SDK/root-audit, dApp, and generated-M25-IDL jobs passed. GitHub merged PR #41 as
 `7c62346` on 2026-07-16.
 
-## Milestone 26 — Release and operations evidence automation (in review — PR #42)
+## Milestone 26 — Release and operations evidence automation (complete — PR #42)
 
 Implements the repository-controlled portion of ADR 0009 step 6 on
 `codex/release-operations-evidence`:
@@ -945,7 +946,21 @@ retained seven allowed upstream warnings. The checksum-verified Windows Gitleaks
 8.30.1 binary scanned all 123 existing commits / approximately 4.17 MB with no leaks.
 The first parallel WSL `cargo test` link hit Ubuntu BFD 2.38's internal
 `_bfd_merged_section_offset` error; `cargo test -j 1` linked the same suite serially and
-all 97 tests passed. Final-head pull-request CI evidence remains to be recorded.
+all 97 tests passed.
+
+Observed in final PR #42 CI run `29520261971` on commit `7aba3b8`: all seven
+Rust/Anchor, cargo-audit, SDK/manifest/root-audit, dApp, full-history Gitleaks,
+generated-IDL, and deterministic-release-evidence jobs passed. GitHub merged PR #42
+as `03a25d1` on 2026-07-16. The run retained non-failing Node 20 runtime-deprecation
+annotations from the then-current v4 action pins; the separate Node 24 follow-up
+refreshes only those immutable pins.
+
+## M26 follow-up — Node 24 GitHub Action refresh (in review — PR #43)
+
+Refreshes checkout, cache, setup-node, upload-artifact, and download-artifact to their
+current Node-24 major releases at immutable full SHAs. It changes no workflow
+permissions, commands, artifacts, program/SDK/dApp behavior, manifest policy, or
+release semantics. Focused and final-head follow-up evidence remains to be recorded.
 
 ## Post-MVP Roadmap (candidate pool — implementation requires separate approval)
 

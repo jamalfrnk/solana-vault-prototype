@@ -2,7 +2,7 @@
 
 ## Status
 
-In review — draft PR #42.
+Complete — merged PR #42; final CI run `29520261971` passed all seven jobs.
 
 ## Objective
 
