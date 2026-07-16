@@ -36,7 +36,7 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 | — | UI follow-up — persistent header wallet control | `[x]` complete |
 | — | UI follow-up — authoritative wallet assets and vault shares | `[x]` complete |
 | 24 | MintConfig, governed initialization, and exposure caps | `[x]` complete |
-| 25 | Constrained exact-excess recovery | `[~]` in progress |
+| 25 | Constrained exact-excess recovery | `[~]` in review — PR #41 |
 
 ## Milestone 0 — Repository bootstrap (complete)
 
@@ -876,7 +876,7 @@ Observed in final PR #40 CI run `29506690101`: all five jobs passed, including t
 dependent M24 generated-IDL verifier. Merged through PR #40 as `efa00c6` on
 2026-07-16.
 
-## Milestone 25 — Constrained exact-excess recovery (in progress)
+## Milestone 25 — Constrained exact-excess recovery (in review — PR #41)
 
 Implements ADR 0008's next independently safe program/SDK slice on
 `codex/exact-excess-recovery`:
@@ -900,12 +900,17 @@ M25 adds no persistent account, migration, dApp governance control, deployment,
 upgrade, live treasury provisioning, devnet mutation, or asset movement. The public
 devnet remains an M23 binary and cannot receive M24/M25 builders.
 
-Observed locally so far: Anchor/SBF build and all integration-test targets compile;
-all 8 focused recovery tests pass; root typecheck and SDK build pass; all 117 SDK tests
-pass; and the generated-IDL verifier confirms all 17 instructions, four unchanged
-account layouts, bounded enums, M24 events, and the 176-byte M25 event. Full regression,
-audit, documentation, and pull-request CI evidence remain to be completed before this
-milestone leaves review.
+Observed locally: Anchor/SBF build, Rust formatting, warning-denying all-target clippy,
+all 97 Rust tests, root typecheck, SDK build, 117 SDK tests, generated-IDL verification,
+dApp typecheck/build, 122 dApp tests, high-severity dApp audit, Rust audit, changed
+documentation links, focused source formatting, secret/attribution scanning, and
+whitespace checks passed. The verifier confirmed all 17 instructions, four unchanged
+account layouts, bounded enums, M24 events, and the 176-byte M25 event. Yarn Classic's
+retired local audit endpoint returned HTTP 410, so pull-request CI's existing
+severity-bitmask gate remains authoritative.
+
+Observed in initial PR #41 CI run `29514911025` on commit `94828b8`: all five
+Rust/Anchor, cargo-audit, SDK/root-audit, dApp, and generated-M25-IDL jobs passed.
 
 ## Post-MVP Roadmap (candidate pool — implementation requires separate approval)
 

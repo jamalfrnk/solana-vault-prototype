@@ -1,8 +1,8 @@
 # Test Plan
 
 **Status: M21–M24 and all UI/devnet follow-ups are complete through PR #40; M25
-constrained exact-excess recovery is in progress — 97 Rust tests, 117 SDK tests, and
-122 dApp tests. Pull-request CI remains the publication gate.**
+constrained exact-excess recovery is in review through draft PR #41 — 97 Rust tests,
+117 SDK tests, and 122 dApp tests. Pull-request CI remains the publication gate.**
 
 ## Repository hygiene (complete)
 
@@ -631,7 +631,7 @@ GitHub reported the draft PR mergeable.
 Observed in final PR #40 CI run `29506690101`: all five jobs passed on the final head.
 GitHub merged PR #40 as `efa00c6` on 2026-07-16.
 
-## M25 constrained exact-excess recovery (in progress)
+## M25 constrained exact-excess recovery (in review — PR #41)
 
 All new on-chain authorization, arithmetic, atomicity, and lifecycle cases are in
 `tests/test_excess_recovery.rs`. The SDK and generated-IDL cases remain offline and
@@ -663,12 +663,22 @@ exercise the exact no-argument wire contract.
 - [x] No persistent account, migration, dApp privileged control, deployment, upgrade,
       treasury provisioning, devnet mutation, or live asset movement is included.
 
-Observed locally so far (2026-07-16): `anchor build --ignore-keys` completed without an
-SBF stack warning; all eight focused recovery tests passed; root typecheck, SDK build,
-all 117 SDK tests, and generated-IDL verification exited 0. The verifier confirmed all
-17 instruction schemas, four exact unchanged account layouts, bounded enums, M24
-events, and the fixed 176-byte M25 event. Full regression and audit evidence will be
-recorded before publication.
+Observed locally (2026-07-16): `anchor build --ignore-keys` completed without an SBF
+stack warning; Rust formatting and warning-denying all-target/all-feature clippy exited
+0; all 97 Rust tests passed, including all eight focused recovery cases. Root
+typecheck, SDK build, all 117 SDK tests, generated-IDL verification, dApp typecheck and
+production build, all 122 dApp tests, high-severity dApp audit, and `cargo audit`
+exited 0. Rust audit retained the seven allowed upstream warnings. The verifier
+confirmed all 17 instruction schemas, four exact unchanged account layouts, bounded
+enums, M24 events, and the fixed 176-byte M25 event. Focused TypeScript formatting, 52
+changed local documentation links, secret/attribution scanning, and whitespace checks
+passed. Yarn Classic's retired local audit endpoint returned HTTP 410, so the existing
+pull-request severity-bitmask audit remains authoritative. The dApp tests retained the
+known non-fatal jsdom canvas warning.
+
+Observed in initial PR #41 CI run `29514911025` on commit `94828b8`: all five
+Rust/Anchor, cargo-audit, SDK/root-audit, dApp, and generated-M25-IDL jobs passed. The
+Linux Rust job includes the complete 97-test regression.
 
 ## Anchor scaffold baseline (complete — M2)
 

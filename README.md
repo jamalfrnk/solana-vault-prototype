@@ -25,8 +25,8 @@ vault product without building custody logic from zero.
 ProtocolConfig and emergency-control milestone merged through PR #36, its isolated
 devnet/UI follow-up through PR #37, and the persistent wallet-header follow-up through
 PR #38. The connected-wallet balance UX merged through PR #39, and M24 MintConfig/
-exposure controls through PR #40. M25 constrained exact-excess recovery is in
-progress; see `ROADMAP.md` for the full history.
+exposure controls through PR #40. M25 constrained exact-excess recovery is in review
+through draft PR #41; see `ROADMAP.md` for the full history.
 
 The original lifecycle was confirmed live on Solana devnet in June 2026. The reviewed
 M23 binary is now deployed separately at the current-layout devnet address; its

@@ -1,6 +1,6 @@
 # Milestone 25 — Constrained Exact-Excess Recovery
 
-- **Status:** In progress
+- **Status:** In review — draft PR #41
 - **Branch:** `codex/exact-excess-recovery`
 - **Milestone type:** Program behavior, SDK, tests, IDL verification, and documentation
 
