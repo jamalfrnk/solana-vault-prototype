@@ -13,7 +13,15 @@
  */
 
 import * as anchor from "@anchor-lang/core";
-import { Keypair, PublicKey, Connection, LAMPORTS_PER_SOL, Transaction, SystemProgram, sendAndConfirmTransaction } from "@solana/web3.js";
+import {
+  Keypair,
+  PublicKey,
+  Connection,
+  LAMPORTS_PER_SOL,
+  Transaction,
+  SystemProgram,
+  sendAndConfirmTransaction,
+} from "@solana/web3.js";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
@@ -22,11 +30,17 @@ import * as os from "os";
 // Constants
 // ---------------------------------------------------------------------------
 
-const PROGRAM_ID = new PublicKey("FYqCCoAnM9tUYRcSRbeLbUE9LBPv8bN2uyuhcz46pSgq");
+const PROGRAM_ID = new PublicKey(
+  "FYqCCoAnM9tUYRcSRbeLbUE9LBPv8bN2uyuhcz46pSgq"
+);
 const VAULT_SEED = Buffer.from("vault");
 const VAULT_AUTHORITY_SEED = Buffer.from("vault_authority");
-const TOKEN_PROGRAM_ID = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
-const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
+const TOKEN_PROGRAM_ID = new PublicKey(
+  "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+);
+const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey(
+  "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+);
 const SYSTEM_PROGRAM_ID = new PublicKey("11111111111111111111111111111111");
 const RPC_URL = "https://api.devnet.solana.com";
 
@@ -49,12 +63,15 @@ function loadKeypair(filePath: string): Keypair {
 async function getAta(owner: PublicKey, mint: PublicKey): Promise<PublicKey> {
   const [ata] = PublicKey.findProgramAddressSync(
     [owner.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(), mint.toBuffer()],
-    ASSOCIATED_TOKEN_PROGRAM_ID,
+    ASSOCIATED_TOKEN_PROGRAM_ID
   );
   return ata;
 }
 
-async function getTokenBalance(connection: Connection, ata: PublicKey): Promise<number> {
+async function getTokenBalance(
+  connection: Connection,
+  ata: PublicKey
+): Promise<number> {
   try {
     const info = await connection.getTokenAccountBalance(ata);
     return Number(info.value.amount);
@@ -73,7 +90,11 @@ async function main(): Promise<void> {
   // Load payer keypair from default Solana CLI location.
   const payer = loadKeypair("~/.config/solana/id.json");
   console.log(`\nPayer: ${payer.publicKey.toBase58()}`);
-  console.log(`Balance: ${(await connection.getBalance(payer.publicKey)) / LAMPORTS_PER_SOL} SOL`);
+  console.log(
+    `Balance: ${
+      (await connection.getBalance(payer.publicKey)) / LAMPORTS_PER_SOL
+    } SOL`
+  );
 
   // Pause authority must be different from payer (enforced on-chain).
   const pauseAuthority = Keypair.generate();
@@ -86,9 +107,11 @@ async function main(): Promise<void> {
         fromPubkey: payer.publicKey,
         toPubkey: pauseAuthority.publicKey,
         lamports: 0.01 * LAMPORTS_PER_SOL,
-      }),
+      })
     );
-    const fundSig = await sendAndConfirmTransaction(connection, fundTx, [payer]);
+    const fundSig = await sendAndConfirmTransaction(connection, fundTx, [
+      payer,
+    ]);
     console.log(`Funded pause authority (0.01 SOL from payer)`);
     console.log(`  ${explorerUrl(fundSig)}`);
   }
@@ -118,13 +141,21 @@ async function main(): Promise<void> {
       programId: TOKEN_PROGRAM_ID,
       keys: [
         { pubkey: mintKp.publicKey, isSigner: false, isWritable: true },
-        { pubkey: new PublicKey("SysvarRent111111111111111111111111111111111"), isSigner: false, isWritable: false },
+        {
+          pubkey: new PublicKey("SysvarRent111111111111111111111111111111111"),
+          isSigner: false,
+          isWritable: false,
+        },
       ],
       data: INITIALIZE_MINT_IX_DATA,
-    },
+    }
   );
 
-  const mintSetupSig = await sendAndConfirmTransaction(connection, createMintTx, [payer, mintKp]);
+  const mintSetupSig = await sendAndConfirmTransaction(
+    connection,
+    createMintTx,
+    [payer, mintKp]
+  );
   const mintPk = mintKp.publicKey;
   console.log(`\nMint created: ${mintPk.toBase58()}`);
   console.log(`  ${explorerUrl(mintSetupSig)}`);
@@ -135,17 +166,21 @@ async function main(): Promise<void> {
   const createAtaTx = new Transaction().add({
     programId: ASSOCIATED_TOKEN_PROGRAM_ID,
     keys: [
-      { pubkey: payer.publicKey, isSigner: true, isWritable: true },     // funder
-      { pubkey: userAta, isSigner: false, isWritable: true },             // ATA to create
-      { pubkey: payer.publicKey, isSigner: false, isWritable: false },    // owner
-      { pubkey: mintPk, isSigner: false, isWritable: false },             // mint
+      { pubkey: payer.publicKey, isSigner: true, isWritable: true }, // funder
+      { pubkey: userAta, isSigner: false, isWritable: true }, // ATA to create
+      { pubkey: payer.publicKey, isSigner: false, isWritable: false }, // owner
+      { pubkey: mintPk, isSigner: false, isWritable: false }, // mint
       { pubkey: SYSTEM_PROGRAM_ID, isSigner: false, isWritable: false },
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
     ],
     data: Buffer.alloc(0),
   });
 
-  const createAtaSig = await sendAndConfirmTransaction(connection, createAtaTx, [payer]);
+  const createAtaSig = await sendAndConfirmTransaction(
+    connection,
+    createAtaTx,
+    [payer]
+  );
   console.log(`\nUser ATA created: ${userAta.toBase58()}`);
   console.log(`  ${explorerUrl(createAtaSig)}`);
 
@@ -165,7 +200,9 @@ async function main(): Promise<void> {
     data: mintToData,
   });
 
-  const mintToSig = await sendAndConfirmTransaction(connection, mintToTx, [payer]);
+  const mintToSig = await sendAndConfirmTransaction(connection, mintToTx, [
+    payer,
+  ]);
   console.log(`\nMinted 10 000 tokens to user ATA`);
   console.log(`  ${explorerUrl(mintToSig)}`);
 
@@ -174,22 +211,27 @@ async function main(): Promise<void> {
   // ---------------------------------------------------------------------------
 
   const wallet = new anchor.Wallet(payer);
-  const provider = new anchor.AnchorProvider(connection, wallet, { commitment: "confirmed" });
+  const provider = new anchor.AnchorProvider(connection, wallet, {
+    commitment: "confirmed",
+  });
   anchor.setProvider(provider);
 
   const idl = JSON.parse(
-    fs.readFileSync(path.join(__dirname, "../target/idl/solana_vault_prototype.json"), "utf-8"),
+    fs.readFileSync(
+      path.join(__dirname, "../target/idl/solana_vault_prototype.json"),
+      "utf-8"
+    )
   );
   const program = new anchor.Program(idl, provider);
 
   // Derive PDAs.
   const [vaultStatePda] = PublicKey.findProgramAddressSync(
     [VAULT_SEED, mintPk.toBuffer()],
-    PROGRAM_ID,
+    PROGRAM_ID
   );
   const [vaultAuthorityPda] = PublicKey.findProgramAddressSync(
     [VAULT_AUTHORITY_SEED, vaultStatePda.toBuffer()],
-    PROGRAM_ID,
+    PROGRAM_ID
   );
   const custodyAta = await getAta(vaultAuthorityPda, mintPk);
 
@@ -227,8 +269,12 @@ async function main(): Promise<void> {
   const DEPOSIT_AMOUNT = new anchor.BN("1000000000"); // 1 000 @ 6 decimals
 
   const [userPositionPda] = PublicKey.findProgramAddressSync(
-    [Buffer.from("user_position"), vaultStatePda.toBuffer(), payer.publicKey.toBuffer()],
-    PROGRAM_ID,
+    [
+      Buffer.from("user_position"),
+      vaultStatePda.toBuffer(),
+      payer.publicKey.toBuffer(),
+    ],
+    PROGRAM_ID
   );
 
   const depositSig: string = await (program.methods as any)
@@ -281,7 +327,7 @@ async function main(): Promise<void> {
   // ---------------------------------------------------------------------------
 
   const pauseSig: string = await (program.methods as any)
-    .pause()
+    .pause({ incidentResponse: {} })
     .accounts({
       pauseAuthority: pauseAuthority.publicKey,
       vaultState: vaultStatePda,

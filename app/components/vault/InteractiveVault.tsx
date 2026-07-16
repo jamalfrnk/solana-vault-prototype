@@ -1,4 +1,5 @@
 import { VaultStage } from "../../hooks/useVaultAnimation";
+import { OperationalState } from "@vault-sdk";
 import { VaultDoor } from "./VaultDoor";
 import { VaultInterior } from "./VaultInterior";
 
@@ -14,12 +15,12 @@ import { VaultInterior } from "./VaultInterior";
  */
 export function InteractiveVault({
   totalAssets,
-  isPaused,
+  operationalState,
   decimals,
   stage = "closed",
 }: {
   totalAssets: bigint;
-  isPaused: boolean;
+  operationalState: OperationalState;
   decimals: number;
   stage?: VaultStage;
 }) {
@@ -27,7 +28,7 @@ export function InteractiveVault({
     <div className="vault-scene" data-stage={stage} aria-hidden="true">
       <div className="vault-frame">
         <VaultInterior totalAssets={totalAssets} decimals={decimals} />
-        <VaultDoor isPaused={isPaused} />
+        <VaultDoor operationalState={operationalState} />
         <span className="vault-hinge vault-hinge-top" />
         <span className="vault-hinge vault-hinge-bottom" />
       </div>

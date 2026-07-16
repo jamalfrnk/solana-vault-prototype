@@ -1,16 +1,17 @@
 /// Event emission tests (M12)
 ///
-/// Each instruction emits an Anchor event after state mutation. These tests
-/// prove the emit!() call actually fires by checking for the "Program data: ..."
-/// log line litesvm surfaces for sol_log_data (what emit!() compiles down to),
-/// without needing full Borsh-decode-and-field-assert complexity.
+/// Each instruction emits an Anchor event after state mutation. The general tests
+/// prove emit!() fires by checking LiteSVM's "Program data: ..." log. M22 additionally
+/// decodes the exact OperationalStateChanged wire payload and asserts every field.
 use {
     anchor_lang::{
-        solana_program::instruction::Instruction, AccountDeserialize, InstructionData,
-        ToAccountMetas,
+        solana_program::instruction::Instruction, AccountDeserialize, Discriminator,
+        InstructionData, ToAccountMetas,
     },
+    base64::{engine::general_purpose::STANDARD, Engine as _},
     litesvm::LiteSVM,
     solana_account::Account,
+    solana_clock::Clock,
     solana_keypair::Keypair,
     solana_message::{Message, VersionedMessage},
     solana_pubkey::Pubkey,
@@ -18,7 +19,8 @@ use {
     solana_transaction::versioned::VersionedTransaction,
     solana_vault_prototype::{
         constants::{USER_POSITION_SEED, VAULT_AUTHORITY_SEED, VAULT_SEED},
-        state::{OperationalState, VaultState},
+        events::OperationalStateChanged,
+        state::{OperationalState, OperationalStateReason, VaultState},
     },
 };
 
@@ -135,6 +137,42 @@ fn assert_event_logged(logs: &[String], context: &str) {
     );
 }
 
+struct DecodedOperationalStateChanged {
+    vault: Pubkey,
+    previous_state: u8,
+    new_state: u8,
+    authority: Pubkey,
+    slot: u64,
+    unix_timestamp: i64,
+    reason_code: u8,
+}
+
+fn decode_operational_state_changed(logs: &[String]) -> DecodedOperationalStateChanged {
+    let encoded = logs
+        .iter()
+        .find_map(|line| line.strip_prefix("Program data: "))
+        .expect("OperationalStateChanged event log missing");
+    let bytes = STANDARD
+        .decode(encoded)
+        .expect("event must be valid base64");
+    assert_eq!(bytes.len(), 91, "unexpected transition-event wire size");
+    assert_eq!(
+        &bytes[0..8],
+        OperationalStateChanged::DISCRIMINATOR,
+        "unexpected event discriminator"
+    );
+
+    DecodedOperationalStateChanged {
+        vault: Pubkey::new_from_array(bytes[8..40].try_into().unwrap()),
+        previous_state: bytes[40],
+        new_state: bytes[41],
+        authority: Pubkey::new_from_array(bytes[42..74].try_into().unwrap()),
+        slot: u64::from_le_bytes(bytes[74..82].try_into().unwrap()),
+        unix_timestamp: i64::from_le_bytes(bytes[82..90].try_into().unwrap()),
+        reason_code: bytes[90],
+    }
+}
+
 fn make_initialize_ix(
     payer: Pubkey,
     pause_authority: Pubkey,
@@ -221,7 +259,10 @@ fn make_withdraw_ix(
 fn make_pause_ix(pause_authority: Pubkey, vault_state: Pubkey) -> Instruction {
     Instruction::new_with_bytes(
         program_id(),
-        &solana_vault_prototype::instruction::Pause {}.data(),
+        &solana_vault_prototype::instruction::Pause {
+            reason: OperationalStateReason::IncidentResponse,
+        }
+        .data(),
         solana_vault_prototype::accounts::Pause {
             pause_authority,
             vault_state,
@@ -233,7 +274,10 @@ fn make_pause_ix(pause_authority: Pubkey, vault_state: Pubkey) -> Instruction {
 fn make_unpause_ix(pause_authority: Pubkey, vault_state: Pubkey) -> Instruction {
     Instruction::new_with_bytes(
         program_id(),
-        &solana_vault_prototype::instruction::Unpause {}.data(),
+        &solana_vault_prototype::instruction::Unpause {
+            reason: OperationalStateReason::IncidentResolved,
+        }
+        .data(),
         solana_vault_prototype::accounts::Unpause {
             pause_authority,
             vault_state,
@@ -405,13 +449,28 @@ fn test_withdraw_emits_withdrawn_log() {
 }
 
 #[test]
-fn test_pause_emits_paused_log() {
+fn test_pause_emits_operational_state_changed_log() {
     let mut v = Vault::new();
     let pa_pk = keypair_pubkey(&v.pause_authority);
+    let mut clock = v.svm.get_sysvar::<Clock>();
+    clock.slot = 4_242;
+    clock.unix_timestamp = 1_750_000_000;
+    v.svm.set_sysvar::<Clock>(&clock);
 
     let ix = make_pause_ix(pa_pk, v.vault_state_pda);
     let logs = send_and_get_logs(&mut v.svm, &[ix], &[&v.payer, &v.pause_authority], &v.payer);
-    assert_event_logged(&logs, "Paused");
+    assert_event_logged(&logs, "OperationalStateChanged by pause");
+    let event = decode_operational_state_changed(&logs);
+    assert_eq!(event.vault, v.vault_state_pda);
+    assert_eq!(event.previous_state, OperationalState::Active as u8);
+    assert_eq!(event.new_state, OperationalState::ExitOnly as u8);
+    assert_eq!(event.authority, pa_pk);
+    assert_eq!(event.slot, clock.slot);
+    assert_eq!(event.unix_timestamp, clock.unix_timestamp);
+    assert_eq!(
+        event.reason_code,
+        OperationalStateReason::IncidentResponse as u8
+    );
 
     let acct = v.svm.get_account(&v.vault_state_pda).unwrap();
     let vs = VaultState::try_deserialize(&mut acct.data.as_slice()).unwrap();
@@ -419,7 +478,7 @@ fn test_pause_emits_paused_log() {
 }
 
 #[test]
-fn test_unpause_emits_unpaused_log() {
+fn test_unpause_emits_operational_state_changed_log() {
     let mut v = Vault::new();
     let pa_pk = keypair_pubkey(&v.pause_authority);
 
@@ -430,9 +489,25 @@ fn test_unpause_emits_unpaused_log() {
         &v.payer,
     );
 
+    let mut clock = v.svm.get_sysvar::<Clock>();
+    clock.slot = 8_484;
+    clock.unix_timestamp = 1_750_000_123;
+    v.svm.set_sysvar::<Clock>(&clock);
+
     let ix = make_unpause_ix(pa_pk, v.vault_state_pda);
     let logs = send_and_get_logs(&mut v.svm, &[ix], &[&v.payer, &v.pause_authority], &v.payer);
-    assert_event_logged(&logs, "Unpaused");
+    assert_event_logged(&logs, "OperationalStateChanged by unpause");
+    let event = decode_operational_state_changed(&logs);
+    assert_eq!(event.vault, v.vault_state_pda);
+    assert_eq!(event.previous_state, OperationalState::ExitOnly as u8);
+    assert_eq!(event.new_state, OperationalState::Active as u8);
+    assert_eq!(event.authority, pa_pk);
+    assert_eq!(event.slot, clock.slot);
+    assert_eq!(event.unix_timestamp, clock.unix_timestamp);
+    assert_eq!(
+        event.reason_code,
+        OperationalStateReason::IncidentResolved as u8
+    );
 
     let acct = v.svm.get_account(&v.vault_state_pda).unwrap();
     let vs = VaultState::try_deserialize(&mut acct.data.as_slice()).unwrap();

@@ -28,7 +28,7 @@ use {
     solana_transaction::versioned::VersionedTransaction,
     solana_vault_prototype::{
         constants::{VAULT_AUTHORITY_SEED, VAULT_SEED},
-        state::{OperationalState, VaultState},
+        state::{OperationalState, OperationalStateReason, VaultState},
     },
 };
 
@@ -178,7 +178,10 @@ fn make_initialize_ix(
 fn make_pause_ix(pause_authority: Pubkey, vault_state: Pubkey) -> Instruction {
     Instruction::new_with_bytes(
         program_id(),
-        &solana_vault_prototype::instruction::Pause {}.data(),
+        &solana_vault_prototype::instruction::Pause {
+            reason: OperationalStateReason::IncidentResponse,
+        }
+        .data(),
         solana_vault_prototype::accounts::Pause {
             pause_authority,
             vault_state,
@@ -190,7 +193,10 @@ fn make_pause_ix(pause_authority: Pubkey, vault_state: Pubkey) -> Instruction {
 fn make_unpause_ix(pause_authority: Pubkey, vault_state: Pubkey) -> Instruction {
     Instruction::new_with_bytes(
         program_id(),
-        &solana_vault_prototype::instruction::Unpause {}.data(),
+        &solana_vault_prototype::instruction::Unpause {
+            reason: OperationalStateReason::IncidentResolved,
+        }
+        .data(),
         solana_vault_prototype::accounts::Unpause {
             pause_authority,
             vault_state,
@@ -353,7 +359,10 @@ fn test_pause_rejects_pda_authority_without_signer_privilege() {
     // Hand-build the metas so the PDA is present but is_signer = false.
     let ix = Instruction::new_with_bytes(
         program_id(),
-        &solana_vault_prototype::instruction::Pause {}.data(),
+        &solana_vault_prototype::instruction::Pause {
+            reason: OperationalStateReason::IncidentResponse,
+        }
+        .data(),
         vec![
             AccountMeta::new_readonly(f.multisig_pda, false),
             AccountMeta::new(f.vault_state_pda, false),

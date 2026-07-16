@@ -22,7 +22,7 @@ use {
     solana_transaction::versioned::VersionedTransaction,
     solana_vault_prototype::{
         constants::{VAULT_AUTHORITY_SEED, VAULT_SEED},
-        state::{OperationalState, VaultState},
+        state::{OperationalState, OperationalStateReason, VaultState},
     },
 };
 
@@ -211,7 +211,10 @@ fn make_accept_ix(new_pause_authority: Pubkey, vault_state: Pubkey) -> Instructi
 fn make_pause_ix(pause_authority: Pubkey, vault_state: Pubkey) -> Instruction {
     Instruction::new_with_bytes(
         program_id(),
-        &solana_vault_prototype::instruction::Pause {}.data(),
+        &solana_vault_prototype::instruction::Pause {
+            reason: OperationalStateReason::IncidentResponse,
+        }
+        .data(),
         solana_vault_prototype::accounts::Pause {
             pause_authority,
             vault_state,
@@ -223,7 +226,10 @@ fn make_pause_ix(pause_authority: Pubkey, vault_state: Pubkey) -> Instruction {
 fn make_unpause_ix(pause_authority: Pubkey, vault_state: Pubkey) -> Instruction {
     Instruction::new_with_bytes(
         program_id(),
-        &solana_vault_prototype::instruction::Unpause {}.data(),
+        &solana_vault_prototype::instruction::Unpause {
+            reason: OperationalStateReason::IncidentResolved,
+        }
+        .data(),
         solana_vault_prototype::accounts::Unpause {
             pause_authority,
             vault_state,

@@ -36,12 +36,12 @@ pub mod solana_vault_prototype {
         withdraw::handler(ctx, shares_in)
     }
 
-    pub fn pause(ctx: Context<Pause>) -> Result<()> {
-        pause::pause_handler(ctx)
+    pub fn pause(ctx: Context<Pause>, reason: OperationalStateReason) -> Result<()> {
+        pause::pause_handler(ctx, reason)
     }
 
-    pub fn unpause(ctx: Context<Unpause>) -> Result<()> {
-        pause::unpause_handler(ctx)
+    pub fn unpause(ctx: Context<Unpause>, reason: OperationalStateReason) -> Result<()> {
+        pause::unpause_handler(ctx, reason)
     }
 
     pub fn propose_pause_authority(

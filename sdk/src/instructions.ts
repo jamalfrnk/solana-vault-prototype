@@ -11,6 +11,7 @@ import {
   SYSTEM_PROGRAM_ID,
 } from "./constants";
 import { instructionDiscriminator } from "./discriminator";
+import { OperationalStateReason } from "./accounts";
 import {
   deriveVaultStatePda,
   deriveVaultAuthorityPda,
@@ -133,6 +134,20 @@ export function buildWithdrawIx(p: WithdrawIxParams): TransactionInstruction {
 export interface PauseIxParams {
   pauseAuthority: PublicKey;
   mint: PublicKey;
+  reason: OperationalStateReason;
+}
+
+function operationalStateChangeData(
+  name: "pause" | "unpause",
+  reason: OperationalStateReason
+): Buffer {
+  if (!Number.isInteger(reason) || reason < 0 || reason > 3) {
+    throw new RangeError(`Unsupported operational-state reason code ${reason}`);
+  }
+  const data = Buffer.alloc(9);
+  instructionDiscriminator(name).copy(data, 0);
+  data[8] = reason;
+  return data;
 }
 
 function buildPauseLikeIx(
@@ -146,7 +161,7 @@ function buildPauseLikeIx(
       meta(p.pauseAuthority, true, false),
       meta(vaultState.address, false, true),
     ],
-    data: instructionDiscriminator(name),
+    data: operationalStateChangeData(name, p.reason),
   });
 }
 

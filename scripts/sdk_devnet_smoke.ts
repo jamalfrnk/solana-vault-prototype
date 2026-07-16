@@ -31,6 +31,7 @@ import * as os from "os";
 import * as path from "path";
 
 import {
+  OperationalStateReason,
   TOKEN_PROGRAM_ID,
   VaultClient,
   deriveAssociatedTokenAddress,
@@ -55,12 +56,18 @@ async function main(): Promise<void> {
   const connection = new Connection(RPC_URL, "confirmed");
   const payer = loadKeypair("~/.config/solana/id.json");
   console.log(`\nPayer: ${payer.publicKey.toBase58()}`);
-  console.log(`Balance: ${(await connection.getBalance(payer.publicKey)) / LAMPORTS_PER_SOL} SOL`);
+  console.log(
+    `Balance: ${
+      (await connection.getBalance(payer.publicKey)) / LAMPORTS_PER_SOL
+    } SOL`
+  );
 
   const pauseAuthority = Keypair.generate();
   const newPauseAuthority = Keypair.generate();
   console.log(`Pause authority: ${pauseAuthority.publicKey.toBase58()}`);
-  console.log(`New pause authority (rotation target): ${newPauseAuthority.publicKey.toBase58()}`);
+  console.log(
+    `New pause authority (rotation target): ${newPauseAuthority.publicKey.toBase58()}`
+  );
 
   const fundTx = new Transaction().add(
     SystemProgram.transfer({
@@ -72,10 +79,12 @@ async function main(): Promise<void> {
       fromPubkey: payer.publicKey,
       toPubkey: newPauseAuthority.publicKey,
       lamports: 0.01 * LAMPORTS_PER_SOL,
-    }),
+    })
   );
   await sendAndConfirmTransaction(connection, fundTx, [payer]);
-  console.log(`Funded pause authority + new pause authority (0.01 SOL each from payer)`);
+  console.log(
+    `Funded pause authority + new pause authority (0.01 SOL each from payer)`
+  );
 
   // Create a fresh SPL mint (same manual InitializeMint pattern as devnet_demo.ts).
   const mintKp = Keypair.generate();
@@ -98,10 +107,14 @@ async function main(): Promise<void> {
       programId: TOKEN_PROGRAM_ID,
       keys: [
         { pubkey: mintKp.publicKey, isSigner: false, isWritable: true },
-        { pubkey: new PublicKey("SysvarRent111111111111111111111111111111111"), isSigner: false, isWritable: false },
+        {
+          pubkey: new PublicKey("SysvarRent111111111111111111111111111111111"),
+          isSigner: false,
+          isWritable: false,
+        },
       ],
       data: initMintData,
-    },
+    }
   );
   await sendAndConfirmTransaction(connection, createMintTx, [payer, mintKp]);
   const mintPk = mintKp.publicKey;
@@ -144,31 +157,40 @@ async function main(): Promise<void> {
   // ---------------------------------------------------------------------------
 
   const client = new VaultClient(connection, mintPk);
-  console.log(`\nVault state PDA:     ${client.vaultStatePda.address.toBase58()}`);
-  console.log(`Vault authority PDA: ${client.vaultAuthorityPda.address.toBase58()}`);
+  console.log(
+    `\nVault state PDA:     ${client.vaultStatePda.address.toBase58()}`
+  );
+  console.log(
+    `Vault authority PDA: ${client.vaultAuthorityPda.address.toBase58()}`
+  );
 
   try {
     const initSig = await client.sendAndConfirm(
       [client.buildInitializeIx(payer.publicKey, pauseAuthority.publicKey)],
-      [payer, pauseAuthority],
+      [payer, pauseAuthority]
     );
     console.log(`\n[1/7] initialize\n  ${explorerUrl(initSig)}`);
 
     const depositSig = await client.sendAndConfirm(
       [client.buildDepositIx(payer.publicKey, 1_000_000_000n)],
-      [payer],
+      [payer]
     );
     console.log(`\n[2/7] deposit 1 000 tokens\n  ${explorerUrl(depositSig)}`);
 
     const withdrawSig = await client.sendAndConfirm(
       [client.buildWithdrawIx(payer.publicKey, 500_000_000n)],
-      [payer],
+      [payer]
     );
     console.log(`\n[3/7] withdraw 500 shares\n  ${explorerUrl(withdrawSig)}`);
 
     const pauseSig = await client.sendAndConfirm(
-      [client.buildPauseIx(pauseAuthority.publicKey)],
-      [pauseAuthority],
+      [
+        client.buildPauseIx(
+          pauseAuthority.publicKey,
+          OperationalStateReason.IncidentResponse
+        ),
+      ],
+      [pauseAuthority]
     );
     console.log(`\n[4/7] pause\n  ${explorerUrl(pauseSig)}`);
 
@@ -178,29 +200,45 @@ async function main(): Promise<void> {
     // is unpaused using the NEW authority. The old authority no longer has
     // pause power at all after this point.
     const proposeSig = await client.sendAndConfirm(
-      [client.buildProposePauseAuthorityIx(pauseAuthority.publicKey, newPauseAuthority.publicKey)],
-      [pauseAuthority],
+      [
+        client.buildProposePauseAuthorityIx(
+          pauseAuthority.publicKey,
+          newPauseAuthority.publicKey
+        ),
+      ],
+      [pauseAuthority]
     );
-    console.log(`\n[5/7] propose_pause_authority -> ${newPauseAuthority.publicKey.toBase58()}\n  ${explorerUrl(proposeSig)}`);
+    console.log(
+      `\n[5/7] propose_pause_authority -> ${newPauseAuthority.publicKey.toBase58()}\n  ${explorerUrl(
+        proposeSig
+      )}`
+    );
 
     const acceptSig = await client.sendAndConfirm(
       [client.buildAcceptPauseAuthorityIx(newPauseAuthority.publicKey)],
-      [newPauseAuthority],
+      [newPauseAuthority]
     );
     console.log(`\n[6/7] accept_pause_authority\n  ${explorerUrl(acceptSig)}`);
 
     const unpauseSig = await client.sendAndConfirm(
-      [client.buildUnpauseIx(newPauseAuthority.publicKey)],
-      [newPauseAuthority],
+      [
+        client.buildUnpauseIx(
+          newPauseAuthority.publicKey,
+          OperationalStateReason.IncidentResolved
+        ),
+      ],
+      [newPauseAuthority]
     );
-    console.log(`\n[7/7] unpause (with the NEW authority)\n  ${explorerUrl(unpauseSig)}`);
+    console.log(
+      `\n[7/7] unpause (with the NEW authority)\n  ${explorerUrl(unpauseSig)}`
+    );
 
     const vaultState = await client.fetchVaultState();
     console.log(`\nFinal vault state:`, vaultState);
     console.log(
       `\nRotation confirmed: vaultState.pauseAuthority is now the new authority ` +
         `(${vaultState?.pauseAuthority.toBase58()}), pendingPauseAuthority cleared ` +
-        `(${vaultState?.pendingPauseAuthority.toBase58()}).`,
+        `(${vaultState?.pendingPauseAuthority.toBase58()}).`
     );
 
     console.log(`\n✓ All seven instructions confirmed on devnet via the SDK.`);

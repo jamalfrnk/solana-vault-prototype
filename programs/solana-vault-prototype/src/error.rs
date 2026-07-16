@@ -40,4 +40,6 @@ pub enum VaultError {
     InvalidVaultBump,
     #[msg("Stored vault-authority bump is not canonical")]
     InvalidAuthorityBump,
+    #[msg("The pause authority cannot perform this operational-state transition")]
+    InvalidOperationalStateTransition,
 }

@@ -20,6 +20,7 @@ export enum VaultErrorCode {
   InvalidVaultStatePda = 6015,
   InvalidVaultBump = 6016,
   InvalidAuthorityBump = 6017,
+  InvalidOperationalStateTransition = 6018,
 }
 
 export interface ParsedVaultError {

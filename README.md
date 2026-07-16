@@ -78,8 +78,8 @@ A single vault custodies one SPL token mint:
 - [x] `initialize` — create the vault state PDA and custody ATA bound to one mint.
 - [x] `deposit` — transfer tokens into custody and credit shares.
 - [x] `withdraw` — redeem shares and transfer tokens out via PDA-signed CPI.
-- [x] `pause` / `unpause` — set `ExitOnly` / `Active` under an explicit authority;
-  both deposits and withdrawals still require `Active` until the next milestone.
+- [x] `pause` / `unpause` — set `ExitOnly` / `Active` under an explicit authority and
+  bounded reason; exit-only blocks deposits while preserving valid withdrawals.
 - [x] `propose_pause_authority` / `accept_pause_authority` — two-step authority rotation.
 - [x] `migrate_v0_to_v1` — permissionless, deterministic migration of compatible
   145-byte version-0 VaultState accounts; it never resizes 113-byte accounts.
@@ -119,10 +119,10 @@ account decoders, and Anchor error parsing — with **no runtime dependency on
 `target/idl/*.json`**. Every Anchor discriminator is computed directly via
 `sha256("global:<name>")` / `sha256("account:<Name>")`, matching Anchor's own
 codegen, which makes the SDK fully testable without the Anchor CLI installed. Since
-M19, discriminator matches are verified on every CI run. M21 expands the same gate:
-CI runs `anchor build` and verifies all instruction/account discriminators, exact
-account field order and types, fixed serialized sizes, and `OperationalState` variants
-against the real generated IDL.
+M19, discriminator matches are verified on every CI run. M21/M22 expand the same gate:
+CI runs `anchor build` and verifies all instruction discriminators and argument schemas,
+all account discriminators, exact account field order and types, fixed serialized
+sizes, and both operational-state enums against the real generated IDL.
 
 `sdk/` is now a versioned, buildable package (`solana-vault-prototype-sdk`, see
 `sdk/README.md`) — **not yet published to npm**. Until then, import it directly from
@@ -130,16 +130,20 @@ the repo as shown below.
 
 ```bash
 corepack yarn install
-corepack yarn test:sdk    # 68 tests, offline, no RPC, no compiled program
+corepack yarn test:sdk    # 73 tests, offline, no RPC, no compiled program
 corepack yarn typecheck
 corepack yarn sdk:build   # emits sdk/dist/*.js + *.d.ts
 ```
 
 ```ts
-import { VaultClient } from "./sdk/src";
+import { OperationalStateReason, VaultClient } from "./sdk/src";
 
 const client = new VaultClient(connection, mintPublicKey);
 const ix = client.buildDepositIx(userPublicKey, 1_000_000n);
+const pauseIx = client.buildPauseIx(
+  pauseAuthorityPublicKey,
+  OperationalStateReason.IncidentResponse,
+);
 const state = await client.fetchVaultState();
 ```
 

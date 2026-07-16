@@ -12,7 +12,7 @@ use {
     solana_transaction::versioned::VersionedTransaction,
     solana_vault_prototype::{
         constants::{VAULT_AUTHORITY_SEED, VAULT_SEED},
-        state::{OperationalState, VaultState},
+        state::{OperationalState, OperationalStateReason, VaultState},
     },
 };
 
@@ -132,7 +132,10 @@ fn make_initialize_ix(
 fn make_pause_ix(pause_authority: Pubkey, vault_state: Pubkey) -> Instruction {
     Instruction::new_with_bytes(
         program_id(),
-        &solana_vault_prototype::instruction::Pause {}.data(),
+        &solana_vault_prototype::instruction::Pause {
+            reason: OperationalStateReason::IncidentResponse,
+        }
+        .data(),
         solana_vault_prototype::accounts::Pause {
             pause_authority,
             vault_state,
@@ -144,7 +147,10 @@ fn make_pause_ix(pause_authority: Pubkey, vault_state: Pubkey) -> Instruction {
 fn make_unpause_ix(pause_authority: Pubkey, vault_state: Pubkey) -> Instruction {
     Instruction::new_with_bytes(
         program_id(),
-        &solana_vault_prototype::instruction::Unpause {}.data(),
+        &solana_vault_prototype::instruction::Unpause {
+            reason: OperationalStateReason::IncidentResolved,
+        }
+        .data(),
         solana_vault_prototype::accounts::Unpause {
             pause_authority,
             vault_state,
@@ -281,6 +287,31 @@ fn test_pause_idempotent() {
     assert_eq!(vs.operational_state, OperationalState::ExitOnly);
 }
 
+/// Unpausing an already-Active vault is also idempotent and observable.
+#[test]
+fn test_unpause_idempotent() {
+    let mut f = VaultFixture::new();
+    let pa_pk = keypair_pubkey(&f.pause_authority);
+
+    send_ok(
+        &mut f.svm,
+        &[make_unpause_ix(pa_pk, f.vault_state_pda)],
+        &[&f.payer, &f.pause_authority],
+        &f.payer,
+    );
+    f.svm.expire_blockhash();
+    send_ok(
+        &mut f.svm,
+        &[make_unpause_ix(pa_pk, f.vault_state_pda)],
+        &[&f.payer, &f.pause_authority],
+        &f.payer,
+    );
+
+    let acct = f.svm.get_account(&f.vault_state_pda).unwrap();
+    let vs = VaultState::try_deserialize(&mut acct.data.as_slice()).unwrap();
+    assert_eq!(vs.operational_state, OperationalState::Active);
+}
+
 /// Wrong pause_authority must fail.
 #[test]
 fn test_pause_wrong_authority_fails() {
@@ -324,4 +355,76 @@ fn test_unpause_wrong_authority_fails() {
         f.svm.send_transaction(tx).is_err(),
         "wrong authority must be rejected for unpause"
     );
+}
+
+/// The ordinary pause authority cannot downgrade or clear FullyPaused. That
+/// state remains under the stronger ProtocolConfig authority introduced next.
+#[test]
+fn test_pause_authority_cannot_change_fully_paused() {
+    let mut f = VaultFixture::new();
+    let pa_pk = keypair_pubkey(&f.pause_authority);
+    let payer_pk = keypair_pubkey(&f.payer);
+
+    let mut account = f.svm.get_account(&f.vault_state_pda).unwrap();
+    account.data[90] = OperationalState::FullyPaused as u8;
+    f.svm.set_account(f.vault_state_pda, account).unwrap();
+
+    for ix in [
+        make_pause_ix(pa_pk, f.vault_state_pda),
+        make_unpause_ix(pa_pk, f.vault_state_pda),
+    ] {
+        let blockhash = f.svm.latest_blockhash();
+        let msg = Message::new_with_blockhash(&[ix], Some(&payer_pk), &blockhash);
+        let tx = VersionedTransaction::try_new(
+            VersionedMessage::Legacy(msg),
+            &[&f.payer, &f.pause_authority],
+        )
+        .unwrap();
+        assert!(
+            f.svm.send_transaction(tx).is_err(),
+            "ordinary pause authority must not change FullyPaused"
+        );
+    }
+
+    let account = f.svm.get_account(&f.vault_state_pda).unwrap();
+    let vault_state = VaultState::try_deserialize(&mut account.data.as_slice()).unwrap();
+    assert_eq!(vault_state.operational_state, OperationalState::FullyPaused);
+}
+
+/// Borsh enum decoding rejects unbounded reason codes before state mutation.
+#[test]
+fn test_pause_rejects_unknown_reason_code() {
+    let mut f = VaultFixture::new();
+    let pa_pk = keypair_pubkey(&f.pause_authority);
+    let payer_pk = keypair_pubkey(&f.payer);
+    let mut data = solana_vault_prototype::instruction::Pause {
+        reason: OperationalStateReason::IncidentResponse,
+    }
+    .data();
+    data[8] = 4;
+    let ix = Instruction::new_with_bytes(
+        program_id(),
+        &data,
+        solana_vault_prototype::accounts::Pause {
+            pause_authority: pa_pk,
+            vault_state: f.vault_state_pda,
+        }
+        .to_account_metas(None),
+    );
+
+    let blockhash = f.svm.latest_blockhash();
+    let msg = Message::new_with_blockhash(&[ix], Some(&payer_pk), &blockhash);
+    let tx = VersionedTransaction::try_new(
+        VersionedMessage::Legacy(msg),
+        &[&f.payer, &f.pause_authority],
+    )
+    .unwrap();
+    assert!(
+        f.svm.send_transaction(tx).is_err(),
+        "unknown reason codes must fail closed"
+    );
+
+    let account = f.svm.get_account(&f.vault_state_pda).unwrap();
+    let vault_state = VaultState::try_deserialize(&mut account.data.as_slice()).unwrap();
+    assert_eq!(vault_state.operational_state, OperationalState::Active);
 }

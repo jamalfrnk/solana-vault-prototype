@@ -13,6 +13,8 @@ const RING_RIVET_ANGLES = Array.from({ length: 12 }, (_, i) => i * 30);
 const WHEEL_ROD_ANGLES = [0, 45, 90, 135];
 
 /** Frame-edge rivets: percentage positions along the door's square border. */
+import { OperationalState } from "@vault-sdk";
+
 const EDGE_RIVETS: Array<{ top: string; left: string }> = [
   // top edge
   { top: "2.5%", left: "14%" },
@@ -34,7 +36,11 @@ const EDGE_RIVETS: Array<{ top: string; left: string }> = [
   { top: "74%", left: "94.5%" },
 ];
 
-export function VaultDoor({ isPaused }: { isPaused: boolean }) {
+export function VaultDoor({
+  operationalState,
+}: {
+  operationalState: OperationalState;
+}) {
   return (
     <div className="vault-door" data-testid="vault-door">
       {EDGE_RIVETS.map((pos, i) => (
@@ -51,7 +57,10 @@ export function VaultDoor({ isPaused }: { isPaused: boolean }) {
         ))}
 
         <div className="vault-door-disc">
-          <span className="vault-led" data-paused={isPaused ? "true" : "false"} />
+          <span
+            className="vault-led"
+            data-operational-state={OperationalState[operationalState]}
+          />
 
           <div className="vault-dial" data-testid="vault-dial">
             <div className="vault-dial-face">

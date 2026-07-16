@@ -1,3 +1,4 @@
+import { OperationalState, operationalStateLabel } from "@vault-sdk";
 import { formatTokenAmount } from "../../lib/solana/amounts";
 
 /**
@@ -8,12 +9,12 @@ import { formatTokenAmount } from "../../lib/solana/amounts";
 export function VaultStatusPanel({
   totalAssets,
   totalShares,
-  isPaused,
+  operationalState,
   decimals,
 }: {
   totalAssets: bigint;
   totalShares: bigint;
-  isPaused: boolean;
+  operationalState: OperationalState;
   decimals: number;
 }) {
   return (
@@ -24,7 +25,15 @@ export function VaultStatusPanel({
         <dt>Total shares</dt>
         <dd>{formatTokenAmount(totalShares, decimals)}</dd>
         <dt>Status</dt>
-        <dd>{isPaused ? "Paused" : "Active"}</dd>
+        <dd>{operationalStateLabel(operationalState)}</dd>
+        <dt>Availability</dt>
+        <dd>
+          {operationalState === OperationalState.Active
+            ? "Deposits and withdrawals enabled"
+            : operationalState === OperationalState.ExitOnly
+            ? "Deposits disabled; withdrawals enabled"
+            : "Deposits and withdrawals disabled"}
+        </dd>
       </dl>
     </div>
   );

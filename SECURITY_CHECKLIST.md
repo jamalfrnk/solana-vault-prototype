@@ -196,20 +196,22 @@ can it be timed to shift share price around a pending deposit or withdrawal. Pro
       price.
       — M12: `test_direct_donation_does_not_skew_second_depositor_share_price`.
 
-## Events (M12/M18/M21)
+## Events (M12/M18/M21/M22)
 
-`VaultInitialized`, `Deposited`, `Withdrawn`, `Paused`, `Unpaused` are emitted at the end
-of each handler, after all state mutation, so they reflect final post-instruction state.
-M18 adds proposal/rotation events; M21 adds `VaultStateMigrated` with old/new version
-and the deterministic operational state.
+`VaultInitialized`, `Deposited`, and `Withdrawn` are emitted at the end of their handlers,
+after all state mutation. M18 adds proposal/rotation events; M21 adds
+`VaultStateMigrated`; M22 replaces the former `Paused`/`Unpaused` pair with one
+`OperationalStateChanged` event carrying old/new state, signer, slot, Unix timestamp,
+and bounded reason evidence.
 Events are informational only — intended for off-chain indexing and monitoring. They are
 **not** a security boundary: no instruction's correctness depends on an event being
 observed, and emitting an event grants no authority.
 
 - [x] Each instruction emits its corresponding event.
       — M12: `test_initialize_emits_vault_initialized_log`, `test_deposit_emits_deposited_log`,
-        `test_withdraw_emits_withdrawn_log`, `test_pause_emits_paused_log`,
-        `test_unpause_emits_unpaused_log`.
+        `test_withdraw_emits_withdrawn_log`; M22:
+        `test_pause_emits_operational_state_changed_log`,
+        `test_unpause_emits_operational_state_changed_log`.
 - [x] Rotation and migration success paths emit evidence without using events as an
       authorization boundary.
       — M18: `test_rotation_events_emitted`; M21:
@@ -355,12 +357,12 @@ multisig PDA using the same M16 sigverify-off `invoke_signed` analog.
 - [x] Both instructions emit their events (`PauseAuthorityProposed`, `PauseAuthorityRotated`).
       — M18: `test_rotation_events_emitted`.
 
-## Pre-audit production target (M20 accepted; M21 versioning slice implemented)
+## Pre-audit production target (M20 accepted; M21 versioning and M22 exit-first slices implemented)
 
 ADRs 0003–0009 define the reviewed target before further program work. They adapt
 OWASP SCSVS architecture, governance, authorization, external-interaction, business-
-logic, and denial-of-service principles to this Solana program. Checked M21 items below
-are implemented and tested; every unchecked item remains a launch blocker.
+logic, and denial-of-service principles to this Solana program. Checked M21/M22 items
+below are implemented and tested; every unchecked item remains a launch blocker.
 
 ### Threat boundaries and roles
 
@@ -374,10 +376,13 @@ are implemented and tested; every unchecked item remains a launch blocker.
 ### Pause and availability
 
 - [ ] `operational_state` implements the complete exit-first behavior and authority
-      matrix from ADR 0004. M21 encodes `Active`, `ExitOnly`, and `FullyPaused`, but
-      deliberately preserves the old behavior: deposit and withdrawal both require
-      `Active`. Exit-first behavior remains the next separate milestone.
-- [ ] Ordinary incident response blocks new deposits while preserving valid user exits.
+      matrix from ADR 0004. M22 implements the deposit/withdraw gates, ordinary
+      `Active`/`ExitOnly` transitions, and fail-closed `FullyPaused` behavior; the
+      stronger `ProtocolConfig` emergency-authority transition path remains pending.
+- [x] Ordinary incident response blocks new deposits while preserving valid user exits.
+- [x] The ordinary pause authority cannot enter, clear, or downgrade `FullyPaused`.
+- [x] Successful ordinary transitions emit bounded old/new state, signer, slot,
+      Unix timestamp, and reason evidence; invalid reason/state enum values fail closed.
 - [ ] Only the stronger emergency authority can block withdrawals, and cap/mint controls
       never restrict exits.
 
@@ -395,8 +400,9 @@ are implemented and tested; every unchecked item remains a launch blocker.
       reconciled with transaction evidence, recorded, and retired before persistent
       deployment.
 - [x] The SDK rejects 113-byte, v0, unsupported-version, invalid-enum, nonzero-reserved,
-      and incorrectly sized layouts. CI verifies all instruction/account discriminators,
-      exact account field order/types/sizes, and the `OperationalState` enum.
+      and incorrectly sized layouts. CI verifies all instruction interfaces and account
+      discriminators, exact account field order/types/sizes, and both operational-state
+      enums.
 
 ### Versioning and migration security (M21)
 

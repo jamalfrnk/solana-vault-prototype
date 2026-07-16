@@ -11,10 +11,18 @@ vi.mock("@solana/wallet-adapter-react", () => ({
 }));
 
 import { AdminPausePanel } from "../components/AdminPausePanel";
-import type { VaultClient } from "../../sdk/src";
+import {
+  OperationalState,
+  OperationalStateReason,
+  type VaultClient,
+} from "../../sdk/src";
 
-const buildPauseIxMock = vi.fn().mockReturnValue({ keys: [], programId: {}, data: {} });
-const buildUnpauseIxMock = vi.fn().mockReturnValue({ keys: [], programId: {}, data: {} });
+const buildPauseIxMock = vi
+  .fn()
+  .mockReturnValue({ keys: [], programId: {}, data: {} });
+const buildUnpauseIxMock = vi
+  .fn()
+  .mockReturnValue({ keys: [], programId: {}, data: {} });
 const fakeVaultClient = {
   buildPauseIx: buildPauseIxMock,
   buildUnpauseIx: buildUnpauseIxMock,
@@ -50,8 +58,8 @@ describe("AdminPausePanel", () => {
       <AdminPausePanel
         vaultClient={fakeVaultClient}
         pauseAuthority={pauseAuthority}
-        isPaused={false}
-      />,
+        operationalState={OperationalState.Active}
+      />
     );
     expect(container.textContent).to.equal("");
   });
@@ -66,8 +74,8 @@ describe("AdminPausePanel", () => {
       <AdminPausePanel
         vaultClient={fakeVaultClient}
         pauseAuthority={pauseAuthority}
-        isPaused={false}
-      />,
+        operationalState={OperationalState.Active}
+      />
     );
     expect(container.textContent).to.equal("");
   });
@@ -82,13 +90,13 @@ describe("AdminPausePanel", () => {
       <AdminPausePanel
         vaultClient={fakeVaultClient}
         pauseAuthority={pauseAuthority}
-        isPaused={false}
-      />,
+        operationalState={OperationalState.Active}
+      />
     );
     expect(screen.getByRole("button", { name: /^pause$/i })).to.exist;
   });
 
-  it("renders an unpause button when paused", () => {
+  it("renders an unpause button in exit-only mode", () => {
     useWalletMock.mockReturnValue({
       connected: true,
       publicKey: pauseAuthority,
@@ -98,10 +106,29 @@ describe("AdminPausePanel", () => {
       <AdminPausePanel
         vaultClient={fakeVaultClient}
         pauseAuthority={pauseAuthority}
-        isPaused={true}
-      />,
+        operationalState={OperationalState.ExitOnly}
+      />
     );
     expect(screen.getByRole("button", { name: /unpause/i })).to.exist;
+  });
+
+  it("does not offer an ordinary-authority transition when fully paused", () => {
+    useWalletMock.mockReturnValue({
+      connected: true,
+      publicKey: pauseAuthority,
+      sendTransaction: sendTransactionMock,
+    });
+    render(
+      <AdminPausePanel
+        vaultClient={fakeVaultClient}
+        pauseAuthority={pauseAuthority}
+        operationalState={OperationalState.FullyPaused}
+      />
+    );
+    expect(screen.queryByRole("button")).to.equal(null);
+    expect(
+      screen.getByText(/ordinary pause authority cannot change this state/i)
+    ).to.exist;
   });
 
   it("pauses: confirms on-chain, then refreshes authoritative state", async () => {
@@ -116,16 +143,19 @@ describe("AdminPausePanel", () => {
       <AdminPausePanel
         vaultClient={fakeVaultClient}
         pauseAuthority={pauseAuthority}
-        isPaused={false}
+        operationalState={OperationalState.Active}
         onConfirmed={onConfirmed}
-      />,
+      />
     );
     fireEvent.click(screen.getByRole("button", { name: /^pause$/i }));
 
     await waitFor(() => {
       expect(screen.getByText(/pause confirmed/i)).to.exist;
     });
-    expect(buildPauseIxMock).toHaveBeenCalledWith(pauseAuthority);
+    expect(buildPauseIxMock).toHaveBeenCalledWith(
+      pauseAuthority,
+      OperationalStateReason.IncidentResponse
+    );
     expect(onConfirmed).toHaveBeenCalledTimes(1);
   });
 
@@ -141,16 +171,19 @@ describe("AdminPausePanel", () => {
       <AdminPausePanel
         vaultClient={fakeVaultClient}
         pauseAuthority={pauseAuthority}
-        isPaused={true}
+        operationalState={OperationalState.ExitOnly}
         onConfirmed={onConfirmed}
-      />,
+      />
     );
     fireEvent.click(screen.getByRole("button", { name: /unpause/i }));
 
     await waitFor(() => {
       expect(screen.getByText(/unpause confirmed/i)).to.exist;
     });
-    expect(buildUnpauseIxMock).toHaveBeenCalledWith(pauseAuthority);
+    expect(buildUnpauseIxMock).toHaveBeenCalledWith(
+      pauseAuthority,
+      OperationalStateReason.IncidentResolved
+    );
     expect(onConfirmed).toHaveBeenCalledTimes(1);
     expect(screen.getByRole("link", { name: /explorer/i }))
       .to.have.property("href")
@@ -165,14 +198,14 @@ describe("AdminPausePanel", () => {
     });
     let resolveSend: (sig: string) => void = () => {};
     sendTransactionMock.mockImplementation(
-      () => new Promise<string>((resolve) => (resolveSend = resolve)),
+      () => new Promise<string>((resolve) => (resolveSend = resolve))
     );
     render(
       <AdminPausePanel
         vaultClient={fakeVaultClient}
         pauseAuthority={pauseAuthority}
-        isPaused={false}
-      />,
+        operationalState={OperationalState.Active}
+      />
     );
     const button = screen.getByRole("button", { name: /^pause$/i });
     fireEvent.click(button);

@@ -26,6 +26,7 @@ import {
 } from "../src/instructions";
 import { VaultClient } from "../src/client";
 import { Connection } from "@solana/web3.js";
+import { OperationalStateReason } from "../src/accounts";
 
 function randomPubkey(): PublicKey {
   return Keypair.generate().publicKey;
@@ -168,26 +169,48 @@ describe("instructions", () => {
     const mint = randomPubkey();
     const vaultState = deriveVaultStatePda(mint);
 
-    it("pause: 2-account order, data is discriminator only", () => {
-      const ix = buildPauseIx({ pauseAuthority, mint });
+    it("pause: 2-account order, data is discriminator + bounded reason", () => {
+      const ix = buildPauseIx({
+        pauseAuthority,
+        mint,
+        reason: OperationalStateReason.IncidentResponse,
+      });
       assertKeys(ix.keys, [
         { pubkey: pauseAuthority, isSigner: true, isWritable: false },
         { pubkey: vaultState.address, isSigner: false, isWritable: true },
       ]);
-      expect(ix.data.toString("hex")).to.equal(
+      expect(ix.data.subarray(0, 8).toString("hex")).to.equal(
         instructionDiscriminator("pause").toString("hex")
       );
+      expect(ix.data).to.have.lengthOf(9);
+      expect(ix.data[8]).to.equal(OperationalStateReason.IncidentResponse);
     });
 
-    it("unpause: 2-account order, data is discriminator only", () => {
-      const ix = buildUnpauseIx({ pauseAuthority, mint });
+    it("unpause: 2-account order, data is discriminator + bounded reason", () => {
+      const ix = buildUnpauseIx({
+        pauseAuthority,
+        mint,
+        reason: OperationalStateReason.IncidentResolved,
+      });
       assertKeys(ix.keys, [
         { pubkey: pauseAuthority, isSigner: true, isWritable: false },
         { pubkey: vaultState.address, isSigner: false, isWritable: true },
       ]);
-      expect(ix.data.toString("hex")).to.equal(
+      expect(ix.data.subarray(0, 8).toString("hex")).to.equal(
         instructionDiscriminator("unpause").toString("hex")
       );
+      expect(ix.data).to.have.lengthOf(9);
+      expect(ix.data[8]).to.equal(OperationalStateReason.IncidentResolved);
+    });
+
+    it("rejects an out-of-range reason before wallet interaction", () => {
+      expect(() =>
+        buildPauseIx({
+          pauseAuthority,
+          mint,
+          reason: 4 as OperationalStateReason,
+        })
+      ).to.throw(/reason code 4/i);
     });
   });
 
@@ -329,8 +352,16 @@ describe("instructions", () => {
       buildInitializeIx({ payer, pauseAuthority, mint }),
       buildDepositIx({ user, mint, amount: 1n }),
       buildWithdrawIx({ user, mint, sharesIn: 1n }),
-      buildPauseIx({ pauseAuthority, mint }),
-      buildUnpauseIx({ pauseAuthority, mint }),
+      buildPauseIx({
+        pauseAuthority,
+        mint,
+        reason: OperationalStateReason.IncidentResponse,
+      }),
+      buildUnpauseIx({
+        pauseAuthority,
+        mint,
+        reason: OperationalStateReason.IncidentResolved,
+      }),
       buildProposePauseAuthorityIx({
         pauseAuthority,
         mint,

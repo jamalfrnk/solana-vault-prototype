@@ -163,7 +163,7 @@ jobs:
         run: npm --prefix app audit --audit-level=high
 
   idl-verify:
-    name: IDL discriminator + account layout verification (M21)
+    name: IDL instruction + account layout verification (M22)
     runs-on: ubuntu-latest
     needs: build-and-test
     steps:
@@ -186,7 +186,8 @@ jobs:
           path: target/idl
 
       # The SDK has no runtime IDL dependency (by design — see M13). This checks
-      # its hand-derived discriminators plus the exact account field order/types,
-      # fixed sizes, and enum variants against the real IDL emitted above.
-      - name: Verify discriminators and account layouts match the generated IDL
+      # its hand-derived discriminators and instruction arguments plus the exact
+      # account field order/types, fixed sizes, and enum variants against the real
+      # IDL emitted above.
+      - name: Verify instruction interfaces and account layouts match the generated IDL
         run: npx ts-node scripts/verify_idl_discriminators.ts

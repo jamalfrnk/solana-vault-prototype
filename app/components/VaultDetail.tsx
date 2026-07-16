@@ -96,7 +96,9 @@ export function VaultDetail({ mintInput }: { mintInput: string }) {
 
   const { stage, openVault } = useVaultAnimation();
   const { play: playChaChing, muted, toggleMuted } = useSoundEffect();
-  const [pendingCelebration, setPendingCelebration] = useState<string | null>(null);
+  const [pendingCelebration, setPendingCelebration] = useState<string | null>(
+    null
+  );
   const [confettiBurst, setConfettiBurst] = useState<string | null>(null);
   const celebratedSignatures = useRef<Set<string>>(new Set());
 
@@ -112,7 +114,7 @@ export function VaultDetail({ mintInput }: { mintInput: string }) {
       setPendingCelebration(signature);
       openVault();
     },
-    [refresh, openVault],
+    [refresh, openVault]
   );
 
   /** Sound + confetti fire at the reveal — the moment the door is open. */
@@ -135,8 +137,9 @@ export function VaultDetail({ mintInput }: { mintInput: string }) {
   if (loadState === "error") {
     return (
       <p role="alert">
-        Failed to load vault state: {loadError}. This can happen if the vault was
-        initialized under an older, incompatible program version — see RUNBOOK.md.
+        Failed to load vault state: {loadError}. This can happen if the vault
+        was initialized under an older, incompatible program version — see
+        RUNBOOK.md.
       </p>
     );
   }
@@ -157,7 +160,7 @@ export function VaultDetail({ mintInput }: { mintInput: string }) {
           <div className="vault-celebration-wrap">
             <InteractiveVault
               totalAssets={vaultState.totalAssets}
-              isPaused={vaultState.isPaused}
+              operationalState={vaultState.operationalState}
               decimals={displayDecimals}
               stage={stage}
             />
@@ -166,37 +169,40 @@ export function VaultDetail({ mintInput }: { mintInput: string }) {
           <VaultStatusPanel
             totalAssets={vaultState.totalAssets}
             totalShares={vaultState.totalShares}
-            isPaused={vaultState.isPaused}
+            operationalState={vaultState.operationalState}
             decimals={displayDecimals}
           />
         </div>
         <div className="vault-dashboard-side">
           {!connected && (
-            <p className="panel">Connect your wallet to deposit, withdraw, or view your shares.</p>
+            <p className="panel">
+              Connect your wallet to deposit, withdraw, or view your shares.
+            </p>
           )}
           <div className="panel">
             <h3>Your position</h3>
             <UserSharesDisplay
-              shares={connected ? (userPosition?.shares ?? 0n) : null}
+              shares={connected ? userPosition?.shares ?? 0n : null}
               decimals={displayDecimals}
             />
           </div>
           <DepositForm
             vaultClient={vaultClient!}
-            isPaused={vaultState.isPaused}
+            operationalState={vaultState.operationalState}
             decimals={displayDecimals}
             onConfirmed={celebrateConfirmed}
           />
           <WithdrawForm
             vaultClient={vaultClient!}
             userShares={userPosition?.shares ?? 0n}
+            operationalState={vaultState.operationalState}
             decimals={displayDecimals}
             onConfirmed={celebrateConfirmed}
           />
           <AdminPausePanel
             vaultClient={vaultClient!}
             pauseAuthority={vaultState.pauseAuthority}
-            isPaused={vaultState.isPaused}
+            operationalState={vaultState.operationalState}
             onConfirmed={refresh}
           />
           <button type="button" onClick={toggleMuted} aria-pressed={muted}>

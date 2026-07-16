@@ -17,11 +17,33 @@ const instructionNames = [
   "migrate_v0_to_v1",
 ];
 
+const instructionArgs: Record<string, { name: string; type: unknown }[]> = {
+  initialize: [],
+  deposit: [{ name: "amount", type: "u64" }],
+  withdraw: [{ name: "shares_in", type: "u64" }],
+  pause: [
+    {
+      name: "reason",
+      type: { defined: { name: "OperationalStateReason" } },
+    },
+  ],
+  unpause: [
+    {
+      name: "reason",
+      type: { defined: { name: "OperationalStateReason" } },
+    },
+  ],
+  propose_pause_authority: [{ name: "new_authority", type: "pubkey" }],
+  accept_pause_authority: [],
+  migrate_v0_to_v1: [],
+};
+
 function validIdl(): Record<string, unknown> {
   return {
     instructions: instructionNames.map((name) => ({
       name,
       discriminator: Array.from(instructionDiscriminator(name)),
+      args: instructionArgs[name],
     })),
     accounts: ["VaultState", "UserPosition"].map((name) => ({
       name,
@@ -36,6 +58,18 @@ function validIdl(): Record<string, unknown> {
             { name: "Active" },
             { name: "ExitOnly" },
             { name: "FullyPaused" },
+          ],
+        },
+      },
+      {
+        name: "OperationalStateReason",
+        type: {
+          kind: "enum",
+          variants: [
+            { name: "IncidentResponse" },
+            { name: "ExposureReduction" },
+            { name: "IncidentResolved" },
+            { name: "GovernanceAction" },
           ],
         },
       },
@@ -106,6 +140,33 @@ describe("full IDL account-layout verification", () => {
     ).type.variants[1].name = "Paused";
     expect(verifyIdlDocument(idl).join("\n")).to.match(
       /OperationalState.*variant.*1/i
+    );
+  });
+
+  it("rejects a missing pause reason argument", () => {
+    const idl = validIdl() as any;
+    idl.instructions.find((entry: any) => entry.name === "pause").args = [];
+    expect(verifyIdlDocument(idl).join("\n")).to.match(
+      /instruction pause.*expected 1 args/i
+    );
+  });
+
+  it("rejects an absent args schema even for a no-argument instruction", () => {
+    const idl = validIdl() as any;
+    delete idl.instructions.find((entry: any) => entry.name === "initialize")
+      .args;
+    expect(verifyIdlDocument(idl).join("\n")).to.match(
+      /instruction initialize.*args missing/i
+    );
+  });
+
+  it("rejects a changed OperationalStateReason enum definition", () => {
+    const idl = validIdl() as any;
+    idl.types.find(
+      (entry: any) => entry.name === "OperationalStateReason"
+    ).type.variants[2].name = "ManualOverride";
+    expect(verifyIdlDocument(idl).join("\n")).to.match(
+      /OperationalStateReason.*variant.*2/i
     );
   });
 });

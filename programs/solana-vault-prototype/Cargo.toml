@@ -32,6 +32,8 @@ solana-signer = "3.0.0"
 solana-keypair = "3.0.1"
 solana-account = "3.4.0"
 solana-pubkey = { version = "4.0.0", features = ["curve25519"] }
+solana-clock = "3.0.0"
+base64 = "0.22.1"
 
 
 [lints.rust]

@@ -3,15 +3,35 @@ use anchor_lang::prelude::*;
 pub const VAULT_STATE_VERSION_V0: u8 = 0;
 pub const VAULT_STATE_VERSION_V1: u8 = 1;
 
-/// M21 assigns the accepted wire values without yet activating ADR 0004's
-/// exit-first authority/transition behavior. Borsh encodes these unit variants
-/// as their zero-based one-byte indexes, exactly matching the legacy bool byte.
+/// Borsh encodes these unit variants as their zero-based one-byte indexes,
+/// exactly matching the legacy bool byte for Active (0) and ExitOnly (1).
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug, Eq, InitSpace, PartialEq)]
 #[repr(u8)]
 pub enum OperationalState {
     Active,
     ExitOnly,
     FullyPaused,
+}
+
+impl OperationalState {
+    pub const fn allows_deposits(self) -> bool {
+        matches!(self, Self::Active)
+    }
+
+    pub const fn allows_withdrawals(self) -> bool {
+        matches!(self, Self::Active | Self::ExitOnly)
+    }
+}
+
+/// Bounded machine-readable evidence for an Active/ExitOnly transition.
+/// Arbitrary incident narratives stay in the off-chain incident record.
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug, Eq, InitSpace, PartialEq)]
+#[repr(u8)]
+pub enum OperationalStateReason {
+    IncidentResponse,
+    ExposureReduction,
+    IncidentResolved,
+    GovernanceAction,
 }
 
 #[account]

@@ -139,7 +139,8 @@ path, and the seeds are auditable and stable.
 2. `user_position.vault == vault_state.key()` — no cross-vault position confusion
 3. `shares_in <= user_position.shares` — no over-withdrawal
 4. `version == 1` — legacy and unsupported account semantics fail closed
-5. `operational_state == Active` — M21 retains blocked withdrawals in `ExitOnly`
+5. `operational_state` is `Active` or `ExitOnly` — M22 preserves exits during the
+   default incident response and blocks them only in `FullyPaused`
 6. `user_token_account.mint == vault_state.mint` — no wrong destination mint
 7. `user_token_account.owner == user.key()` — tokens go to the correct wallet
 
@@ -148,8 +149,8 @@ path, and the seeds are auditable and stable.
 ## 6 — Pause / Unpause
 
 ```rust
-pub fn pause(ctx: Context<Pause>) -> Result<()>
-pub fn unpause(ctx: Context<Unpause>) -> Result<()>
+pub fn pause(ctx: Context<Pause>, reason: OperationalStateReason) -> Result<()>
+pub fn unpause(ctx: Context<Unpause>, reason: OperationalStateReason) -> Result<()>
 ```
 
 **Gate:** `pause_authority.key() == vault_state.pause_authority` — Anchor constraint,
@@ -157,12 +158,18 @@ evaluated on-chain. No separate "has_one" — implemented as an explicit `constr
 for clarity.
 
 **Idempotent:** Pausing an already-paused vault succeeds (no error). This is
-intentional — an emergency pause should never fail because of current state.
+intentional: repeated operator actions remain observable and do not fail merely because
+the intended ordinary state is already set.
 
-M21 represents pause as `OperationalState`: `pause` writes `ExitOnly`, `unpause`
-writes `Active`, and all ordinary instructions require account version 1. Deposits and
-withdrawals both still require `Active`; preserving exits in `ExitOnly` and adding the
-stronger `FullyPaused` authority path are intentionally deferred to the next milestone.
+M22 implements exit-first behavior: `pause` writes `ExitOnly`, which blocks deposits
+while preserving valid withdrawals; `unpause` returns to `Active`. `FullyPaused` blocks
+both paths, but the ordinary pause authority cannot alter it. The future versioned
+`ProtocolConfig` must supply the stronger authority for entering `FullyPaused` and
+recovering first to `ExitOnly`; M22 intentionally does not invent a temporary path.
+
+Each accepted pause/unpause carries one of four bounded reason codes and emits
+`OperationalStateChanged` with previous/new state, signing authority, Clock slot, Unix
+timestamp, and reason. Arbitrary incident text stays off-chain.
 
 ### Version migration
 
@@ -184,8 +191,8 @@ version 1. It never transfers tokens or reallocates an account.
 
 In-process Solana VM. Load the compiled `.so` via `include_bytes!`, airdrop SOL,
 inject SPL mint and token accounts via `svm.set_account()`, send transactions.
-No external validator. The current program suite contains 66 tests, including 10 raw-
-wire migration/version cases.
+No external validator. The current program suite contains 70 tests, including 10 raw-
+wire migration/version cases and explicit exit-first gate/transition/event coverage.
 
 ### SPL account injection
 
