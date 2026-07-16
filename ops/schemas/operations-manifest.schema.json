@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://solana-vault.invalid/schemas/operations-manifest-v1.json",
+  "title": "Solana Vault operations manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "environment",
+    "primaryRpc",
+    "fallbackRpc",
+    "monitoring",
+    "incidentResponse",
+    "approvalEvidence"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "environment": { "const": "production" },
+    "primaryRpc": { "$ref": "#/$defs/rpc" },
+    "fallbackRpc": { "$ref": "#/$defs/rpc" },
+    "monitoring": {
+      "type": "array",
+      "minItems": 8,
+      "items": { "$ref": "#/$defs/monitor" }
+    },
+    "incidentResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commanderRole",
+        "pauseRole",
+        "recoveryRole",
+        "runbook",
+        "rehearsalRecord"
+      ],
+      "properties": {
+        "commanderRole": { "type": "string", "minLength": 1 },
+        "pauseRole": { "type": "string", "minLength": 1 },
+        "recoveryRole": { "type": "string", "minLength": 1 },
+        "runbook": { "type": "string", "minLength": 1 },
+        "rehearsalRecord": { "const": "incident-rehearsal.json" }
+      }
+    },
+    "approvalEvidence": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    }
+  },
+  "$defs": {
+    "rpc": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["providerId", "endpointEnv"],
+      "properties": {
+        "providerId": { "type": "string", "minLength": 1 },
+        "endpointEnv": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" }
+      }
+    },
+    "monitor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "ownerRole",
+        "alertDestinationEnv",
+        "runbook",
+        "enabled"
+      ],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "ownerRole": { "type": "string", "minLength": 1 },
+        "alertDestinationEnv": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]*$"
+        },
+        "runbook": { "type": "string", "minLength": 1 },
+        "enabled": { "const": true }
+      }
+    }
+  }
+}

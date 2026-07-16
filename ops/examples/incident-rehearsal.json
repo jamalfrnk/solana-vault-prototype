@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "environment": "production",
+  "status": "planned",
+  "scenario": "<REHEARSAL_SCENARIO>",
+  "startedAt": "<REHEARSAL_STARTED_AT_UTC>",
+  "completedAt": "<REHEARSAL_COMPLETED_AT_UTC>",
+  "participants": ["<PARTICIPANT_1_ID>", "<PARTICIPANT_2_ID>"],
+  "evidenceReferences": ["<REHEARSAL_EVIDENCE_REFERENCE>"],
+  "findings": ["<REHEARSAL_FINDING>"],
+  "followUps": [
+    {
+      "ownerId": "<FOLLOW_UP_OWNER_ID>",
+      "dueAt": "<FOLLOW_UP_DUE_AT_UTC>",
+      "status": "open"
+    }
+  ]
+}

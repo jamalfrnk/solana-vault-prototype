@@ -112,9 +112,12 @@ implements ADR 0008's constrained exact-excess recovery: only configured governa
 only while not active, only the full computed excess, and only to the configured
 treasury's canonical same-mint ATA, without changing accounting. Role rotation,
 production multisig/timelock configuration, and the remaining operational launch
-gates are still incomplete. These milestones do not
-approve deployment, legacy asset movement, an audit engagement, mainnet deployment,
-or production custody.
+gates are still incomplete. M26 automates deterministic release evidence, immutable
+CI action pinning and secret scanning, plus fail-closed non-secret authority,
+deployment, RPC/monitoring, and rehearsal manifest validation. It supplies templates
+and enforcement, not real production approvals or infrastructure. These milestones do
+not approve deployment, legacy asset movement, an audit engagement, mainnet
+deployment, or production custody.
 After M23 merged, a separately scoped devnet/UI follow-up deployed the reviewed binary
 under a new devnet-only program ID and created a fresh v1 UI fixture. The original
 program and both 113-byte vaults remain unchanged for later retirement. This live test

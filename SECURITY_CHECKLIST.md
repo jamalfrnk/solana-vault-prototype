@@ -1,9 +1,10 @@
 # Security Checklist
 
-**Status: implemented controls checked through M25; M20 pre-audit target design
+**Status: implemented controls checked through M26; M20 pre-audit target design
 accepted, with its VaultState versioning, exit-first availability, and ProtocolConfig
 emergency-control slices implemented in M21–M23 and its MintConfig/exposure slice in
-M24 and its exact-excess recovery slice in M25. Remaining target items stay unchecked
+M24, exact-excess recovery slice in M25, and repository release/operations evidence
+automation in M26. Remaining external and live target items stay unchecked
 until built, tested, and reviewed. The M23 devnet/UI follow-up deploys only a separate
 test identity and does not satisfy production launch gates.**
 
@@ -380,11 +381,11 @@ multisig PDA using the same M16 sigverify-off `invoke_signed` analog.
 - [x] Both instructions emit their events (`PauseAuthorityProposed`, `PauseAuthorityRotated`).
       — M18: `test_rotation_events_emitted`.
 
-## Pre-audit production target (M20 accepted; M21–M25 initial slices implemented)
+## Pre-audit production target (M20 accepted; M21–M26 initial slices implemented)
 
 ADRs 0003–0009 define the reviewed target before further program work. They adapt
 OWASP SCSVS architecture, governance, authorization, external-interaction, business-
-logic, and denial-of-service principles to this Solana program. Checked M21–M25 items
+logic, and denial-of-service principles to this Solana program. Checked M21–M26 items
 below are implemented and tested; every unchecked item remains a launch blocker.
 
 ### Threat boundaries and roles
@@ -495,6 +496,31 @@ below are implemented and tested; every unchecked item remains a launch blocker.
       governance thresholds, monitoring, and response evidence are independently
       approved. M25 source implementation does not satisfy this launch gate.
 
+### Release and operations evidence security (M26)
+
+- [x] Every third-party GitHub Action is pinned to an immutable full commit SHA and
+      both CI workflows grant only read access to repository contents.
+- [x] Pull-request/`main` CI installs Gitleaks 8.30.1 from its fixed release URL,
+      verifies the published Linux archive SHA-256, scans full Git history, and redacts
+      findings before output.
+- [x] Deterministic release evidence binds the exact program, IDL, and Cargo.lock
+      bytes to the clean checkout's full source commit, IDL program ID, build kind, and
+      pinned toolchain versions; unsafe paths, empty artifacts, invalid commits, and
+      default/malformed program IDs fail closed.
+- [x] Version-1 authority/deployment/operations/rehearsal schemas and the runtime
+      validator reject unexpected fields, secret-shaped fields, literal URLs,
+      placeholders in production mode, weak thresholds, duplicate role addresses,
+      unsafe caps, same-provider RPC, missing monitors, and incomplete rehearsal
+      evidence.
+- [x] Checked-in manifest examples are accepted only by an explicit template mode and
+      are documented as neither approvals nor completed production controls.
+- [ ] The Docker-verifiable workflow is run for an approved release, reproduced by an
+      independent verifier, and compared to a deployed binary. Automation alone does
+      not prove an existing deployment.
+- [ ] Real multisig/timelock addresses, approved mint/caps, private RPC providers,
+      alert routes, role holders, and rehearsal evidence replace every placeholder and
+      are independently approved. M26 does not choose or provision them.
+
 ### Versioning and migration security (M21)
 
 - [x] Migration is permissionless but value-deterministic: the caller supplies no
@@ -538,7 +564,9 @@ below are implemented and tested; every unchecked item remains a launch blocker.
 - [x] The devnet UI fixture never prints its burner or role private keys; Phantom
       import uses a local clipboard pipeline from a gitignored keypair file, and only
       public addresses/transaction evidence are documented.
-- [ ] CI/secret scanning configured (future milestone, if adopted).
+- [x] CI secret scanning is checksum/version pinned, full-history, and redacts findings
+      (M26). It complements rather than replaces manual secret handling and history
+      review.
 
 ## Deployment claims
 

@@ -177,6 +177,38 @@ It compiles the Anchor program to Solana BPF (Berkeley Packet Filter) bytecode â
 instruction set the Solana Virtual Machine (SVM) executes on-chain. The resulting `.so`
 file is what gets deployed to devnet or loaded by the LiteSVM test harness.
 
+### Release evidence and production manifest gates (M26)
+
+Validate the checked-in placeholder examples after changing a schema or validator:
+
+```powershell
+corepack yarn manifests:validate:examples
+```
+
+Validate a real four-file review directory without placeholder mode:
+
+```powershell
+corepack yarn manifests:validate C:\approved\vault-production-manifests
+```
+
+Production validation rejects placeholders, literal RPC/alert URLs, secret-shaped or
+unexpected fields, weak authority policy, invalid/default addresses, unsafe caps,
+incomplete monitoring, and a rehearsal not marked complete. Passing is necessary but
+does not replace independent address/evidence verification. See
+[`docs/PRODUCTION_OPERATIONS_EVIDENCE.md`](docs/PRODUCTION_OPERATIONS_EVIDENCE.md).
+
+The PR workflow generates evidence for its normal build. For an approved release
+candidate, dispatch **Verifiable release evidence** at the exact reviewed commit. It
+runs Anchor's Docker-verifiable build and retains the binary, IDL, and deterministic
+evidence. Download that artifact, have a second operator reproduce it, and compare all
+hashes before any separately approved deployment. The workflow does not deploy and has
+no signer or write permission.
+
+CI also performs a full-history Gitleaks scan using a fixed binary version and archive
+checksum. Findings are redacted. A clean scan does not make it safe to commit secrets;
+keep endpoints/credentials in the operator secret manager and key material off every
+repository-backed machine where possible.
+
 ---
 
 ## 5. Run the full test suite
@@ -570,6 +602,70 @@ withdrawal probe. Do not represent `ExitOnly` as a complete halt. If the
 withdrawal/custody path itself appears unsafe, escalate to the separate ProtocolConfig
 emergency authority and preserve the reason/event evidence; never reuse the ordinary
 pause key as an emergency signer.
+
+#### Transaction failures
+
+Correlate failure rate by instruction, program ID, mint, wallet, RPC provider, and
+recent release. Preserve redacted RPC responses and transaction signatures. If valid
+deposits are failing or state is uncertain, enter `ExitOnly`; keep withdrawals open
+unless the withdrawal/custody path is implicated. Do not retry a privileged
+transaction blindly.
+
+#### Transaction latency
+
+Compare submission and confirmation latency across the independently configured RPC
+providers and Solana cluster health. Stop automated retries that could duplicate an
+operator intent, preserve signatures/blockhashes, and enter `ExitOnly` if latency makes
+exposure controls unreliable. Never infer transaction failure solely from a client
+timeout.
+
+#### RPC failover
+
+Compare slot, finalized block, program account, and transaction results from primary
+and fallback providers before failover. No RPC response grants authority. If providers
+diverge beyond the approved tolerance, stop deposits and use a separately trusted
+source for reconciliation; do not place endpoint URLs or credentials in the manifest
+or incident record.
+
+#### Custody accounting
+
+Reconcile custody amount, `total_assets`, `total_shares`, every known position,
+MintConfig caps, and recent transfer/events. Excess is not a shortfall and may be left
+inert. If `custody.amount < total_assets` or the withdrawal path cannot be proven safe,
+escalate to the emergency council for `FullyPaused`, preserve all account bytes, and do
+not use `sweep_excess` as an accounting repair.
+
+#### Authority changes
+
+Alert on ProtocolConfig, VaultState pending/current pause authority, program
+ProgramData upgrade authority, and approved multisig membership/threshold changes.
+Compare the observed transaction and post-state to the signed authority manifest. An
+unapproved change is a security incident; stop deposits, escalate based on withdrawal
+safety, and begin signer-compromise response without publishing member secrets.
+
+#### Cap utilization
+
+Page before the approved rollout, per-vault, or aggregate cap is exhausted. Governance
+may disable or reduce exposure immediately through the reviewed path; increases remain
+subject to the full delay and independent approval. Never edit a manifest to match an
+unexpected on-chain value after the fact.
+
+#### Program upgrades
+
+Alert on loader ProgramData changes and every program deployment/upgrade signature.
+Fetch the deployed bytes from independent sources, hash them, and compare to the
+approved verifiable-release evidence. An unapproved or mismatched binary is an
+automatic launch/operation blocker; do not restore deposits while provenance is
+unresolved.
+
+#### Production incident response
+
+Assign one incident commander with no unilateral signer power, timestamp severity,
+preserve evidence, and choose `ExitOnly` by default. Use `FullyPaused` only when safe
+withdrawals cannot be offered. Reconcile invariants, obtain the required multisig
+approvals for any change, restore first to `ExitOnly`, then to `Active`, and record a
+postmortem/follow-ups. The four-file production manifest set and completed rehearsal
+record must validate, but human reviewers still verify every cited artifact and action.
 
 ---
 

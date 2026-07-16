@@ -1,8 +1,8 @@
 # Test Plan
 
-**Status: M21–M24 and all UI/devnet follow-ups are complete through PR #40; M25
-constrained exact-excess recovery is in review through draft PR #41 — 97 Rust tests,
-117 SDK tests, and 122 dApp tests. Pull-request CI remains the publication gate.**
+**Status: M21–M25 and all UI/devnet follow-ups are complete through PR #41; M26
+release and operations evidence automation is in review through draft PR #42.
+Pull-request CI remains the publication gate.**
 
 ## Repository hygiene (complete)
 
@@ -631,7 +631,7 @@ GitHub reported the draft PR mergeable.
 Observed in final PR #40 CI run `29506690101`: all five jobs passed on the final head.
 GitHub merged PR #40 as `efa00c6` on 2026-07-16.
 
-## M25 constrained exact-excess recovery (in review — PR #41)
+## M25 constrained exact-excess recovery (complete — PR #41)
 
 All new on-chain authorization, arithmetic, atomicity, and lifecycle cases are in
 `tests/test_excess_recovery.rs`. The SDK and generated-IDL cases remain offline and
@@ -679,6 +679,45 @@ known non-fatal jsdom canvas warning.
 Observed in initial PR #41 CI run `29514911025` on commit `94828b8`: all five
 Rust/Anchor, cargo-audit, SDK/root-audit, dApp, and generated-M25-IDL jobs passed. The
 Linux Rust job includes the complete 97-test regression.
+
+Observed in final PR #41 CI run `29515303554`: the same five jobs passed on the final
+head. GitHub merged PR #41 as `7c62346` on 2026-07-16.
+
+## M26 release and operations evidence automation (in review — PR #42)
+
+- [x] The four checked-in production templates validate only with the explicit
+      `--allow-placeholders` mode; ordinary production mode rejects them.
+- [x] A complete non-secret manifest fixture passes strict validation.
+- [x] Secret-shaped fields, literal URLs, unexpected fields, malformed/default Solana
+      keys, unresolved placeholders, and duplicate role addresses fail closed.
+- [x] Weakened governance thresholds, a non-48-hour upgrade timelock, missing
+      hardware-backed/backup attestations, and missing approval evidence fail closed.
+- [x] Non-positive or unordered rollout/per-vault/maximum caps, fewer than two
+      verifiers, same-provider RPC configuration, missing monitors, and a planned
+      rather than completed production rehearsal fail closed.
+- [x] All four Draft 2020-12 JSON Schema documents are parseable, versioned, and
+      disallow unknown top-level fields.
+- [x] Release evidence is deterministic, hashes the exact program/IDL/Cargo.lock
+      bytes, normalizes repository-relative paths, and rejects invalid commits,
+      default program IDs, empty files, and out-of-repository artifacts.
+- [x] CI actions are immutable-SHA pinned, permissions are read-only, and Gitleaks is
+      version/checksum pinned with full-history/redacted scan arguments.
+- [ ] The manual Docker-verifiable workflow is dispatched and its retained evidence is
+      reproduced independently. This remains a release-ceremony gate, not a PR test.
+- [ ] Real role/RPC/monitoring manifests and a completed incident rehearsal are
+      independently approved. Templates do not satisfy these production gates.
+
+Observed locally (2026-07-16): formatting, Anchor/SBF + generated-IDL build,
+warning-denying all-target clippy, all 97 Rust tests, root typecheck, SDK build, all 128
+SDK tests (11 new manifest/release-evidence cases), generated-IDL verification, dApp
+typecheck/production build, all 122 dApp tests, root and high-severity dApp audits,
+Rust audit, four example-manifest validation, workflow-YAML parsing, focused Prettier,
+and whitespace checks passed. Rust audit retained seven allowed upstream warnings.
+The checksum-verified Windows Gitleaks 8.30.1 binary scanned 123 commits /
+approximately 4.17 MB and reported no leaks. The first parallel WSL `cargo test` link
+hit Ubuntu BFD 2.38's internal `_bfd_merged_section_offset` error; `cargo test -j 1`
+linked the same suite serially and all 97 tests passed. Final-head pull-request CI
+results remain to be recorded.
 
 ## Anchor scaffold baseline (complete — M2)
 

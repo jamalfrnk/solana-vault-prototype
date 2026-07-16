@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://solana-vault.invalid/schemas/authority-manifest-v1.json",
+  "title": "Solana Vault authority manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "environment",
+    "approvedAt",
+    "roles",
+    "approvalEvidence"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "environment": { "const": "production" },
+    "approvedAt": { "type": "string", "minLength": 1 },
+    "roles": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pause", "protocol", "upgrade", "treasury"],
+      "properties": {
+        "pause": { "$ref": "#/$defs/twoOfThree" },
+        "protocol": { "$ref": "#/$defs/threeOfFive" },
+        "treasury": { "$ref": "#/$defs/twoOfThree" },
+        "upgrade": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "address",
+            "ordinaryThreshold",
+            "emergencyThreshold",
+            "ordinaryTimelockSeconds",
+            "members"
+          ],
+          "properties": {
+            "address": { "type": "string", "minLength": 1 },
+            "ordinaryThreshold": { "const": 3 },
+            "emergencyThreshold": { "const": 4 },
+            "ordinaryTimelockSeconds": { "const": 172800 },
+            "members": {
+              "type": "array",
+              "minItems": 5,
+              "maxItems": 5,
+              "items": { "$ref": "#/$defs/member" }
+            }
+          }
+        }
+      }
+    },
+    "approvalEvidence": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    }
+  },
+  "$defs": {
+    "member": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "hardwareBacked", "backupAttestation"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "hardwareBacked": { "const": true },
+        "backupAttestation": { "type": "string", "minLength": 1 }
+      }
+    },
+    "twoOfThree": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["address", "threshold", "members"],
+      "properties": {
+        "address": { "type": "string", "minLength": 1 },
+        "threshold": { "const": 2 },
+        "members": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": { "$ref": "#/$defs/member" }
+        }
+      }
+    },
+    "threeOfFive": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["address", "threshold", "members"],
+      "properties": {
+        "address": { "type": "string", "minLength": 1 },
+        "threshold": { "const": 3 },
+        "members": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "items": { "$ref": "#/$defs/member" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,114 @@
+{
+  "schemaVersion": 1,
+  "environment": "production",
+  "approvedAt": "<APPROVED_AT_UTC>",
+  "roles": {
+    "pause": {
+      "address": "<PAUSE_AUTHORITY_PUBLIC_KEY>",
+      "threshold": 2,
+      "members": [
+        {
+          "id": "pause-member-1",
+          "hardwareBacked": true,
+          "backupAttestation": "<PAUSE_MEMBER_1_BACKUP_EVIDENCE>"
+        },
+        {
+          "id": "pause-member-2",
+          "hardwareBacked": true,
+          "backupAttestation": "<PAUSE_MEMBER_2_BACKUP_EVIDENCE>"
+        },
+        {
+          "id": "pause-member-3",
+          "hardwareBacked": true,
+          "backupAttestation": "<PAUSE_MEMBER_3_BACKUP_EVIDENCE>"
+        }
+      ]
+    },
+    "protocol": {
+      "address": "<PROTOCOL_AUTHORITY_PUBLIC_KEY>",
+      "threshold": 3,
+      "members": [
+        {
+          "id": "protocol-member-1",
+          "hardwareBacked": true,
+          "backupAttestation": "<PROTOCOL_MEMBER_1_BACKUP_EVIDENCE>"
+        },
+        {
+          "id": "protocol-member-2",
+          "hardwareBacked": true,
+          "backupAttestation": "<PROTOCOL_MEMBER_2_BACKUP_EVIDENCE>"
+        },
+        {
+          "id": "protocol-member-3",
+          "hardwareBacked": true,
+          "backupAttestation": "<PROTOCOL_MEMBER_3_BACKUP_EVIDENCE>"
+        },
+        {
+          "id": "protocol-member-4",
+          "hardwareBacked": true,
+          "backupAttestation": "<PROTOCOL_MEMBER_4_BACKUP_EVIDENCE>"
+        },
+        {
+          "id": "protocol-member-5",
+          "hardwareBacked": true,
+          "backupAttestation": "<PROTOCOL_MEMBER_5_BACKUP_EVIDENCE>"
+        }
+      ]
+    },
+    "upgrade": {
+      "address": "<UPGRADE_AUTHORITY_PUBLIC_KEY>",
+      "ordinaryThreshold": 3,
+      "emergencyThreshold": 4,
+      "ordinaryTimelockSeconds": 172800,
+      "members": [
+        {
+          "id": "upgrade-member-1",
+          "hardwareBacked": true,
+          "backupAttestation": "<UPGRADE_MEMBER_1_BACKUP_EVIDENCE>"
+        },
+        {
+          "id": "upgrade-member-2",
+          "hardwareBacked": true,
+          "backupAttestation": "<UPGRADE_MEMBER_2_BACKUP_EVIDENCE>"
+        },
+        {
+          "id": "upgrade-member-3",
+          "hardwareBacked": true,
+          "backupAttestation": "<UPGRADE_MEMBER_3_BACKUP_EVIDENCE>"
+        },
+        {
+          "id": "upgrade-member-4",
+          "hardwareBacked": true,
+          "backupAttestation": "<UPGRADE_MEMBER_4_BACKUP_EVIDENCE>"
+        },
+        {
+          "id": "upgrade-member-5",
+          "hardwareBacked": true,
+          "backupAttestation": "<UPGRADE_MEMBER_5_BACKUP_EVIDENCE>"
+        }
+      ]
+    },
+    "treasury": {
+      "address": "<TREASURY_AUTHORITY_PUBLIC_KEY>",
+      "threshold": 2,
+      "members": [
+        {
+          "id": "treasury-member-1",
+          "hardwareBacked": true,
+          "backupAttestation": "<TREASURY_MEMBER_1_BACKUP_EVIDENCE>"
+        },
+        {
+          "id": "treasury-member-2",
+          "hardwareBacked": true,
+          "backupAttestation": "<TREASURY_MEMBER_2_BACKUP_EVIDENCE>"
+        },
+        {
+          "id": "treasury-member-3",
+          "hardwareBacked": true,
+          "backupAttestation": "<TREASURY_MEMBER_3_BACKUP_EVIDENCE>"
+        }
+      ]
+    }
+  },
+  "approvalEvidence": ["<AUTHORITY_APPROVAL_EVIDENCE>"]
+}

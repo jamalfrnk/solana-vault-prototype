@@ -36,7 +36,8 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 | — | UI follow-up — persistent header wallet control | `[x]` complete |
 | — | UI follow-up — authoritative wallet assets and vault shares | `[x]` complete |
 | 24 | MintConfig, governed initialization, and exposure caps | `[x]` complete |
-| 25 | Constrained exact-excess recovery | `[~]` in review — PR #41 |
+| 25 | Constrained exact-excess recovery | `[x]` complete — PR #41 |
+| 26 | Release and operations evidence automation | `[~]` in review — PR #42 |
 
 ## Milestone 0 — Repository bootstrap (complete)
 
@@ -876,7 +877,7 @@ Observed in final PR #40 CI run `29506690101`: all five jobs passed, including t
 dependent M24 generated-IDL verifier. Merged through PR #40 as `efa00c6` on
 2026-07-16.
 
-## Milestone 25 — Constrained exact-excess recovery (in review — PR #41)
+## Milestone 25 — Constrained exact-excess recovery (complete — PR #41)
 
 Implements ADR 0008's next independently safe program/SDK slice on
 `codex/exact-excess-recovery`:
@@ -909,8 +910,42 @@ account layouts, bounded enums, M24 events, and the 176-byte M25 event. Yarn Cla
 retired local audit endpoint returned HTTP 410, so pull-request CI's existing
 severity-bitmask gate remains authoritative.
 
-Observed in initial PR #41 CI run `29514911025` on commit `94828b8`: all five
-Rust/Anchor, cargo-audit, SDK/root-audit, dApp, and generated-M25-IDL jobs passed.
+Observed in final PR #41 CI run `29515303554`: all five Rust/Anchor, cargo-audit,
+SDK/root-audit, dApp, and generated-M25-IDL jobs passed. GitHub merged PR #41 as
+`7c62346` on 2026-07-16.
+
+## Milestone 26 — Release and operations evidence automation (in review — PR #42)
+
+Implements the repository-controlled portion of ADR 0009 step 6 on
+`codex/release-operations-evidence`:
+
+- pins every third-party GitHub Action to a full commit SHA, restricts workflow
+  permissions to read-only contents, and adds a checksum-pinned full-history Gitleaks
+  job with redacted findings;
+- generates deterministic evidence binding an SBF binary, generated IDL, Cargo lock,
+  source commit, program ID, build kind, and pinned toolchain versions;
+- adds a manual Docker-verifiable build/evidence workflow that retains review
+  artifacts and has no deployment or signer capability;
+- adds strict version-1 authority, deployment, RPC/monitoring, and incident-rehearsal
+  schemas, placeholder-only examples, fail-closed runtime validation, and offline
+  tests; and
+- documents exactly which human, infrastructure, rehearsal, audit, deployment, and
+  mainnet gates remain open.
+
+M26 does not choose real production values, create governance, configure live RPC or
+monitoring, conduct a rehearsal, move assets, deploy/upgrade a program, or claim
+production readiness.
+
+Observed locally (2026-07-16): formatting, Anchor/SBF + generated-IDL build,
+warning-denying all-target clippy, all 97 Rust tests, root typecheck, SDK build, all 128
+SDK tests, generated-IDL verification, dApp typecheck/production build, all 122 dApp
+tests, root and high-severity dApp audits, Rust audit, four example-manifest validation,
+workflow-YAML parsing, focused Prettier, and whitespace checks passed. Rust audit
+retained seven allowed upstream warnings. The checksum-verified Windows Gitleaks
+8.30.1 binary scanned all 123 existing commits / approximately 4.17 MB with no leaks.
+The first parallel WSL `cargo test` link hit Ubuntu BFD 2.38's internal
+`_bfd_merged_section_offset` error; `cargo test -j 1` linked the same suite serially and
+all 97 tests passed. Final-head pull-request CI evidence remains to be recorded.
 
 ## Post-MVP Roadmap (candidate pool — implementation requires separate approval)
 
