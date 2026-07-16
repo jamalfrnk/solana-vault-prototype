@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "environment": "production",
+  "programId": "<PROGRAM_PUBLIC_KEY>",
+  "mint": "<ALLOWLISTED_MINT_PUBLIC_KEY>",
+  "tokenProgramId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+  "sourceCommit": "<SOURCE_COMMIT_SHA>",
+  "toolchain": {
+    "anchor": "1.0.2",
+    "agave": "v3.1.10",
+    "rust": "1.89.0"
+  },
+  "caps": {
+    "maximumTvlBaseUnits": "<MAXIMUM_TVL_BASE_UNITS>",
+    "perVaultDepositCapBaseUnits": "<PER_VAULT_DEPOSIT_CAP_BASE_UNITS>",
+    "rolloutStageCapBaseUnits": "<ROLLOUT_STAGE_CAP_BASE_UNITS>"
+  },
+  "artifacts": {
+    "program": {
+      "path": "target/verifiable/solana_vault_prototype.so",
+      "sha256": "<PROGRAM_SHA256>"
+    },
+    "idl": {
+      "path": "target/idl/solana_vault_prototype.json",
+      "sha256": "<IDL_SHA256>"
+    },
+    "releaseEvidence": {
+      "path": "target/release-evidence/verifiable-release-evidence.json",
+      "sha256": "<RELEASE_EVIDENCE_SHA256>"
+    }
+  },
+  "authorityManifest": "authority-manifest.json",
+  "operationsManifest": "operations-manifest.json",
+  "independentVerifiers": ["<VERIFIER_1_EVIDENCE>", "<VERIFIER_2_EVIDENCE>"],
+  "approvalEvidence": ["<DEPLOYMENT_APPROVAL_EVIDENCE>"]
+}

@@ -575,6 +575,34 @@ one.
 | `MintConfigChanged` | config/mint/authority, complete previous/new state, slot, Unix timestamp, bounded change kind | execute, disable, and lower-cap paths (M24) |
 | `ExcessSwept` | vault, mint, treasury, governance signer, exact amount, post-transfer custody, accounting total, slot, Unix timestamp | `sweep_excess` (M25) |
 
+## Release and operations evidence boundary (M26)
+
+M26 adds off-chain release and planning evidence without changing any program account,
+instruction, event, SDK transaction builder, or dApp authorization rule. The boundary
+is deliberately one-way: the tools inspect repository artifacts and validate operator
+claims, but no manifest or release JSON is trusted by the on-chain program.
+
+`scripts/generate_release_evidence.ts` produces deterministic version-1 JSON from a
+clean source commit and already-built artifacts. It records the IDL's program address,
+build kind, pinned Anchor/Agave/Rust versions, and exact SHA-256/byte length/path for
+the program, IDL, and Cargo lock. It contains no timestamp, runner identity, RPC value,
+signer, or deployment capability. The normal CI build and the separately dispatched
+Docker-verifiable build use the same generator so reviewers compare the same evidence
+shape.
+
+The authority, deployment, operations, and rehearsal schemas under `ops/schemas/`
+define non-secret review records. The runtime validator adds cross-field rules that
+JSON Schema alone does not express compactly: valid/non-default Solana keys, pairwise
+role separation, exact governance thresholds/timelock, ordered exposure caps,
+different RPC providers, the complete monitor set, and completed rehearsal status.
+Literal URLs and secret-shaped fields are forbidden; only environment-variable names
+identify injected RPC endpoints and alert destinations.
+
+Passing validation means a record is structurally consistent with ADRs 0006, 0007,
+and 0009. It does not prove that a listed person approved it, a multisig exists, a
+provider is healthy, an alert fires, a drill occurred, or a binary is deployed. Those
+claims require independent external evidence and remain launch blockers.
+
 ## Governance-ready pause authority (M16)
 
 `pause_authority` is a plain `Pubkey` compared against a `Signer` — nothing in the

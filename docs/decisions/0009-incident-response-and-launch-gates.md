@@ -3,11 +3,13 @@
 - **Status:** Accepted
 - **Date:** 2026-07-15
 - **Milestone:** 20 — Pre-Audit Production Design
-- **Implementation status:** Partially implemented through M25; the repository now
+- **Implementation status:** Partially implemented through M26; the repository now
   enforces versioning, exit-first gates, separated emergency transitions, governed
-  fixed-supply mint approval, delayed risk increases, and deposit exposure caps, while
-  production roles, deployment/manifests, monitoring, rehearsal,
-  audit, and most launch gates remain unmet
+  fixed-supply mint approval, delayed risk increases, deposit exposure caps, exact
+  excess recovery, immutable-pinned CI/secret scanning, deterministic release
+  evidence, and strict non-secret operations-manifest validation. Real production
+  roles/values, deployed verification, live RPC/monitoring, rehearsal, audit, and most
+  launch gates remain unmet
 
 ## Context
 
@@ -143,8 +145,12 @@ milestones:
    M24; production deployment/values remain gated).
 5. Constrained excess recovery and reconciliation tests (implemented in M25; no live
    recovery or deployment).
-6. Verifiable release automation, secret scanning, authority manifests, RPC/monitoring,
-   and incident runbook rehearsal.
+6. Release/operations evidence automation (repository portion implemented in M26):
+   immutable-pinned CI, checksum-pinned secret scanning, deterministic standard and
+   Docker-verifiable build evidence, and strict authority/deployment/RPC-monitoring/
+   rehearsal manifest schemas and validation. Real authorities and values, independent
+   release reproduction/deployed verification, live RPC/monitoring, and an executed
+   incident runbook rehearsal remain separately gated.
 7. Audit preparation, external audit, remediation, and verification.
 8. Separately approved capped mainnet canary.
 

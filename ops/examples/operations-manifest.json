@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "environment": "production",
+  "primaryRpc": {
+    "providerId": "<PRIMARY_RPC_PROVIDER_ID>",
+    "endpointEnv": "SOLANA_PRIMARY_RPC_URL"
+  },
+  "fallbackRpc": {
+    "providerId": "<FALLBACK_RPC_PROVIDER_ID>",
+    "endpointEnv": "SOLANA_FALLBACK_RPC_URL"
+  },
+  "monitoring": [
+    {
+      "id": "transaction-failure-rate",
+      "ownerRole": "operations",
+      "alertDestinationEnv": "OPERATIONS_ALERT_DESTINATION",
+      "runbook": "RUNBOOK.md#transaction-failures",
+      "enabled": true
+    },
+    {
+      "id": "transaction-latency",
+      "ownerRole": "operations",
+      "alertDestinationEnv": "OPERATIONS_ALERT_DESTINATION",
+      "runbook": "RUNBOOK.md#transaction-latency",
+      "enabled": true
+    },
+    {
+      "id": "rpc-health-divergence",
+      "ownerRole": "operations",
+      "alertDestinationEnv": "OPERATIONS_ALERT_DESTINATION",
+      "runbook": "RUNBOOK.md#rpc-failover",
+      "enabled": true
+    },
+    {
+      "id": "custody-accounting",
+      "ownerRole": "security",
+      "alertDestinationEnv": "SECURITY_ALERT_DESTINATION",
+      "runbook": "RUNBOOK.md#custody-accounting",
+      "enabled": true
+    },
+    {
+      "id": "authority-config-change",
+      "ownerRole": "security",
+      "alertDestinationEnv": "SECURITY_ALERT_DESTINATION",
+      "runbook": "RUNBOOK.md#authority-changes",
+      "enabled": true
+    },
+    {
+      "id": "cap-utilization",
+      "ownerRole": "risk",
+      "alertDestinationEnv": "RISK_ALERT_DESTINATION",
+      "runbook": "RUNBOOK.md#cap-utilization",
+      "enabled": true
+    },
+    {
+      "id": "operational-state",
+      "ownerRole": "operations",
+      "alertDestinationEnv": "OPERATIONS_ALERT_DESTINATION",
+      "runbook": "RUNBOOK.md#production-incident-response",
+      "enabled": true
+    },
+    {
+      "id": "program-upgrade",
+      "ownerRole": "security",
+      "alertDestinationEnv": "SECURITY_ALERT_DESTINATION",
+      "runbook": "RUNBOOK.md#program-upgrades",
+      "enabled": true
+    }
+  ],
+  "incidentResponse": {
+    "commanderRole": "incident-commander",
+    "pauseRole": "pause",
+    "recoveryRole": "treasury",
+    "runbook": "RUNBOOK.md#production-incident-response",
+    "rehearsalRecord": "incident-rehearsal.json"
+  },
+  "approvalEvidence": ["<OPERATIONS_APPROVAL_EVIDENCE>"]
+}

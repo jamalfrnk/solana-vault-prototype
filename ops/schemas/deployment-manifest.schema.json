@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://solana-vault.invalid/schemas/deployment-manifest-v1.json",
+  "title": "Solana Vault deployment manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "environment",
+    "programId",
+    "mint",
+    "tokenProgramId",
+    "sourceCommit",
+    "toolchain",
+    "caps",
+    "artifacts",
+    "authorityManifest",
+    "operationsManifest",
+    "independentVerifiers",
+    "approvalEvidence"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "environment": { "const": "production" },
+    "programId": { "type": "string", "minLength": 1 },
+    "mint": { "type": "string", "minLength": 1 },
+    "tokenProgramId": { "type": "string", "minLength": 1 },
+    "sourceCommit": { "type": "string", "minLength": 1 },
+    "toolchain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["anchor", "agave", "rust"],
+      "properties": {
+        "anchor": { "type": "string" },
+        "agave": { "type": "string" },
+        "rust": { "type": "string" }
+      }
+    },
+    "caps": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "maximumTvlBaseUnits",
+        "perVaultDepositCapBaseUnits",
+        "rolloutStageCapBaseUnits"
+      ],
+      "properties": {
+        "maximumTvlBaseUnits": { "type": "string", "minLength": 1 },
+        "perVaultDepositCapBaseUnits": { "type": "string", "minLength": 1 },
+        "rolloutStageCapBaseUnits": { "type": "string", "minLength": 1 }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["program", "idl", "releaseEvidence"],
+      "properties": {
+        "program": { "$ref": "#/$defs/artifact" },
+        "idl": { "$ref": "#/$defs/artifact" },
+        "releaseEvidence": { "$ref": "#/$defs/artifact" }
+      }
+    },
+    "authorityManifest": { "type": "string", "minLength": 1 },
+    "operationsManifest": { "type": "string", "minLength": 1 },
+    "independentVerifiers": {
+      "type": "array",
+      "minItems": 2,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "approvalEvidence": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    }
+  },
+  "$defs": {
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

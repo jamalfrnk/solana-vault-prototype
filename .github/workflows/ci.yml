@@ -6,22 +6,27 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 env:
   AGAVE_VERSION: v3.1.10
   ANCHOR_VERSION: "1.0.2"
+  GITLEAKS_VERSION: "8.30.1"
+  GITLEAKS_LINUX_X64_SHA256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
 
 jobs:
   build-and-test:
     name: fmt, clippy, build-sbf, test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Install pinned Rust toolchain
         run: rustup show
 
       - name: Cache cargo registry and target
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
             ~/.cargo/registry
@@ -32,7 +37,7 @@ jobs:
             cargo-${{ runner.os }}-
 
       - name: Cache Agave / Anchor toolchain
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
             ~/.local/share/solana
@@ -68,25 +73,28 @@ jobs:
       - name: Whitespace / conflict marker check
         run: git diff --check
 
-      - name: Upload generated IDL (discriminator and layout verification consumes this)
-        uses: actions/upload-artifact@v4
+      - name: Upload generated program and IDL
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: vault-idl
-          path: target/idl/solana_vault_prototype.json
+          name: vault-build-artifacts
+          path: |
+            target/deploy/solana_vault_prototype.so
+            target/idl/solana_vault_prototype.json
           retention-days: 7
+          if-no-files-found: error
 
   audit:
     name: cargo audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Install pinned Rust toolchain
         run: rustup show
 
       - name: Cache cargo-audit binary
         id: cache-audit
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.cargo/bin/cargo-audit
           key: cargo-audit-${{ runner.os }}-v1
@@ -102,9 +110,9 @@ jobs:
     name: SDK tests (Node, no Solana/Anchor toolchain)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "22"
 
@@ -119,6 +127,9 @@ jobs:
 
       - name: SDK tests
         run: corepack yarn test:sdk
+
+      - name: Validate non-secret production manifest templates
+        run: corepack yarn manifests:validate:examples
 
       # Yarn 1's audit exit code is a severity bitmask (1=info, 2=low, 4=moderate,
       # 8=high, 16=critical); gate on high/critical only so a new low/moderate
@@ -135,9 +146,9 @@ jobs:
     name: dApp tests (Node, no Solana/Anchor toolchain)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "22"
 
@@ -167,9 +178,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: build-and-test
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "22"
 
@@ -180,10 +191,10 @@ jobs:
         run: corepack yarn install --frozen-lockfile
 
       - name: Download generated IDL from build-and-test
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          name: vault-idl
-          path: target/idl
+          name: vault-build-artifacts
+          path: target
 
       # The SDK has no runtime IDL dependency (by design — see M13). This checks
       # its hand-derived discriminators and instruction arguments plus the exact
@@ -191,3 +202,66 @@ jobs:
       # IDL emitted above.
       - name: Verify instruction interfaces and account layouts match the generated IDL
         run: npx ts-node scripts/verify_idl_discriminators.ts
+
+  release-evidence:
+    name: Deterministic release evidence
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: yarn install
+        run: corepack yarn install --frozen-lockfile
+
+      - name: Download program and IDL from build-and-test
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: vault-build-artifacts
+          path: target
+
+      - name: Generate evidence for the CI build
+        run: |
+          npx ts-node scripts/generate_release_evidence.ts \
+            --repository-root . \
+            --program target/deploy/solana_vault_prototype.so \
+            --idl target/idl/solana_vault_prototype.json \
+            --output target/release-evidence/release-evidence.json \
+            --build-kind standard \
+            --anchor-version "$ANCHOR_VERSION" \
+            --agave-version "$AGAVE_VERSION" \
+            --rust-version 1.89.0
+
+      - name: Upload release evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-evidence
+          path: target/release-evidence/release-evidence.json
+          retention-days: 30
+          if-no-files-found: error
+
+  secret-scan:
+    name: Secret scan (Gitleaks, full history)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+
+      - name: Install checksum-pinned Gitleaks
+        run: |
+          archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl --fail --location --silent --show-error \
+            --output "$RUNNER_TEMP/$archive" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/$archive"
+          echo "${GITLEAKS_LINUX_X64_SHA256}  $RUNNER_TEMP/$archive" | sha256sum --check --strict
+          tar --extract --gzip --file "$RUNNER_TEMP/$archive" --directory "$RUNNER_TEMP" gitleaks
+
+      - name: Scan the complete Git history with redacted findings
+        run: "$RUNNER_TEMP/gitleaks git --redact --no-banner --verbose ."
