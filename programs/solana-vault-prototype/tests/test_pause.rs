@@ -12,7 +12,7 @@ use {
     solana_transaction::versioned::VersionedTransaction,
     solana_vault_prototype::{
         constants::{VAULT_AUTHORITY_SEED, VAULT_SEED},
-        state::VaultState,
+        state::{OperationalState, VaultState},
     },
 };
 
@@ -209,9 +209,10 @@ impl VaultFixture {
 // Tests
 // ---------------------------------------------------------------------------
 
-/// pause() sets is_paused = true.
+/// pause() writes the wire-compatible ExitOnly value. M21 still applies the
+/// legacy active-only instruction gates until the next pause milestone.
 #[test]
-fn test_pause_sets_is_paused() {
+fn test_pause_sets_exit_only() {
     let mut f = VaultFixture::new();
     let pa_pk = keypair_pubkey(&f.pause_authority);
 
@@ -224,12 +225,12 @@ fn test_pause_sets_is_paused() {
 
     let acct = f.svm.get_account(&f.vault_state_pda).unwrap();
     let vs = VaultState::try_deserialize(&mut acct.data.as_slice()).unwrap();
-    assert!(vs.is_paused, "vault should be paused");
+    assert_eq!(vs.operational_state, OperationalState::ExitOnly);
 }
 
-/// unpause() sets is_paused = false.
+/// unpause() writes Active.
 #[test]
-fn test_unpause_clears_is_paused() {
+fn test_unpause_sets_active() {
     let mut f = VaultFixture::new();
     let pa_pk = keypair_pubkey(&f.pause_authority);
 
@@ -251,7 +252,7 @@ fn test_unpause_clears_is_paused() {
 
     let acct = f.svm.get_account(&f.vault_state_pda).unwrap();
     let vs = VaultState::try_deserialize(&mut acct.data.as_slice()).unwrap();
-    assert!(!vs.is_paused, "vault should be unpaused");
+    assert_eq!(vs.operational_state, OperationalState::Active);
 }
 
 /// Pausing an already-paused vault is idempotent (second call still succeeds).
@@ -277,7 +278,7 @@ fn test_pause_idempotent() {
 
     let acct = f.svm.get_account(&f.vault_state_pda).unwrap();
     let vs = VaultState::try_deserialize(&mut acct.data.as_slice()).unwrap();
-    assert!(vs.is_paused, "should still be paused after second pause");
+    assert_eq!(vs.operational_state, OperationalState::ExitOnly);
 }
 
 /// Wrong pause_authority must fail.

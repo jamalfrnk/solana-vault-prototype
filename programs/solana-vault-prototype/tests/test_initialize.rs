@@ -12,7 +12,7 @@ use {
     solana_transaction::versioned::VersionedTransaction,
     solana_vault_prototype::{
         constants::{VAULT_AUTHORITY_SEED, VAULT_SEED},
-        state::VaultState,
+        state::{OperationalState, VaultState, VAULT_STATE_VERSION_V1},
     },
 };
 
@@ -266,7 +266,13 @@ fn test_vault_initialize_creates_correct_state() {
     assert_eq!(to_pk(vault_state.mint), mint_pk, "mint mismatch");
     assert_eq!(vault_state.total_assets, 0, "total_assets != 0");
     assert_eq!(vault_state.total_shares, 0, "total_shares != 0");
-    assert!(!vault_state.is_paused, "should not be paused");
+    assert_eq!(
+        vault_state.operational_state,
+        OperationalState::Active,
+        "new vault should be active"
+    );
+    assert_eq!(vault_state.version, VAULT_STATE_VERSION_V1);
+    assert_eq!(acct.data.len(), VaultState::ACCOUNT_LEN);
     assert_eq!(
         vault_state.vault_bump, expected_vault_bump,
         "vault_bump mismatch"

@@ -18,7 +18,7 @@ use {
     solana_transaction::versioned::VersionedTransaction,
     solana_vault_prototype::{
         constants::{USER_POSITION_SEED, VAULT_AUTHORITY_SEED, VAULT_SEED},
-        state::VaultState,
+        state::{OperationalState, VaultState},
     },
 };
 
@@ -415,7 +415,7 @@ fn test_pause_emits_paused_log() {
 
     let acct = v.svm.get_account(&v.vault_state_pda).unwrap();
     let vs = VaultState::try_deserialize(&mut acct.data.as_slice()).unwrap();
-    assert!(vs.is_paused);
+    assert_eq!(vs.operational_state, OperationalState::ExitOnly);
 }
 
 #[test]
@@ -436,5 +436,5 @@ fn test_unpause_emits_unpaused_log() {
 
     let acct = v.svm.get_account(&v.vault_state_pda).unwrap();
     let vs = VaultState::try_deserialize(&mut acct.data.as_slice()).unwrap();
-    assert!(!vs.is_paused);
+    assert_eq!(vs.operational_state, OperationalState::Active);
 }

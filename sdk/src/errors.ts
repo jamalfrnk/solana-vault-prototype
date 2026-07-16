@@ -10,6 +10,16 @@ export enum VaultErrorCode {
   Unauthorized = 6005,
   FreezeAuthorityPresent = 6006,
   InvalidVaultAuthorityOwner = 6007,
+  NoPendingAuthority = 6008,
+  InvalidNewAuthority = 6009,
+  UnsupportedVaultVersion = 6010,
+  VaultStateAlreadyMigrated = 6011,
+  InvalidLegacyReservedBytes = 6012,
+  InvalidLegacyOperationalState = 6013,
+  InvalidVaultStateSize = 6014,
+  InvalidVaultStatePda = 6015,
+  InvalidVaultBump = 6016,
+  InvalidAuthorityBump = 6017,
 }
 
 export interface ParsedVaultError {
@@ -24,7 +34,9 @@ function isKnownVaultErrorCode(n: number): n is VaultErrorCode {
 }
 
 /** Parses raw transaction logs for an AnchorError, reusing @anchor-lang/core's own log parser. */
-export function parseVaultErrorFromLogs(logs: string[] | undefined): ParsedVaultError {
+export function parseVaultErrorFromLogs(
+  logs: string[] | undefined
+): ParsedVaultError {
   const anchorError = logs ? AnchorError.parse(logs) : null;
   if (!anchorError) {
     return { code: undefined, message: "", raw: logs };
@@ -49,7 +61,9 @@ export function parseVaultError(err: unknown): ParsedVaultError {
 
 function extractLogs(err: unknown): string[] | undefined {
   if (err && typeof err === "object") {
-    const withTransactionError = err as { transactionError?: { logs?: string[] } };
+    const withTransactionError = err as {
+      transactionError?: { logs?: string[] };
+    };
     if (Array.isArray(withTransactionError.transactionError?.logs)) {
       return withTransactionError.transactionError!.logs;
     }

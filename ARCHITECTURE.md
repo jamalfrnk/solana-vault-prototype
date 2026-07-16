@@ -2,33 +2,35 @@
 
 **Current implementation: ACCEPTED — see `docs/decisions/0002-vault-architecture.md`**
 
-**Pre-audit production target: ACCEPTED BUT NOT IMPLEMENTED — see ADRs 0003–0009
+**Pre-audit production target: ACCEPTED AND PARTIALLY IMPLEMENTED — see ADRs 0003–0009
 under `docs/decisions/`**
 
 This document describes the design of the single-asset SPL-token vault.
 Current decisions are recorded in `docs/decisions/0002-vault-architecture.md` and
 reflected here as the authoritative reference for implemented behavior. Milestone 20
-approved the target production decisions before code. Those ADRs do not change the
-behavior described below: the prototype still has a boolean pause that blocks deposits
-and withdrawals, no explicit account version or migration, no protocol mint allowlist
-or caps, no excess-recovery instruction, and no configured production
-multisig/timelock.
+approved the target production decisions before code. Milestone 21 implements the
+145-byte VaultState v1 wire layout, deterministic same-size v0-to-v1 migration, strict
+SDK/IDL layout verification, and legacy-account inventory. It assigns the three-state
+pause wire enum, but deliberately preserves the prior behavior for one milestone:
+deposits and withdrawals both require `Active`. Mint allowlisting, caps,
+excess recovery, production multisig/timelock configuration, 113-byte account
+retirement, and exit-first instruction semantics remain unimplemented.
 
-## Accepted pre-audit target (not implemented)
+## Accepted pre-audit target and implementation status
 
 | Area | Accepted target | ADR |
 |---|---|---|
 | Threat boundaries | Users, clients, RPC, issuer, and operational roles remain outside the on-chain trust boundary; canonical legacy SPL Token only | [0003](docs/decisions/0003-production-threat-model.md) |
-| Pause | `Active`, `ExitOnly`, and exceptional `FullyPaused`; ordinary incidents preserve withdrawals | [0004](docs/decisions/0004-exit-first-pause-semantics.md) |
-| Versioning | Same-size 145-byte VaultState v1, deterministic v0 migration, and retirement of 113-byte devnet accounts | [0005](docs/decisions/0005-account-versioning-and-migration.md) |
+| Pause | `Active`, `ExitOnly`, and exceptional `FullyPaused`; enum and version gate implemented in M21, exit-first behavior and authority matrix pending | [0004](docs/decisions/0004-exit-first-pause-semantics.md) |
+| Versioning | Same-size 145-byte VaultState v1 and deterministic v0 migration implemented in M21; 113-byte devnet retirement pending | [0005](docs/decisions/0005-account-versioning-and-migration.md) |
 | Upgrades | Established 3-of-5 multisig, 48-hour ordinary timelock, 4-of-5 emergency path, and later immutability review | [0006](docs/decisions/0006-upgrade-governance-and-immutability.md) |
 | Mint and exposure | Governance allowlist, one mint- and freeze-authority-free legacy SPL mint initially, on-chain TVL/deposit caps, and staged rollout | [0007](docs/decisions/0007-mint-policy-and-exposure-limits.md) |
 | Donations | Internal accounting remains authoritative; only exact excess may be swept to the configured treasury while not active | [0008](docs/decisions/0008-donations-and-excess-recovery.md) |
 | Operations | Separated incident roles, explicit invariants, launch blockers, and sequential implementation/audit gates | [0009](docs/decisions/0009-incident-response-and-launch-gates.md) |
 
-The target reuses the current pause byte as `operational_state` and the first current
-reserved byte as `version`, so the 145-byte VaultState does not grow. Current values
-map deterministically: `false`/`0` becomes `Active`; `true`/`1` becomes `ExitOnly`.
+M21 reuses the former pause byte as `operational_state` and the first former
+reserved byte as `version`, so the 145-byte VaultState does not grow. Migration maps
+legacy `false`/`0` to `Active` and `true`/`1` to `ExitOnly` deterministically.
 Configuration and mint approval use separate versioned PDAs in the target design.
 Later milestones must implement one accepted slice at a time before this document can
 describe that slice as current behavior.
@@ -58,26 +60,27 @@ controls (pause/unpause) are gated by an explicit `pause_authority` keypair stor
 
 ### VaultState
 
-| Field | Type | Notes |
-|-------|------|-------|
-| `pause_authority` | `Pubkey` | Keypair authorised to pause/unpause |
-| `mint` | `Pubkey` | The one accepted deposit mint |
-| `vault_bump` | `u8` | Bump for vault_state PDA |
-| `authority_bump` | `u8` | Bump for vault_authority PDA |
-| `total_assets` | `u64` | Token units held in custody |
-| `total_shares` | `u64` | Sum of all UserPosition.shares |
-| `is_paused` | `bool` | Blocks deposit and withdraw when true |
-| `pending_pause_authority` | `Pubkey` | M18: proposed next `pause_authority`, or `Pubkey::default()` when no rotation is pending |
-| `reserved` | `[u8; 22]` | Future expansion |
+| Offset | Field | Type | Notes |
+|--------|-------|------|-------|
+| 0–7 | account discriminator | `[u8; 8]` | Anchor `VaultState` discriminator |
+| 8–39 | `pause_authority` | `Pubkey` | Authority currently allowed to pause/unpause |
+| 40–71 | `mint` | `Pubkey` | The one accepted deposit mint |
+| 72 | `vault_bump` | `u8` | Canonical bump for vault_state PDA |
+| 73 | `authority_bump` | `u8` | Canonical bump for vault_authority PDA |
+| 74–81 | `total_assets` | `u64` | Token units represented by accounting |
+| 82–89 | `total_shares` | `u64` | Sum of all UserPosition.shares |
+| 90 | `operational_state` | `OperationalState` | `Active=0`, `ExitOnly=1`, `FullyPaused=2` on the wire |
+| 91–122 | `pending_pause_authority` | `Pubkey` | Proposed next authority, or `Pubkey::default()` |
+| 123 | `version` | `u8` | Must equal `1` for all ordinary instructions |
+| 124–144 | `reserved` | `[u8; 21]` | Must be all zero in v1 |
 
-Field order matters here: `pending_pause_authority` was appended after
-`is_paused` (not inserted between existing fields) so every pre-M18 field
-keeps its byte offset. This still grows the account by 32 bytes — a vault
-initialized under the pre-M18 layout is not binary-compatible with this
-program version. Accepted for the current devnet prototype with no implemented
-migration path. ADR 0005 resolves the production design by retiring 113-byte devnet
-accounts and adding a same-size v0-to-v1 path for current 145-byte accounts; that path
-does not exist yet.
+The exact account length remains 145 bytes. A v0 account used the same offsets and
+length, interpreting byte 90 as `is_paused` and bytes 123–144 as 22 reserved bytes.
+The M21 permissionless migration validates every structural invariant before changing
+only byte 90's semantic type and byte 123's version marker. A pre-M18 113-byte account
+cannot be grown in place or passed to the migration instruction. Such accounts must be
+inventoried, drained under a compatible binary, reconciled, and retired; the initial
+devnet inventory is recorded in `docs/LEGACY_ACCOUNT_INVENTORY.md`.
 
 ### UserPosition
 
@@ -124,14 +127,15 @@ regardless of init mode.
 | `associated_token_program` | `Program<AssociatedToken>` | no | no | For ATA init |
 | `system_program` | `Program<System>` | no | no | For account init |
 
-State changes: sets all VaultState fields; total_assets = 0, total_shares = 0, is_paused = false.
+State changes: sets all VaultState fields; `total_assets = 0`, `total_shares = 0`,
+`operational_state = Active`, `version = 1`, and all reserved bytes zero.
 
 ### `deposit`
 
 | Account | Type | Signer | Mut | Constraint |
 |---------|------|--------|-----|------------|
 | `user` | `Signer` | yes | yes | Pays rent for user_position on first deposit |
-| `vault_state` | `Account<VaultState>` | no | yes | Must not be paused |
+| `vault_state` | `Account<VaultState>` | no | yes | Must be version 1 and `Active` |
 | `vault_authority` | `UncheckedAccount` | no | no | PDA seeds verified; owner = System Program (M12) |
 | `custody` | `Account<TokenAccount>` | no | yes | ATA for vault_authority + mint |
 | `user_token_account` | `Account<TokenAccount>` | no | yes | Caller's token account; mint must match |
@@ -141,7 +145,7 @@ State changes: sets all VaultState fields; total_assets = 0, total_shares = 0, i
 | `system_program` | `Program<System>` | no | no | For init_if_needed |
 
 Arguments: `amount: u64`
-Preconditions: `amount > 0`, `!is_paused`, user has sufficient token balance.
+Preconditions: `amount > 0`, `version == 1`, `operational_state == Active`, user has sufficient token balance.
 State changes: shares_out credited to user_position; total_assets += amount; total_shares += shares_out.
 CPI: `token::transfer_checked(user_token_account → custody, authority = user, amount, decimals)`.
 Postconditions: `shares_out > 0`.
@@ -151,7 +155,7 @@ Postconditions: `shares_out > 0`.
 | Account | Type | Signer | Mut | Constraint |
 |---------|------|--------|-----|------------|
 | `user` | `Signer` | yes | no | Must be user_position.owner |
-| `vault_state` | `Account<VaultState>` | no | yes | Must not be paused |
+| `vault_state` | `Account<VaultState>` | no | yes | Must be version 1 and `Active` in M21 |
 | `vault_authority` | `UncheckedAccount` | no | no | PDA seeds verified; signs CPI; owner = System Program (M12) |
 | `custody` | `Account<TokenAccount>` | no | yes | ATA for vault_authority + mint |
 | `user_token_account` | `Account<TokenAccount>` | no | yes | Destination; mint must match |
@@ -160,7 +164,8 @@ Postconditions: `shares_out > 0`.
 | `token_program` | `Program<Token>` | no | no | SPL Token |
 
 Arguments: `shares_in: u64`
-Preconditions: `shares_in > 0`, `shares_in ≤ user_position.shares`, `!is_paused`.
+Preconditions: `shares_in > 0`, `shares_in ≤ user_position.shares`, `version == 1`,
+`operational_state == Active`.
 State changes: user_position.shares -= shares_in; total_shares -= shares_in; total_assets -= assets_out.
 CPI: `token::transfer_checked(custody → user_token_account, authority = vault_authority PDA, amount = assets_out, decimals)`.
 Postconditions: `assets_out > 0`.
@@ -172,7 +177,26 @@ Postconditions: `assets_out > 0`.
 | `pause_authority` | `Signer` | yes | no | Must match vault_state.pause_authority |
 | `vault_state` | `Account<VaultState>` | no | yes | — |
 
-State changes: `is_paused = true` (pause) or `is_paused = false` (unpause).
+Both instructions require `version == 1`. `pause` writes `ExitOnly`; `unpause` writes
+`Active`. During this transitional M21 milestone, both deposit and withdrawal still
+require `Active`, so `ExitOnly` preserves the previous fully blocked behavior. The
+separate exit-first milestone will permit safe withdrawals in `ExitOnly` and introduce
+the stronger authority path for `FullyPaused`.
+
+### `migrate_v0_to_v1` (M21)
+
+| Account | Type | Signer | Mut | Constraint |
+|---------|------|--------|-----|------------|
+| `vault_state` | `Account<VaultState>` | no | yes | Exact 145-byte account owned by this program |
+
+The migration is intentionally permissionless: no caller can choose any migrated
+value, and requiring the old pause authority would make loss of that key a permanent
+availability failure. It verifies version 0, canonical vault and authority PDAs and
+stored bumps, a legacy operational byte of 0 or 1, and 21 zero reserved bytes. It then
+maps 0 to `Active` or 1 to `ExitOnly`, writes version 1, preserves every authority,
+mint, bump, accounting total, pending authority, and account length, and emits
+`VaultStateMigrated`. Repeated migration and malformed or unsupported state fail with
+specific errors. A 113-byte account is structurally incompatible and is never resized.
 
 ### `propose_pause_authority` (M18)
 
@@ -267,7 +291,8 @@ Rounding direction: floor (favors vault; dust accumulates in custody).
 1. `vault_state.mint` is immutable after initialization.
 2. `custody.owner == vault_authority.key()` — enforced by Anchor ATA constraint.
 3. `custody.mint == vault_state.mint` — enforced by Anchor ATA constraint.
-4. Only `pause_authority` signer can change `is_paused`.
+4. Only the `pause_authority` signer can invoke the current pause/unpause controls;
+   migration can only preserve and deterministically reinterpret legacy state.
 5. `total_assets` reflects only vault-mediated deposit/withdraw flows, maintained by
    deposit/withdraw CPI. Custody's live token balance may be `>=` `total_assets`: a
    direct SPL transfer into custody outside the `deposit` instruction (a "donation") is
@@ -278,7 +303,10 @@ Rounding direction: floor (favors vault; dust accumulates in custody).
 6. `total_shares == sum(user_position.shares)` — maintained by deposit/withdraw.
 7. No deposit credits zero shares; no withdrawal pays zero assets.
 8. All arithmetic is checked; no silent overflow.
-9. A substituted PDA, wrong mint, wrong token account, wrong owner, or wrong token
+9. Every ordinary instruction rejects VaultState versions other than 1. Migration is
+   the only instruction that accepts version 0, and only at the exact canonical
+   145-byte account.
+10. A substituted PDA, wrong mint, wrong token account, wrong owner, or wrong token
    program causes the transaction to fail with a specific, assertable error.
 
 ---
@@ -287,16 +315,20 @@ Rounding direction: floor (favors vault; dust accumulates in custody).
 
 ```
 Uninitialized
-     │ initialize
+     │ initialize(v1)
      ▼
   Active  ◄──────────────── unpause
      │                          ▲
      │ pause                    │
      ▼                          │
-  Paused ──────────────────────►
+ ExitOnly ─────────────────────►
+
+Legacy v0 Active/Paused ── migrate_v0_to_v1 ──► v1 Active/ExitOnly
 ```
 
-Deposit and withdraw are only available in the Active state.
+Deposit and withdraw are both available only in `Active` during M21. `ExitOnly` is the
+accepted wire state but does not yet preserve exits; implementing that behavior and the
+`FullyPaused` authority transition matrix is the next separate milestone.
 Initialize is available regardless of pause state (vault is initialized exactly once).
 
 ---
@@ -318,6 +350,7 @@ one.
 | `Unpaused` | `vault`, `pause_authority` | `unpause` |
 | `PauseAuthorityProposed` | `vault`, `current_authority`, `proposed_authority` | `propose_pause_authority` (M18) |
 | `PauseAuthorityRotated` | `vault`, `old_authority`, `new_authority` | `accept_pause_authority` (M18) |
+| `VaultStateMigrated` | `vault`, `old_version`, `new_version`, `operational_state` | `migrate_v0_to_v1` (M21) |
 
 ## Governance-ready pause authority (M16)
 

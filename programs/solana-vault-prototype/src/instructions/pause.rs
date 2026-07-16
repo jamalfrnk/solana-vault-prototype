@@ -4,7 +4,7 @@ use crate::{
     constants::VAULT_SEED,
     error::VaultError,
     events::{Paused, Unpaused},
-    state::VaultState,
+    state::{OperationalState, VaultState, VAULT_STATE_VERSION_V1},
 };
 
 #[derive(Accounts)]
@@ -18,12 +18,14 @@ pub struct Pause<'info> {
         mut,
         seeds = [VAULT_SEED, vault_state.mint.as_ref()],
         bump = vault_state.vault_bump,
+        constraint = vault_state.version == VAULT_STATE_VERSION_V1
+            @ VaultError::UnsupportedVaultVersion,
     )]
     pub vault_state: Account<'info, VaultState>,
 }
 
 pub fn pause_handler(ctx: Context<Pause>) -> Result<()> {
-    ctx.accounts.vault_state.is_paused = true;
+    ctx.accounts.vault_state.operational_state = OperationalState::ExitOnly;
 
     emit!(Paused {
         vault: ctx.accounts.vault_state.key(),
@@ -46,12 +48,14 @@ pub struct Unpause<'info> {
         mut,
         seeds = [VAULT_SEED, vault_state.mint.as_ref()],
         bump = vault_state.vault_bump,
+        constraint = vault_state.version == VAULT_STATE_VERSION_V1
+            @ VaultError::UnsupportedVaultVersion,
     )]
     pub vault_state: Account<'info, VaultState>,
 }
 
 pub fn unpause_handler(ctx: Context<Unpause>) -> Result<()> {
-    ctx.accounts.vault_state.is_paused = false;
+    ctx.accounts.vault_state.operational_state = OperationalState::Active;
 
     emit!(Unpaused {
         vault: ctx.accounts.vault_state.key(),

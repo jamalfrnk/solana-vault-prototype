@@ -3,7 +3,9 @@
 - **Status:** Accepted
 - **Date:** 2026-07-15
 - **Milestone:** 20 — Pre-Audit Production Design
-- **Implementation status:** Not implemented; current 145-byte accounts have no explicit version field
+- **Implementation status:** Partially implemented in M21: v1 layout, deterministic
+  migration, SDK diagnostics, inventory tooling, and full IDL layout verification are
+  implemented; inventoried 113-byte devnet accounts are not yet drained or retired
 
 ## Context
 

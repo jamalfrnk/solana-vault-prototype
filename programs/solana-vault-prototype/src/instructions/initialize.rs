@@ -8,7 +8,7 @@ use crate::{
     constants::{VAULT_AUTHORITY_SEED, VAULT_SEED},
     error::VaultError,
     events::VaultInitialized,
-    state::VaultState,
+    state::{OperationalState, VaultState, VAULT_STATE_VERSION_V1},
 };
 
 #[derive(Accounts)]
@@ -64,9 +64,10 @@ pub fn handler(ctx: Context<Initialize>) -> Result<()> {
     vs.authority_bump = ctx.bumps.vault_authority;
     vs.total_assets = 0;
     vs.total_shares = 0;
-    vs.is_paused = false;
+    vs.operational_state = OperationalState::Active;
     vs.pending_pause_authority = Pubkey::default();
-    vs.reserved = [0u8; 22];
+    vs.version = VAULT_STATE_VERSION_V1;
+    vs.reserved = [0u8; 21];
 
     emit!(VaultInitialized {
         vault: ctx.accounts.vault_state.key(),

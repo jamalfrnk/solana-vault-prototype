@@ -1,4 +1,8 @@
-import { AccountMeta, PublicKey, TransactionInstruction } from "@solana/web3.js";
+import {
+  AccountMeta,
+  PublicKey,
+  TransactionInstruction,
+} from "@solana/web3.js";
 
 import {
   PROGRAM_ID,
@@ -14,7 +18,11 @@ import {
   deriveAssociatedTokenAddress,
 } from "./pdas";
 
-function meta(pubkey: PublicKey, isSigner: boolean, isWritable: boolean): AccountMeta {
+function meta(
+  pubkey: PublicKey,
+  isSigner: boolean,
+  isWritable: boolean
+): AccountMeta {
   return { pubkey, isSigner, isWritable };
 }
 
@@ -24,7 +32,11 @@ function amountData(name: string, amount: bigint): Buffer {
   // DataView, not Buffer.writeBigUInt64LE: browser bundlers substitute a Buffer
   // polyfill that lacks the BigInt methods (Node-only), which crashed every
   // deposit/withdraw built in the dApp. DataView is standard ES2020.
-  new DataView(data.buffer, data.byteOffset, data.byteLength).setBigUint64(8, amount, true);
+  new DataView(data.buffer, data.byteOffset, data.byteLength).setBigUint64(
+    8,
+    amount,
+    true
+  );
   return data;
 }
 
@@ -35,7 +47,9 @@ export interface InitializeIxParams {
 }
 
 /** Allocates VaultState + custody ATA bound to one mint. Accounts must not sign; payer/pauseAuthority do. */
-export function buildInitializeIx(p: InitializeIxParams): TransactionInstruction {
+export function buildInitializeIx(
+  p: InitializeIxParams
+): TransactionInstruction {
   const vaultState = deriveVaultStatePda(p.mint);
   const vaultAuthority = deriveVaultAuthorityPda(vaultState.address);
   const custody = deriveAssociatedTokenAddress(vaultAuthority.address, p.mint);
@@ -121,11 +135,17 @@ export interface PauseIxParams {
   mint: PublicKey;
 }
 
-function buildPauseLikeIx(name: "pause" | "unpause", p: PauseIxParams): TransactionInstruction {
+function buildPauseLikeIx(
+  name: "pause" | "unpause",
+  p: PauseIxParams
+): TransactionInstruction {
   const vaultState = deriveVaultStatePda(p.mint);
   return new TransactionInstruction({
     programId: PROGRAM_ID,
-    keys: [meta(p.pauseAuthority, true, false), meta(vaultState.address, false, true)],
+    keys: [
+      meta(p.pauseAuthority, true, false),
+      meta(vaultState.address, false, true),
+    ],
     data: instructionDiscriminator(name),
   });
 }
@@ -146,7 +166,7 @@ export interface ProposePauseAuthorityIxParams {
 
 /** M18: current authority proposes the next one (two-step rotation, step 1). */
 export function buildProposePauseAuthorityIx(
-  p: ProposePauseAuthorityIxParams,
+  p: ProposePauseAuthorityIxParams
 ): TransactionInstruction {
   const vaultState = deriveVaultStatePda(p.mint);
   const data = Buffer.alloc(40);
@@ -154,7 +174,10 @@ export function buildProposePauseAuthorityIx(
   data.set(p.newAuthority.toBytes(), 8);
   return new TransactionInstruction({
     programId: PROGRAM_ID,
-    keys: [meta(p.pauseAuthority, true, false), meta(vaultState.address, false, true)],
+    keys: [
+      meta(p.pauseAuthority, true, false),
+      meta(vaultState.address, false, true),
+    ],
     data,
   });
 }
@@ -166,12 +189,31 @@ export interface AcceptPauseAuthorityIxParams {
 
 /** M18: the proposed authority accepts, completing the rotation (step 2). */
 export function buildAcceptPauseAuthorityIx(
-  p: AcceptPauseAuthorityIxParams,
+  p: AcceptPauseAuthorityIxParams
 ): TransactionInstruction {
   const vaultState = deriveVaultStatePda(p.mint);
   return new TransactionInstruction({
     programId: PROGRAM_ID,
-    keys: [meta(p.newPauseAuthority, true, false), meta(vaultState.address, false, true)],
+    keys: [
+      meta(p.newPauseAuthority, true, false),
+      meta(vaultState.address, false, true),
+    ],
     data: instructionDiscriminator("accept_pause_authority"),
+  });
+}
+
+export interface MigrateV0ToV1IxParams {
+  mint: PublicKey;
+}
+
+/** M21: permissionless, same-size migration; only VaultState is writable. */
+export function buildMigrateV0ToV1Ix(
+  p: MigrateV0ToV1IxParams
+): TransactionInstruction {
+  const vaultState = deriveVaultStatePda(p.mint);
+  return new TransactionInstruction({
+    programId: PROGRAM_ID,
+    keys: [meta(vaultState.address, false, true)],
+    data: instructionDiscriminator("migrate_v0_to_v1"),
   });
 }

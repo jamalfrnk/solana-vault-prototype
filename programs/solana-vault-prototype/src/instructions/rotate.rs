@@ -4,7 +4,7 @@ use crate::{
     constants::VAULT_SEED,
     error::VaultError,
     events::{PauseAuthorityProposed, PauseAuthorityRotated},
-    state::VaultState,
+    state::{VaultState, VAULT_STATE_VERSION_V1},
 };
 
 /// Two-step pause-authority rotation (M18).
@@ -33,6 +33,8 @@ pub struct ProposePauseAuthority<'info> {
         mut,
         seeds = [VAULT_SEED, vault_state.mint.as_ref()],
         bump = vault_state.vault_bump,
+        constraint = vault_state.version == VAULT_STATE_VERSION_V1
+            @ VaultError::UnsupportedVaultVersion,
     )]
     pub vault_state: Account<'info, VaultState>,
 }
@@ -71,6 +73,8 @@ pub struct AcceptPauseAuthority<'info> {
         mut,
         seeds = [VAULT_SEED, vault_state.mint.as_ref()],
         bump = vault_state.vault_bump,
+        constraint = vault_state.version == VAULT_STATE_VERSION_V1
+            @ VaultError::UnsupportedVaultVersion,
     )]
     pub vault_state: Account<'info, VaultState>,
 }

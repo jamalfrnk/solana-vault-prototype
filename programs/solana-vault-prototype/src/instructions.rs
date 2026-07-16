@@ -1,5 +1,6 @@
 pub mod deposit;
 pub mod initialize;
+pub mod migrate;
 pub mod pause;
 pub mod rotate;
 pub mod withdraw;
@@ -10,6 +11,8 @@ pub mod withdraw;
 pub use deposit::*;
 #[allow(ambiguous_glob_reexports)]
 pub use initialize::*;
+#[allow(ambiguous_glob_reexports)]
+pub use migrate::*;
 #[allow(ambiguous_glob_reexports)]
 pub use pause::*;
 #[allow(ambiguous_glob_reexports)]

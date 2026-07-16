@@ -446,9 +446,9 @@ fn test_deposit_paused_vault_fails() {
 
     // Pause the vault via raw byte mutation (pause instruction arrives in M7).
     // VaultState Borsh layout: [8 disc][32 pause_auth][32 mint][1 vault_bump]
-    // [1 auth_bump][8 total_assets][8 total_shares][1 is_paused] → offset 90.
+    // [1 auth_bump][8 total_assets][8 total_shares][1 operational_state] → offset 90.
     let mut vs_acct = f.svm.get_account(&f.vault_state_pda).unwrap();
-    vs_acct.data[90] = 1; // is_paused = true
+    vs_acct.data[90] = 1; // OperationalState::ExitOnly
     f.svm.set_account(f.vault_state_pda, vs_acct).unwrap();
 
     let user = Keypair::new();

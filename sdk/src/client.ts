@@ -7,17 +7,27 @@ import {
   sendAndConfirmTransaction,
 } from "@solana/web3.js";
 
-import { deriveVaultAuthorityPda, deriveVaultStatePda, PdaResult } from "./pdas";
+import {
+  deriveVaultAuthorityPda,
+  deriveVaultStatePda,
+  PdaResult,
+} from "./pdas";
 import {
   buildAcceptPauseAuthorityIx,
   buildDepositIx,
   buildInitializeIx,
+  buildMigrateV0ToV1Ix,
   buildPauseIx,
   buildProposePauseAuthorityIx,
   buildUnpauseIx,
   buildWithdrawIx,
 } from "./instructions";
-import { fetchUserPosition, fetchVaultState, UserPosition, VaultState } from "./accounts";
+import {
+  fetchUserPosition,
+  fetchVaultState,
+  UserPosition,
+  VaultState,
+} from "./accounts";
 import { parseVaultError } from "./errors";
 
 /**
@@ -27,7 +37,7 @@ import { parseVaultError } from "./errors";
 export class VaultClient {
   constructor(
     private readonly connection: Connection,
-    private readonly mint: PublicKey,
+    private readonly mint: PublicKey
   ) {}
 
   get vaultStatePda(): PdaResult {
@@ -38,7 +48,10 @@ export class VaultClient {
     return deriveVaultAuthorityPda(this.vaultStatePda.address);
   }
 
-  buildInitializeIx(payer: PublicKey, pauseAuthority: PublicKey): TransactionInstruction {
+  buildInitializeIx(
+    payer: PublicKey,
+    pauseAuthority: PublicKey
+  ): TransactionInstruction {
     return buildInitializeIx({ payer, pauseAuthority, mint: this.mint });
   }
 
@@ -61,14 +74,25 @@ export class VaultClient {
   /** M18: current authority proposes the next one (two-step rotation, step 1). */
   buildProposePauseAuthorityIx(
     pauseAuthority: PublicKey,
-    newAuthority: PublicKey,
+    newAuthority: PublicKey
   ): TransactionInstruction {
-    return buildProposePauseAuthorityIx({ pauseAuthority, newAuthority, mint: this.mint });
+    return buildProposePauseAuthorityIx({
+      pauseAuthority,
+      newAuthority,
+      mint: this.mint,
+    });
   }
 
   /** M18: the proposed authority accepts, completing the rotation (step 2). */
-  buildAcceptPauseAuthorityIx(newPauseAuthority: PublicKey): TransactionInstruction {
+  buildAcceptPauseAuthorityIx(
+    newPauseAuthority: PublicKey
+  ): TransactionInstruction {
     return buildAcceptPauseAuthorityIx({ newPauseAuthority, mint: this.mint });
+  }
+
+  /** M21: permissionless, same-size migration for this mint's 145-byte v0 vault. */
+  buildMigrateV0ToV1Ix(): TransactionInstruction {
+    return buildMigrateV0ToV1Ix({ mint: this.mint });
   }
 
   fetchVaultState(): Promise<VaultState | null> {
@@ -80,7 +104,10 @@ export class VaultClient {
   }
 
   /** Sends and confirms a transaction; on failure, rethrows a ParsedVaultError-augmented Error. */
-  async sendAndConfirm(ixs: TransactionInstruction[], signers: Signer[]): Promise<string> {
+  async sendAndConfirm(
+    ixs: TransactionInstruction[],
+    signers: Signer[]
+  ): Promise<string> {
     const tx = new Transaction().add(...ixs);
     try {
       return await sendAndConfirmTransaction(this.connection, tx, signers);

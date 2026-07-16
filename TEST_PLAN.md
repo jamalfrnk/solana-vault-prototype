@@ -1,17 +1,11 @@
 # Test Plan
 
-**Status: M17 complete (PR #27, merged 2026-07-12); M18 complete (PR #28,
-merged 2026-07-13); M19 complete (PR #30, merged 2026-07-13); M18/M19
-follow-up complete (PR #32, merged 2026-07-15); M20 pre-audit design in review —
-55 Rust tests (46 through M16 + 9 authority-rotation tests added in M18, in
-`tests/test_rotation.rs`; observed passing in CI run 29224127072 on
-2026-07-13), 53 SDK tests (49 through M17 + 4 M18 rotation-builder/decode
-tests, observed passing locally 2026-07-12 and in the same CI run; unchanged
-by M19), 90 dApp tests (34 at M14 close; M17 added lifecycle, animation,
-sound, confetti, background, and dashboard coverage — see `docs/UI_VAULT.md`
-for the testing strategy; the M18/M19 follow-up added explicit vault-load
-rejection coverage). M20 changes documentation only and does not change these test
-counts.**
+**Status: M20 complete (PR #33, merged 2026-07-15); M21 VaultState versioning
+in review — 65 Rust tests (55 through M18 + 10 migration/version-gate tests),
+68 SDK tests (53 through the M18/M19 follow-up + 15 strict decode, migration
+builder/client, inventory, and full synthetic IDL-layout cases), and 90 dApp tests. Rust
+execution and real generated-IDL verification are pending pull-request CI because
+this Windows host lacks the MSVC linker; the SDK suite is observed green locally.**
 
 ## Repository hygiene (complete)
 
@@ -29,7 +23,8 @@ counts.**
 
 - [x] `initialize` creates the vault state PDA and custody account bound to one mint.
       — `test_vault_initialize_creates_correct_state`: verifies pause_authority, mint,
-        total_assets=0, total_shares=0, is_paused=false, vault_bump, authority_bump.
+        total_assets=0, total_shares=0, `operational_state=Active`, `version=1`, exact
+        145-byte length, vault_bump, and authority_bump.
 - [x] Duplicate initialization fails.
       — `test_vault_initialize_duplicate_fails`.
 - [x] Garbage accounts / payer == pause_authority rejected.
@@ -73,10 +68,10 @@ counts.**
 
 ## Integration tests — pause/unpause (5 tests)
 
-- [x] `pause` sets `is_paused = true`.
-      — `test_pause_sets_is_paused`.
-- [x] `unpause` clears `is_paused = false`.
-      — `test_unpause_clears_is_paused`.
+- [x] `pause` sets `operational_state = ExitOnly`.
+      — `test_pause_sets_exit_only`.
+- [x] `unpause` sets `operational_state = Active`.
+      — `test_unpause_sets_active`.
 - [x] Double-pause is idempotent.
       — `test_pause_idempotent`.
 - [x] Wrong pause authority rejected.
@@ -198,7 +193,7 @@ CI, same pattern as M13–M17.
 Observed (2026-07-13, CI run 29224127072 on PR #28): `fmt, clippy, build-sbf,
 test` job green in 2m1s — all 55 Rust tests passed, including all 9 above.
 
-## IDL discriminator verification (M19)
+## IDL discriminator and account-layout verification (M19/M21)
 
 `sdk/src/discriminator.ts` computes every Anchor discriminator by hand
 (`sha256("global:<name>")` / `sha256("account:<Name>")`) rather than reading a
@@ -211,8 +206,9 @@ prior `cargo build-sbf` — same compiled program, plus IDL extraction to
 `target/idl/solana_vault_prototype.json`) and uploads the generated IDL as an
 artifact. A new `idl-verify` job downloads it and runs
 `scripts/verify_idl_discriminators.ts`, which diffs the IDL's own embedded
-discriminator bytes against every SDK-computed value — all 7 instructions
-and both accounts.
+discriminator bytes against every SDK-computed value. M21 extends that gate to all
+8 instructions, both accounts, both complete account field lists and types, fixed
+serialized sizes, and the exact `OperationalState` enum variants.
 
 - [x] `anchor build` succeeds in CI and produces `target/idl/solana_vault_prototype.json`.
       — First attempt failed: `anchor build` (unlike bare `cargo build-sbf`)
@@ -222,7 +218,7 @@ and both accounts.
         fix the error message names), which skips only that check without
         rewriting `declare_id!()` or needing a committed keypair. Observed
         green in CI run 29232763139 on PR #30 (2026-07-13) after the fix.
-- [x] All 7 instruction discriminators (`initialize`, `deposit`, `withdraw`,
+- [x] The original 7 instruction discriminators (`initialize`, `deposit`, `withdraw`,
       `pause`, `unpause`, `propose_pause_authority`, `accept_pause_authority`)
       and both account discriminators (`VaultState`, `UserPosition`) match
       the generated IDL.
@@ -234,11 +230,16 @@ and both accounts.
         `anchor build`-generated IDL in CI run 29232763139 on PR #30
         (2026-07-13): all 9 discriminators matched.
 
-Scope note: this verifies discriminators only, not full account byte-layout
-(field order/offsets). The roadmap candidate's "IDL-based codegen" phrase was
-read as two separable things — package structure (delivered fully) and
-discriminator provenance (verified, not rewritten) — confirmed with Malcolm
-before implementing; see `ROADMAP.md`'s Milestone 19 section.
+- [x] M21 synthetic fixtures prove the verifier passes the exact v1 layout and rejects
+      reordered fields, resized accounts, and altered enum variants.
+      — `sdk/tests/idl-layout-verification.test.ts`.
+- [x] The expanded verifier rejects the previously generated M20 IDL with explicit
+      missing-migration, field-count, field-name/type, reserved-size, and enum errors;
+      this is the expected negative control, not a claim that an M21 IDL was generated
+      locally.
+- [ ] The M21 verifier passes against the real Anchor-generated IDL.
+      — Pending the pull-request `idl-verify` job; update with the observed run before
+        milestone handoff.
 
 ## M18/M19 follow-up verification (complete — PR #32)
 
@@ -264,7 +265,7 @@ Not executed: the live devnet smoke. It requires a funded devnet keypair and is
 deliberately excluded from the offline SDK suite and CI. Root typecheck covers the
 script statically; the existing SDK suite covers all builders it composes.
 
-## M20 pre-audit design validation (in review)
+## M20 pre-audit design validation (complete — PR #33)
 
 M20 accepts ADRs 0003–0009 and changes no program, SDK, dApp, account bytes, or
 instruction interface. Its local completion checks are documentation-oriented:
@@ -288,25 +289,76 @@ exit 0. The first local-link command mishandled repository-root paths and printe
 PowerShell errors; its base-directory logic was corrected and the complete check was
 rerun successfully before recording the result above.
 
-Observed in initial pull-request CI (2026-07-15, run 29454078682): `fmt, clippy,
-build-sbf, test` — passed in 2m53s; `cargo audit` — passed in 20s; SDK tests —
-passed in 12s; dApp tests — passed in 55s; IDL discriminator verification — passed
-in 15s. All five jobs were green on commit `43fcaeb`.
+Observed in final main CI (2026-07-15, run 29459544952): all five Rust, audit, SDK,
+dApp, and IDL jobs passed after PR #33 merged.
 
 The following tests are required by later implementation milestones and are not marked
 complete by this design milestone:
 
-- [ ] exact 145-byte version-0 to version-1 migration, malformed reserved data,
-      unsupported version, incompatible length, and idempotence;
+- [x] exact 145-byte version-0 to version-1 migration, malformed reserved data,
+      unsupported version, incompatible length, and idempotence (M21);
 - [ ] `Active`/`ExitOnly`/`FullyPaused` transition and authority matrix;
 - [ ] deposits blocked while exits remain available in `ExitOnly`;
 - [ ] ProtocolConfig/MintConfig PDA, governed initialization, mint authority, token
       program, cap decrease/increase authority, and cap-boundary cases;
 - [ ] exact-excess recovery, shortfall, treasury substitution, state, CPI, donation,
       and accounting-preservation cases;
-- [ ] full IDL account field-order/type verification and SDK decoder compatibility;
+- [x] full IDL account field-order/type verification and SDK decoder compatibility
+      against synthetic fixtures (M21; real generated IDL pending CI);
 - [ ] deployment-manifest, verifiable-build, authority, monitoring, RPC-failover, load,
       reconciliation, and incident-drill evidence.
+
+## M21 VaultState versioning and deterministic migration (in review)
+
+All new Rust migration cases are in `tests/test_migration.rs` and use independent raw
+wire fixtures so the test cannot accidentally bless the program struct's own encoding.
+
+- [x] Permissionless exact-size v0 Active migration preserves every non-version/state
+      field and account length, sets version 1, and emits `VaultStateMigrated`.
+- [x] Legacy paused byte maps deterministically to `ExitOnly`.
+- [x] Repeated migration fails with `VaultStateAlreadyMigrated`.
+- [x] Nonzero legacy reserved data, invalid legacy state, and unsupported version fail
+      with their specific errors.
+- [x] Wrong vault PDA, stored vault bump, and stored authority bump fail independently.
+- [x] A 113-byte account and an oversized account cannot enter the migration path.
+- [x] An invalid enum discriminant fails closed during deserialization.
+- [x] An ordinary instruction rejects a structurally valid version-0 account.
+- [x] SDK strict decoding covers v1 success plus legacy 113-byte, v0, unknown version,
+      invalid state, nonzero reserved bytes, and incorrect length failures; diagnostic
+      inspection remains read-only and version-aware.
+- [x] SDK migration builder and client derive the canonical vault PDA and produce the
+      sole writable, non-signer account expected by the on-chain instruction.
+- [x] The read-only devnet inventory checks both account generations, canonical PDAs
+      and bumps, linked UserPositions, custody identity/balance, and accounting
+      shortfall; `--fail-on-blockers` makes unresolved legacy state machine-detectable.
+- [x] Mock-RPC inventory tests classify 113-byte/v0/v1 accounts, reconcile healthy
+      positions and custody, and independently report unsupported version, invalid
+      state, and nonzero reserved-byte blockers.
+      — `sdk/tests/legacy-inventory.test.ts`.
+
+Observed locally (2026-07-15/16): `cargo fmt --all -- --check` — exit 0;
+`corepack.cmd yarn test:sdk` — 68 passed / 0 failed; `corepack.cmd yarn typecheck` —
+exit 0; `corepack.cmd yarn sdk:build` — exit 0; dApp typecheck and production build —
+exit 0; dApp tests — 90 passed / 0 failed; app `npm audit --audit-level=high` —
+0 vulnerabilities. Changed TypeScript sources pass an explicit Prettier check. The
+read-only devnet inventory exited 0
+and found 2 legacy 113-byte vaults, 0 v0/v1 145-byte vaults, 2 linked positions,
+0 orphan positions, and 2 launch blockers; both custody balances exactly matched
+accounting. The same command with `--fail-on-blockers` exited 2 as designed. No
+transaction was signed and no asset moved.
+
+Not observed locally: Rust compile/test. `cargo test --test test_migration --no-run`
+stopped before compiling the project because `link.exe` is unavailable while linking
+a dependency build script. This is the same host limitation recorded for M18; Rust,
+clippy, SBF, and generated-IDL results must come from pull-request CI.
+
+Also unavailable locally: `cargo audit` is not installed, and Yarn Classic's audit
+request returned HTTP 410 from its retired quick-audit endpoint. No package-manager or
+global-tool upgrade is hidden in M21; the existing CI audit gates must be observed and
+any infrastructure failure addressed explicitly before handoff. The broad legacy root
+`yarn lint` script also fails before checking sources because its first glob matches no
+files and it traverses ignored `.next` output; all changed TypeScript files were
+formatted and rechecked explicitly instead of rewriting unrelated generated/app files.
 
 ## Anchor scaffold baseline (complete — M2)
 

@@ -1,8 +1,8 @@
 # Security Checklist
 
-**Status: implemented controls checked through M18; M20 pre-audit target design accepted,
-but its implementation items remain unchecked. Items are checked only when built,
-tested, and reviewed.**
+**Status: implemented controls checked through M21; M20 pre-audit target design accepted
+and its VaultState versioning slice implemented in M21. Remaining target items stay
+unchecked until built, tested, and reviewed.**
 
 Checked items reflect only what is true today. Implementation items remain unchecked
 until the corresponding milestone is implemented and tested. This is an interview-grade
@@ -146,9 +146,13 @@ for production custody.
         byte-identical to the prior hand `LEN` (105 + 8 = 113).
       — M18: Appending `pending_pause_authority` grows `VaultState` by 32 bytes to
         145 bytes on the wire (137-byte `INIT_SPACE` + 8-byte discriminator). Pre-M18
-        113-byte vault accounts are intentionally not binary-compatible; this devnet
-        prototype has no migration instruction, now surfaced explicitly by the dApp
-        and `RUNBOOK.md` in the M18/M19 follow-up.
+        113-byte vault accounts are intentionally not binary-compatible.
+      — M21: The 145-byte account remains exactly the same size while the old pause
+        byte becomes `operational_state`, the first old reserved byte becomes
+        `version`, and the remaining reserved area becomes 21 bytes. The compiler-
+        derived allocation, Rust layout assertions, strict SDK decoder, and generated-
+        IDL verifier independently enforce the complete v1 layout. The same-size
+        migration never reallocates; 113-byte accounts remain a retirement blocker.
 - [x] Account reinitialization is prevented.
       — M4: Anchor `init` constraint on `vault_state` fails if the account already has
         lamports. `test_vault_initialize_duplicate_fails` verifies this. The custody ATA
@@ -192,10 +196,12 @@ can it be timed to shift share price around a pending deposit or withdrawal. Pro
       price.
       — M12: `test_direct_donation_does_not_skew_second_depositor_share_price`.
 
-## Events (M12)
+## Events (M12/M18/M21)
 
 `VaultInitialized`, `Deposited`, `Withdrawn`, `Paused`, `Unpaused` are emitted at the end
 of each handler, after all state mutation, so they reflect final post-instruction state.
+M18 adds proposal/rotation events; M21 adds `VaultStateMigrated` with old/new version
+and the deterministic operational state.
 Events are informational only — intended for off-chain indexing and monitoring. They are
 **not** a security boundary: no instruction's correctness depends on an event being
 observed, and emitting an event grants no authority.
@@ -204,6 +210,10 @@ observed, and emitting an event grants no authority.
       — M12: `test_initialize_emits_vault_initialized_log`, `test_deposit_emits_deposited_log`,
         `test_withdraw_emits_withdrawn_log`, `test_pause_emits_paused_log`,
         `test_unpause_emits_unpaused_log`.
+- [x] Rotation and migration success paths emit evidence without using events as an
+      authorization boundary.
+      — M18: `test_rotation_events_emitted`; M21:
+        `test_migrate_active_v0_to_v1_is_permissionless_same_size_and_preserves_fields`.
 
 ## Adversarial tests
 
@@ -345,13 +355,12 @@ multisig PDA using the same M16 sigverify-off `invoke_signed` analog.
 - [x] Both instructions emit their events (`PauseAuthorityProposed`, `PauseAuthorityRotated`).
       — M18: `test_rotation_events_emitted`.
 
-## Pre-audit production target (M20 — accepted, not implemented)
+## Pre-audit production target (M20 accepted; M21 versioning slice implemented)
 
 ADRs 0003–0009 define the reviewed target before further program work. They adapt
 OWASP SCSVS architecture, governance, authorization, external-interaction, business-
-logic, and denial-of-service principles to this Solana program. Acceptance is not
-implementation: every item below is intentionally unchecked and remains a launch
-blocker until its own milestone is built and verified.
+logic, and denial-of-service principles to this Solana program. Checked M21 items below
+are implemented and tested; every unchecked item remains a launch blocker.
 
 ### Threat boundaries and roles
 
@@ -364,20 +373,44 @@ blocker until its own milestone is built and verified.
 
 ### Pause and availability
 
-- [ ] `operational_state` implements `Active`, `ExitOnly`, and `FullyPaused` exactly as
-      ADR 0004 specifies.
+- [ ] `operational_state` implements the complete exit-first behavior and authority
+      matrix from ADR 0004. M21 encodes `Active`, `ExitOnly`, and `FullyPaused`, but
+      deliberately preserves the old behavior: deposit and withdrawal both require
+      `Active`. Exit-first behavior remains the next separate milestone.
 - [ ] Ordinary incident response blocks new deposits while preserving valid user exits.
 - [ ] Only the stronger emergency authority can block withdrawals, and cap/mint controls
       never restrict exits.
 
 ### Versioning and migration
 
-- [ ] Current 145-byte version-0 VaultState accounts migrate deterministically to the
-      same-size version-1 layout, with idempotence and malformed-state tests.
-- [ ] Pre-M18 113-byte devnet accounts are inventoried, drained with a compatible
-      binary, reconciled, recorded, and retired before persistent deployment.
-- [ ] SDK and CI reject unsupported layouts and verify full IDL field order/types, not
-      only discriminators.
+- [x] Current 145-byte version-0 VaultState accounts migrate deterministically to the
+      same-size version-1 layout, with exact-size, PDA/bump, malformed-reserved,
+      unsupported-state/version, preservation, permissionless, event, and idempotence
+      coverage. Ordinary instructions reject every version other than 1.
+- [x] Pre-M18 113-byte devnet accounts are inventoried read-only, including canonical
+      PDA/bump, linked position, custody ownership/mint/balance, and accounting checks.
+      The initial inventory found two structurally healthy but incompatible devnet
+      vaults; see `docs/LEGACY_ACCOUNT_INVENTORY.md`.
+- [ ] Every inventoried 113-byte account is drained with a compatible binary,
+      reconciled with transaction evidence, recorded, and retired before persistent
+      deployment.
+- [x] The SDK rejects 113-byte, v0, unsupported-version, invalid-enum, nonzero-reserved,
+      and incorrectly sized layouts. CI verifies all instruction/account discriminators,
+      exact account field order/types/sizes, and the `OperationalState` enum.
+
+### Versioning and migration security (M21)
+
+- [x] Migration is permissionless but value-deterministic: the caller supplies no
+      authority, mint, bump, totals, pending authority, state mapping, or destination.
+- [x] Migration checks the program-owned exact-size account plus canonical vault PDA,
+      vault bump, vault-authority bump, version 0, legacy state domain, and zero legacy
+      reserved bytes before the single atomic rewrite.
+- [x] Migration preserves account length and every non-version/state field; it cannot
+      move tokens, resize the account, change authorities, or alter accounting totals.
+- [x] Repeated migration fails specifically instead of silently succeeding, and
+      unsupported ordinary accounts fail closed before state mutation or CPI.
+- [x] Legacy inventory is read-only, accepts no signer, redacts RPC path/query details,
+      writes no files, and has a blocker exit mode suitable for launch automation.
 
 ### Mint, exposure, and donations
 

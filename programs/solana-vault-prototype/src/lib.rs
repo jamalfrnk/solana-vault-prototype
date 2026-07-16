@@ -54,4 +54,8 @@ pub mod solana_vault_prototype {
     pub fn accept_pause_authority(ctx: Context<AcceptPauseAuthority>) -> Result<()> {
         rotate::accept_handler(ctx)
     }
+
+    pub fn migrate_v0_to_v1(ctx: Context<MigrateV0ToV1>) -> Result<()> {
+        migrate::handler(ctx)
+    }
 }

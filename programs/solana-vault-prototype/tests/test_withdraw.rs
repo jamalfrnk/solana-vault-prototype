@@ -509,7 +509,7 @@ fn test_withdraw_paused_vault_fails() {
     let deposit = 1_000_000u64;
     let mut f = DepositFixture::new(deposit);
 
-    // Pause vault via raw byte mutation (is_paused at offset 90)
+    // Pause vault via raw byte mutation (operational_state at offset 90).
     let mut vs_acct = f.svm.get_account(&f.vault_state_pda).unwrap();
     vs_acct.data[90] = 1;
     f.svm.set_account(f.vault_state_pda, vs_acct).unwrap();

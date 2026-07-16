@@ -59,17 +59,17 @@ test changes.
 Accepted ADRs fall into two categories:
 
 - **Implemented architecture:** describes behavior present in the current prototype.
-- **Accepted target design:** approved before implementation and explicitly marked as
-  not implemented. These records are requirements for later milestones, not production
-  readiness claims.
+- **Accepted target design:** approved before implementation, then updated with an
+  explicit per-slice implementation status. Partial implementation is not a production
+  readiness claim; every remaining requirement stays launch-blocking.
 
 | ADR | Decision | Status | Implementation |
 |---|---|---|---|
 | [0001](0001-toolchain-version-pinning.md) | Toolchain version pinning | Accepted | Implemented |
 | [0002](0002-vault-architecture.md) | Vault architecture | Accepted | Implemented, except where a later target ADR supersedes production behavior |
 | [0003](0003-production-threat-model.md) | Production threat model and trust boundaries | Accepted | Target design; not implemented |
-| [0004](0004-exit-first-pause-semantics.md) | Exit-first pause semantics | Accepted | Target design; not implemented |
-| [0005](0005-account-versioning-and-migration.md) | Account versioning and migration | Accepted | Target design; not implemented |
+| [0004](0004-exit-first-pause-semantics.md) | Exit-first pause semantics | Accepted | Wire enum assigned in M21; behavior/authority matrix not implemented |
+| [0005](0005-account-versioning-and-migration.md) | Account versioning and migration | Accepted | v1/migration/tooling implemented in M21; 113-byte retirement pending |
 | [0006](0006-upgrade-governance-and-immutability.md) | Upgrade governance and immutability | Accepted | Target design; not implemented |
 | [0007](0007-mint-policy-and-exposure-limits.md) | Mint policy and exposure limits | Accepted | Target design; not implemented |
 | [0008](0008-donations-and-excess-recovery.md) | Donations, dust, and excess recovery | Accepted | Accounting implemented; recovery not implemented |
