@@ -297,18 +297,21 @@ complete by this design milestone:
 
 - [x] exact 145-byte version-0 to version-1 migration, malformed reserved data,
       unsupported version, incompatible length, and idempotence (M21);
-- [ ] `Active`/`ExitOnly`/`FullyPaused` transition and authority matrix;
-- [ ] deposits blocked while exits remain available in `ExitOnly`;
+- [x] ordinary-authority `Active`/`ExitOnly` transition matrix, fail-closed
+      `FullyPaused`, and exit-first deposit/withdraw gates (M22);
+- [ ] `ProtocolConfig` emergency-authority transitions into and out of `FullyPaused`;
+- [x] deposits blocked while exits remain available in `ExitOnly` (M22);
 - [ ] ProtocolConfig/MintConfig PDA, governed initialization, mint authority, token
       program, cap decrease/increase authority, and cap-boundary cases;
 - [ ] exact-excess recovery, shortfall, treasury substitution, state, CPI, donation,
       and accounting-preservation cases;
-- [x] full IDL account field-order/type verification and SDK decoder compatibility
-      against synthetic fixtures (M21; real generated IDL pending CI);
+- [x] full IDL account field-order/type verification, instruction argument schemas,
+      both operational enums, and SDK decoder compatibility against synthetic fixtures
+      (M21/M22; real generated IDL pending M22 CI);
 - [ ] deployment-manifest, verifiable-build, authority, monitoring, RPC-failover, load,
       reconciliation, and incident-drill evidence.
 
-## M21 VaultState versioning and deterministic migration (in review)
+## M21 VaultState versioning and deterministic migration (complete — PR #34)
 
 All new Rust migration cases are in `tests/test_migration.rs` and use independent raw
 wire fixtures so the test cannot accidentally bless the program struct's own encoding.
@@ -366,6 +369,44 @@ passed in 2m52s; cargo audit — passed in 17s; 68 SDK tests, typecheck, and hig
 Yarn audit gate — passed in 12s; dApp typecheck/build, 90 tests, and high/critical npm
 audit gate — passed in 47s; generated-IDL discriminator/account-layout verification —
 passed in 14s. All five jobs were green.
+
+Merged through PR #34 as `30fa983` on 2026-07-15/16. Final pre-merge CI run
+29461990674 passed all five Rust, audit, SDK, dApp, and generated-IDL jobs.
+
+## M22 exit-first pause semantics (in review)
+
+- [x] Deposit succeeds only in `Active` and fails in `ExitOnly` and `FullyPaused`.
+- [x] Withdrawal succeeds in `Active` and `ExitOnly` and fails in `FullyPaused`.
+- [x] `pause` and `unpause` are idempotent within the ordinary authority's permitted
+      `Active`/`ExitOnly` states; wrong signers remain rejected.
+- [x] The ordinary authority cannot change `FullyPaused`; no temporary full-pause
+      authority or transition is introduced before `ProtocolConfig`.
+- [x] `OperationalStateChanged` has an exact 91-byte wire payload and records old/new
+      state, signer, slot, Unix timestamp, and a bounded reason code.
+- [x] Invalid reason and operational-state enum bytes fail closed.
+- [x] SDK availability helpers implement the exact three-state matrix; pause/unpause
+      builders encode the one-byte reason after the discriminator.
+- [x] Generated-IDL verification pins every instruction argument plus the
+      `OperationalStateReason` variant order in addition to the M21 layout checks.
+- [x] dApp deposit, withdrawal, status, vault LED, and ordinary-admin controls distinguish
+      all three states and preserve exit-only withdrawals.
+
+Observed locally (2026-07-15): Rust formatting and `git diff --check` exited 0; root
+typecheck and SDK build exited 0; 73 SDK tests and 94 dApp tests passed; dApp typecheck
+and production build exited 0; the dApp high-severity npm audit found 0 vulnerabilities.
+Windows `cargo test --no-run` stopped before project compilation because this host has
+no MSVC `link.exe`. An isolated WSL build then compiled the program and every integration
+test source with `cargo test --no-run`; full
+`clippy --all-targets --all-features -- -D warnings` also exited 0.
+Runtime execution, SBF generation, and all 70 tests still require CI because the local
+checkout has no current M22 `.so`; a temporary ignored placeholder was used only to
+satisfy `include_bytes!` during typechecking and was deleted immediately afterward.
+Yarn Classic's audit endpoint returned HTTP 410 locally, so the existing CI
+severity-bitmask gate remains authoritative. The live devnet smoke was not executed: it
+requires a funded keypair and would mutate the deployed demonstration state.
+The first local-link helper repeated M20's empty-parent bug for repository-root files;
+the fail-fast corrected validator was rerun and resolved all 44 local links across the
+12 changed milestone documents.
 
 ## Anchor scaffold baseline (complete — M2)
 

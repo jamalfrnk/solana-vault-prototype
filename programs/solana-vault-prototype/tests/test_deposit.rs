@@ -439,50 +439,48 @@ fn test_deposit_zero_amount_fails() {
     );
 }
 
-/// Deposit into a paused vault must fail.
+/// Deposits are blocked in both non-Active states.
 #[test]
-fn test_deposit_paused_vault_fails() {
-    let mut f = VaultFixture::new();
+fn test_deposit_blocked_in_exit_only_and_fully_paused() {
+    for operational_state in [1u8, 2u8] {
+        let mut f = VaultFixture::new();
 
-    // Pause the vault via raw byte mutation (pause instruction arrives in M7).
-    // VaultState Borsh layout: [8 disc][32 pause_auth][32 mint][1 vault_bump]
-    // [1 auth_bump][8 total_assets][8 total_shares][1 operational_state] → offset 90.
-    let mut vs_acct = f.svm.get_account(&f.vault_state_pda).unwrap();
-    vs_acct.data[90] = 1; // OperationalState::ExitOnly
-    f.svm.set_account(f.vault_state_pda, vs_acct).unwrap();
+        let mut vs_acct = f.svm.get_account(&f.vault_state_pda).unwrap();
+        vs_acct.data[90] = operational_state;
+        f.svm.set_account(f.vault_state_pda, vs_acct).unwrap();
 
-    let user = Keypair::new();
-    let user_pk = keypair_pubkey(&user);
-    f.svm.airdrop(&user.pubkey(), 10_000_000_000).unwrap();
+        let user = Keypair::new();
+        let user_pk = keypair_pubkey(&user);
+        f.svm.airdrop(&user.pubkey(), 10_000_000_000).unwrap();
 
-    let user_ata = associated_token_address(&user_pk, &f.mint_pk);
-    f.svm
-        .set_account(
+        let user_ata = associated_token_address(&user_pk, &f.mint_pk);
+        f.svm
+            .set_account(
+                user_ata,
+                make_token_account(&user_pk, &f.mint_pk, 1_000_000),
+            )
+            .unwrap();
+
+        let (pos, _) = find_user_position(&f.vault_state_pda, &user_pk, &f.pid);
+        let ix = make_deposit_ix(
+            user_pk,
+            f.vault_state_pda,
+            f.vault_authority_pda,
+            f.custody_ata,
             user_ata,
-            make_token_account(&user_pk, &f.mint_pk, 1_000_000),
-        )
-        .unwrap();
+            pos,
+            f.mint_pk,
+            500_000,
+        );
 
-    let (pos, _) = find_user_position(&f.vault_state_pda, &user_pk, &f.pid);
-
-    let ix = make_deposit_ix(
-        user_pk,
-        f.vault_state_pda,
-        f.vault_authority_pda,
-        f.custody_ata,
-        user_ata,
-        pos,
-        f.mint_pk,
-        500_000,
-    );
-
-    let blockhash = f.svm.latest_blockhash();
-    let msg = Message::new_with_blockhash(&[ix], Some(&user.pubkey()), &blockhash);
-    let tx = VersionedTransaction::try_new(VersionedMessage::Legacy(msg), &[&user]).unwrap();
-    assert!(
-        f.svm.send_transaction(tx).is_err(),
-        "deposit into paused vault must fail"
-    );
+        let blockhash = f.svm.latest_blockhash();
+        let msg = Message::new_with_blockhash(&[ix], Some(&user.pubkey()), &blockhash);
+        let tx = VersionedTransaction::try_new(VersionedMessage::Legacy(msg), &[&user]).unwrap();
+        assert!(
+            f.svm.send_transaction(tx).is_err(),
+            "deposits must fail in operational state {operational_state}"
+        );
+    }
 }
 
 /// Wrong mint token account must be rejected.

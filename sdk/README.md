@@ -5,8 +5,8 @@ program — PDA derivation, instruction builders, account decoders, and Anchor
 error parsing, with no runtime dependency on a generated IDL. Every Anchor
 discriminator is computed directly (`sha256("global:<name>")` /
 `sha256("account:<Name>")`). CI verifies those values plus exact account field
-order/types/sizes and the `OperationalState` enum against the program's real generated
-IDL (see `TEST_PLAN.md` in the repository root).
+order/types/sizes, every instruction argument schema, and both operational-state enums
+against the program's real generated IDL (see `TEST_PLAN.md` in the repository root).
 
 **Status**: versioned and buildable, not yet published to npm. Until then,
 import it directly from the repo (see `README.md`'s SDK section for the
@@ -25,12 +25,24 @@ Peer dependencies (bring your own versions): `@solana/web3.js@^1.98.0`,
 ## Usage
 
 ```ts
-import { VaultClient } from "solana-vault-prototype-sdk";
+import {
+  OperationalStateReason,
+  VaultClient,
+} from "solana-vault-prototype-sdk";
 
 const client = new VaultClient(connection, mintPublicKey);
 const ix = client.buildDepositIx(userPublicKey, 1_000_000n);
+const pauseIx = client.buildPauseIx(
+  pauseAuthorityPublicKey,
+  OperationalStateReason.IncidentResponse,
+);
 const state = await client.fetchVaultState();
 ```
+
+`canDeposit(state)` is true only for `Active`; `canWithdraw(state)` is true for
+`Active` and `ExitOnly`. Both are false for `FullyPaused`. Pause/unpause builders
+require a bounded `OperationalStateReason` and reject out-of-range numeric values
+before wallet interaction.
 
 `fetchVaultState()` decodes only the exact 145-byte version-1 layout and fails closed
 on legacy 113-byte, compatible-but-unmigrated v0, unknown-version, invalid-state,
@@ -53,5 +65,5 @@ migration transaction.
 ```bash
 corepack yarn install   # from the repo root
 corepack yarn sdk:build # emits dist/*.js + dist/*.d.ts
-corepack yarn test:sdk  # 68 offline tests
+corepack yarn test:sdk  # 73 offline tests
 ```

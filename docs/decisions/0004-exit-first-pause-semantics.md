@@ -3,15 +3,17 @@
 - **Status:** Accepted
 - **Date:** 2026-07-15
 - **Milestone:** 20 — Pre-Audit Production Design
-- **Implementation status:** Partially implemented in M21: the wire enum is assigned,
-  but exit-first withdrawal behavior and the full-pause authority path remain unimplemented
+- **Implementation status:** Partially implemented through M22: the wire enum,
+  exit-first deposit/withdraw gates, bounded transition evidence, and ordinary-authority
+  `Active`/`ExitOnly` controls are implemented; the `ProtocolConfig`-governed path into
+  and out of `FullyPaused` remains unimplemented
 - **Supersedes:** ADR 0002 section 6 for the target production design
 
 ## Context
 
-The current `is_paused: bool` blocks both deposits and withdrawals. That is simple for
-a prototype, but it lets an authority mistake or non-withdrawal incident lock all users
-in the vault. Most incidents should stop new exposure while preserving safe exits.
+Before M21/M22, `is_paused: bool` blocked both deposits and withdrawals. That was simple
+for a prototype, but it let an authority mistake or non-withdrawal incident lock all
+users in the vault. Most incidents should stop new exposure while preserving safe exits.
 Only evidence that the outbound transfer or redemption path is unsafe justifies
 blocking withdrawals.
 
@@ -97,8 +99,9 @@ stronger, separately controlled authorization boundary.
 - Deposit constraints change from `!is_paused` to `operational_state == Active`.
 - Withdraw constraints permit both `Active` and `ExitOnly`, and reject only
   `FullyPaused` or invalid states.
-- Program, SDK, dApp, IDL verification, event, migration, and state-machine tests all
-  require a later implementation milestone.
+- Program, SDK, dApp, IDL verification, event, migration, and state-machine tests cover
+  the M22 exit-first slice. Emergency-authority transition tests remain required with
+  `ProtocolConfig`.
 - Existing paused 145-byte accounts become exit-only after deterministic migration;
   this intentionally restores safe withdrawals.
 - Monitoring and UI must show the three states explicitly and must never label

@@ -503,15 +503,45 @@ fn test_withdraw_wrong_user_fails() {
     );
 }
 
-/// Withdraw from paused vault must fail.
+/// Exit-first invariant: a valid user exit remains available in ExitOnly.
 #[test]
-fn test_withdraw_paused_vault_fails() {
+fn test_withdraw_succeeds_in_exit_only() {
     let deposit = 1_000_000u64;
     let mut f = DepositFixture::new(deposit);
 
-    // Pause vault via raw byte mutation (operational_state at offset 90).
+    // Set ExitOnly directly so this test isolates the withdraw gate.
     let mut vs_acct = f.svm.get_account(&f.vault_state_pda).unwrap();
     vs_acct.data[90] = 1;
+    f.svm.set_account(f.vault_state_pda, vs_acct).unwrap();
+
+    let user_pk = keypair_pubkey(&f.user);
+    let ix = make_withdraw_ix(
+        user_pk,
+        f.vault_state_pda,
+        f.vault_authority_pda,
+        f.custody_ata,
+        f.user_ata,
+        f.user_position_pda,
+        f.mint_pk,
+        deposit,
+    );
+
+    send_ok(&mut f.svm, &[ix], &[&f.payer, &f.user], &f.payer);
+
+    let vs_acct = f.svm.get_account(&f.vault_state_pda).unwrap();
+    let vs = VaultState::try_deserialize(&mut vs_acct.data.as_slice()).unwrap();
+    assert_eq!(vs.total_assets, 0);
+    assert_eq!(vs.total_shares, 0);
+}
+
+/// FullyPaused is the sole state that blocks a valid withdrawal.
+#[test]
+fn test_withdraw_fails_in_fully_paused() {
+    let deposit = 1_000_000u64;
+    let mut f = DepositFixture::new(deposit);
+
+    let mut vs_acct = f.svm.get_account(&f.vault_state_pda).unwrap();
+    vs_acct.data[90] = 2;
     f.svm.set_account(f.vault_state_pda, vs_acct).unwrap();
 
     let user_pk = keypair_pubkey(&f.user);
@@ -531,6 +561,11 @@ fn test_withdraw_paused_vault_fails() {
     let tx = VersionedTransaction::try_new(VersionedMessage::Legacy(msg), &[&f.user]).unwrap();
     assert!(
         f.svm.send_transaction(tx).is_err(),
-        "withdraw from paused vault must fail"
+        "FullyPaused must fail closed for withdrawals"
     );
+
+    let vs_acct = f.svm.get_account(&f.vault_state_pda).unwrap();
+    let vs = VaultState::try_deserialize(&mut vs_acct.data.as_slice()).unwrap();
+    assert_eq!(vs.total_assets, deposit);
+    assert_eq!(vs.total_shares, deposit);
 }

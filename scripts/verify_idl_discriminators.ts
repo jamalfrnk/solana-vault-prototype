@@ -1,10 +1,12 @@
 /**
- * M19/M21 generated-IDL verification.
+ * M19/M21/M22 generated-IDL verification.
  *
  * M19 pinned every SDK-computed discriminator to Anchor's generated IDL.
  * M21 additionally verifies the complete fixed persistent-account schema:
  * field names, order, types, enum variants, and serialized sizes. This keeps
  * the SDK's manual decoders auditable without adding a runtime IDL dependency.
+ * M22 pins every instruction argument and the bounded operational-state reason
+ * enum so pause/unpause wire changes cannot silently drift from the SDK.
  */
 
 import * as fs from "fs";
@@ -35,21 +37,35 @@ interface IdlTypeDefinition {
 }
 
 interface IdlDocument {
-  instructions?: { name: string; discriminator?: number[] }[];
+  instructions?: {
+    name: string;
+    discriminator?: number[];
+    args?: IdlField[];
+  }[];
   accounts?: { name: string; discriminator?: number[] }[];
   types?: IdlTypeDefinition[];
 }
 
-const INSTRUCTION_NAMES = [
-  "initialize",
-  "deposit",
-  "withdraw",
-  "pause",
-  "unpause",
-  "propose_pause_authority",
-  "accept_pause_authority",
-  "migrate_v0_to_v1",
-];
+const INSTRUCTION_LAYOUTS: Record<string, IdlField[]> = {
+  initialize: [],
+  deposit: [{ name: "amount", type: "u64" }],
+  withdraw: [{ name: "shares_in", type: "u64" }],
+  pause: [
+    {
+      name: "reason",
+      type: { defined: { name: "OperationalStateReason" } },
+    },
+  ],
+  unpause: [
+    {
+      name: "reason",
+      type: { defined: { name: "OperationalStateReason" } },
+    },
+  ],
+  propose_pause_authority: [{ name: "new_authority", type: "pubkey" }],
+  accept_pause_authority: [],
+  migrate_v0_to_v1: [],
+};
 
 const ACCOUNT_LAYOUTS: Record<
   string,
@@ -85,6 +101,12 @@ const ACCOUNT_LAYOUTS: Record<
 };
 
 const OPERATIONAL_STATE_VARIANTS = ["Active", "ExitOnly", "FullyPaused"];
+const OPERATIONAL_STATE_REASON_VARIANTS = [
+  "IncidentResponse",
+  "ExposureReduction",
+  "IncidentResolved",
+  "GovernanceAction",
+];
 
 function snakeToCamel(name: string): string {
   return name.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
@@ -196,7 +218,7 @@ export function verifyIdlDocument(value: unknown): string[] {
   const accounts = idl.accounts ?? [];
   const definitions = idl.types ?? [];
 
-  for (const name of INSTRUCTION_NAMES) {
+  for (const [name, expectedArgs] of Object.entries(INSTRUCTION_LAYOUTS)) {
     const entry = findNamed(instructions, name);
     if (!entry) {
       errors.push(`instruction ${name}: missing from IDL`);
@@ -213,6 +235,36 @@ export function verifyIdlDocument(value: unknown): string[] {
           entry.discriminator
         }] != SDK [${Array.from(expected)}]`
       );
+    }
+
+    if (!entry.args) {
+      errors.push(`instruction ${name}: args missing`);
+    }
+    const actualArgs = entry.args ?? [];
+    if (actualArgs.length !== expectedArgs.length) {
+      errors.push(
+        `instruction ${name}: expected ${expectedArgs.length} args, got ${actualArgs.length}`
+      );
+    }
+    const argCount = Math.max(actualArgs.length, expectedArgs.length);
+    for (let i = 0; i < argCount; i += 1) {
+      const actual = actualArgs[i];
+      const expectedArg = expectedArgs[i];
+      if (!actual || !expectedArg) continue;
+      if (actual.name !== expectedArg.name) {
+        errors.push(
+          `instruction ${name} arg ${i}: expected name ${expectedArg.name}, got ${actual.name}`
+        );
+      }
+      if (typeText(actual.type) !== typeText(expectedArg.type)) {
+        errors.push(
+          `instruction ${name} arg ${i} (${
+            expectedArg.name
+          }): expected type ${typeText(expectedArg.type)}, got ${typeText(
+            actual.type
+          )}`
+        );
+      }
     }
   }
 
@@ -316,6 +368,36 @@ export function verifyIdlDocument(value: unknown): string[] {
     }
   }
 
+  const operationalStateReason = findNamed(
+    definitions,
+    "OperationalStateReason"
+  );
+  if (!operationalStateReason || operationalStateReason.type.kind !== "enum") {
+    errors.push(
+      "OperationalStateReason enum definition missing from IDL types"
+    );
+  } else {
+    const variants = operationalStateReason.type.variants ?? [];
+    if (variants.length !== OPERATIONAL_STATE_REASON_VARIANTS.length) {
+      errors.push(
+        `OperationalStateReason: expected ${OPERATIONAL_STATE_REASON_VARIANTS.length} variants, got ${variants.length}`
+      );
+    }
+    for (let i = 0; i < OPERATIONAL_STATE_REASON_VARIANTS.length; i += 1) {
+      if (!variants[i]) continue;
+      if (variants[i].name !== OPERATIONAL_STATE_REASON_VARIANTS[i]) {
+        errors.push(
+          `OperationalStateReason variant ${i}: expected ${OPERATIONAL_STATE_REASON_VARIANTS[i]}, got ${variants[i].name}`
+        );
+      }
+      if (variants[i].fields !== undefined) {
+        errors.push(
+          `OperationalStateReason variant ${i}: payload fields are not allowed`
+        );
+      }
+    }
+  }
+
   return errors;
 }
 
@@ -337,7 +419,9 @@ function main(): void {
     process.exit(1);
   }
   console.log(
-    `All ${INSTRUCTION_NAMES.length} instruction discriminators, 2 account discriminators, and exact 145/81-byte account layouts match the generated IDL.`
+    `All ${
+      Object.keys(INSTRUCTION_LAYOUTS).length
+    } instruction interfaces, 2 account discriminators, exact 145/81-byte account layouts, and operational-state enums match the generated IDL.`
   );
 }
 

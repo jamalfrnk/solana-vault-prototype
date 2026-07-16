@@ -29,7 +29,8 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 | 19 | SDK v2 — publishable package + IDL discriminator verification | `[x]` complete |
 | — | M18/M19 follow-up — dApp load errors + rotation devnet smoke | `[x]` complete |
 | 20 | Pre-audit production design ADRs | `[x]` complete |
-| 21 | VaultState v1, deterministic migration, legacy inventory, full IDL layout | `[~]` awaiting review |
+| 21 | VaultState v1, deterministic migration, legacy inventory, full IDL layout | `[x]` complete |
+| 22 | Exit-first pause semantics | `[~]` awaiting review |
 
 ## Milestone 0 — Repository bootstrap (complete)
 
@@ -626,7 +627,7 @@ exit 0.
 Merged through PR #33 on 2026-07-15. Final main CI run 29459544952 passed all five
 Rust, audit, SDK, dApp, and IDL jobs. See `TEST_PLAN.md` for the full M20 gate.
 
-## Milestone 21 — VaultState versioning and deterministic migration (awaiting review)
+## Milestone 21 — VaultState versioning and deterministic migration (complete)
 
 Implements ADR 0005's same-size account slice on `codex/vault-state-versioning`:
 
@@ -648,10 +649,9 @@ explicit launch blockers until a separately approved drain/reconcile/retire proc
 is executed. No signer was used and no asset moved; see
 `docs/LEGACY_ACCOUNT_INVENTORY.md`.
 
-M21 assigns the accepted `Active`, `ExitOnly`, and `FullyPaused` wire values but does
-not implement the complete ADR 0004 behavior: deposits and withdrawals both continue
-to require `Active`. Exit-first withdrawals and the stronger full-pause authority
-matrix remain the next separate milestone.
+M21 assigned the accepted `Active`, `ExitOnly`, and `FullyPaused` wire values but did
+not implement the complete ADR 0004 behavior: deposits and withdrawals both continued
+to require `Active`. That behavior boundary was resolved separately in M22.
 
 Observed locally: formatting passed; 68/68 SDK tests, root typecheck, and SDK build
 passed; the inventory completed successfully. Local Rust compile/test remains blocked
@@ -661,6 +661,39 @@ Observed in initial PR CI run 29461693429 on commit `539ddf1`: Anchor/SBF build,
 clippy, all 66 Rust tests, cargo audit, 68 SDK tests/audit, dApp typecheck/build/90 tests/
 audit, and real generated-IDL verification all passed. The IDL gate confirmed all 8
 instruction discriminators, both account discriminators, and exact 145/81-byte layouts.
+
+Merged through PR #34 as `30fa983` on 2026-07-15/16. Final pre-merge CI run
+29461990674 passed all five Rust, audit, SDK, dApp, and generated-IDL jobs.
+
+## Milestone 22 — Exit-first pause semantics (awaiting review)
+
+Implements ADR 0004's independently safe availability slice on
+`codex/exit-first-pause-semantics`:
+
+- deposits remain available only in `Active`;
+- withdrawals remain available in `Active` and `ExitOnly`, preserving safe exits during
+  ordinary incident response, and fail closed in `FullyPaused`;
+- the ordinary pause authority idempotently moves between `Active` and `ExitOnly` but
+  cannot alter `FullyPaused`;
+- every ordinary transition carries a bounded reason and emits old/new state, signer,
+  slot, and Unix timestamp evidence;
+- SDK availability helpers, instruction builders, strict enum handling, and generated-
+  IDL instruction-interface verification match the program wire contract;
+- the dApp labels all three states and keeps withdrawals usable in `ExitOnly` while
+  removing ordinary-authority controls in `FullyPaused`.
+
+M22 deliberately does not invent an emergency authority or consume reserved
+`VaultState` bytes. ADR 0004's path into `FullyPaused` and recovery first to `ExitOnly`
+depends on the separately versioned `ProtocolConfig`, which remains the next planned
+implementation-sequence milestone. No program upgrade, deployment, or asset movement
+is part of M22.
+
+Observed locally: Rust formatting and whitespace checks passed; 73 SDK tests, root
+typecheck, SDK build, dApp typecheck/build/audit, and 94 dApp tests passed. Windows Rust
+compilation is blocked because this host has no MSVC `link.exe`; isolated WSL compilation
+and full all-target clippy passed, including typechecking every integration test source.
+Runtime execution of all 70 tests, SBF, audit, and real generated-IDL verification must
+still be observed in pull-request CI.
 
 ## Post-MVP Roadmap (candidate pool — implementation requires separate approval)
 

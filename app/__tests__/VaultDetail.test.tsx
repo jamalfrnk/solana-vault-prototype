@@ -1,20 +1,25 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { Keypair, PublicKey } from "@solana/web3.js";
+import { OperationalState } from "../../sdk/src";
 
 const fetchVaultStateMock = vi.fn();
 const fetchUserPositionMock = vi.fn();
 
 vi.mock("@vault-sdk", async () => {
-  const actual = await vi.importActual<typeof import("../../sdk/src")>("../../sdk/src");
+  const actual = await vi.importActual<typeof import("../../sdk/src")>(
+    "../../sdk/src"
+  );
   return {
     ...actual,
-    VaultClient: vi.fn().mockImplementation(function MockVaultClient(this: unknown) {
-      return {
-        fetchVaultState: fetchVaultStateMock,
-        fetchUserPosition: fetchUserPositionMock,
-      };
-    }),
+    VaultClient: vi
+      .fn()
+      .mockImplementation(function MockVaultClient(this: unknown) {
+        return {
+          fetchVaultState: fetchVaultStateMock,
+          fetchUserPosition: fetchUserPositionMock,
+        };
+      }),
   };
 });
 
@@ -52,7 +57,9 @@ describe("VaultDetail", () => {
   });
 
   it("shows a distinct error state when fetchVaultState rejects", async () => {
-    fetchVaultStateMock.mockRejectedValue(new Error("account data is too small"));
+    fetchVaultStateMock.mockRejectedValue(
+      new Error("account data is too small")
+    );
     render(<VaultDetail mintInput={mint} />);
 
     const alert = await screen.findByRole("alert");
@@ -70,7 +77,7 @@ describe("VaultDetail", () => {
       authorityBump: 254,
       totalAssets: 1_000_000n,
       totalShares: 1_000_000n,
-      isPaused: false,
+      operationalState: OperationalState.Active,
     });
     render(<VaultDetail mintInput={mint} />);
     await waitFor(() => {
@@ -90,7 +97,7 @@ describe("VaultDetail", () => {
       authorityBump: 254,
       totalAssets: 0n,
       totalShares: 0n,
-      isPaused: false,
+      operationalState: OperationalState.Active,
     });
     render(<VaultDetail mintInput={mint} />);
     await waitFor(() => expect(fetchVaultStateMock).toHaveBeenCalled());

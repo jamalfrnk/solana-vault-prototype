@@ -119,7 +119,7 @@ solana-vault-prototype/
 │       ├── initialize.rs         ← initialize instruction (M4)
 │       ├── deposit.rs            ← deposit instruction (M5)
 │       ├── withdraw.rs           ← withdraw instruction (M6)
-│       ├── pause.rs              ← pause / unpause instructions (M7/M21 state enum)
+│       ├── pause.rs              ← exit-first pause / unpause controls (M7/M21/M22)
 │       ├── rotate.rs             ← two-step authority rotation (M18)
 │       └── migrate.rs            ← exact-size VaultState v0 → v1 migration (M21)
 │
@@ -175,22 +175,22 @@ file is what gets deployed to devnet or loaded by the LiteSVM test harness.
 
 ## 5. Run the full test suite
 
-### Step 1 — Run all 66 Rust tests
+### Step 1 — Run all 70 Rust tests
 
 ```bash
 cargo test
 ```
 
-All 66 tests must pass. Expected output (abbreviated):
+All 70 tests must pass. Expected output (abbreviated):
 
 ```
-running 66 tests across the program test targets
+running 70 tests across the program test targets
 test test_id ... ok
 test test_vault_initialize_creates_correct_state ... ok
 test test_pause_sets_exit_only ... ok
 test test_migrate_v0_active_to_v1_permissionless_preserves_state ... ok
 test test_migrate_v0_paused_maps_to_exit_only ... ok
-test result: ok. 65 passed; 0 failed
+test result: ok. 70 passed; 0 failed
 ```
 
 If any test fails, do not continue — diagnose and fix before proceeding.
@@ -306,11 +306,14 @@ Uninitialized
      │ pause          │
      ▼                │
  ExitOnly ────────────
+
+ FullyPaused  (fail-closed; no accepted M22 transition)
 ```
 
-`deposit` and `withdraw` are both available only in `Active` in M21. `ExitOnly` has
-its accepted wire value but does not preserve withdrawal availability until the next
-separate exit-first milestone. `FullyPaused` is encoded but has no transition yet.
+`deposit` is available only in `Active`. `withdraw` is available in both `Active` and
+`ExitOnly`, so the default incident response stops new exposure without trapping users.
+`FullyPaused` blocks both paths and is encoded fail-closed, but no instruction may enter
+or leave it until the stronger `ProtocolConfig` emergency authority is implemented.
 `initialize` runs exactly once, regardless of pause state.
 
 ---
@@ -383,7 +386,8 @@ signer seeds that include the `authority_bump` stored in `VaultState`.
 2. `user_position.vault == vault_state.key()` — prevents cross-vault confusion
 3. `shares_in <= user_position.shares` — prevents over-withdrawal
 4. `vault_state.version == 1` — legacy/unknown layouts fail closed
-5. `vault_state.operational_state == Active` — M21 still blocks withdrawal in `ExitOnly`
+5. `vault_state.operational_state` is `Active` or `ExitOnly` — only `FullyPaused`
+   blocks a valid withdrawal
 6. `user_token_account.mint == vault_state.mint` — right destination mint
 7. `user_token_account.owner == user.key()` — tokens go to the right wallet
 
@@ -402,15 +406,27 @@ signer seeds that include the `authority_bump` stored in `VaultState`.
 Set `vault_state.operational_state`. Only the signer stored in
 `vault_state.pause_authority` can call either instruction; that signer may be a
 keypair or a governance PDA exercising signer privilege through `invoke_signed`.
-Double-pausing is idempotent and never returns an error — an emergency pause must
-never fail due to current state.
+Both instructions take a bounded `OperationalStateReason` argument:
+`IncidentResponse`, `ExposureReduction`, `IncidentResolved`, or `GovernanceAction`.
+Double-pausing and double-unpausing are idempotent and still emit evidence, so an
+operator action is observable without failing merely because the intended state is
+already set.
 
 **What to check:**
 - After `pause`: `vault_state.operational_state == ExitOnly`
 - After `unpause`: `vault_state.operational_state == Active`
 - Both calls require `version == 1`
-- In M21, any `deposit` or `withdraw` call outside `Active` returns
-  `VaultError::VaultPaused`; exit-first behavior is not yet implemented
+- Every success emits `OperationalStateChanged` with old/new state, signer, Clock slot,
+  Unix timestamp, and reason code
+- `ExitOnly` blocks deposits but preserves valid withdrawals
+- `FullyPaused` blocks both, and the ordinary authority receives
+  `VaultError::InvalidOperationalStateTransition` if it tries to alter that state
+
+For an ordinary deposit-path, cap, RPC, frontend, or monitoring incident, call `pause`
+with the narrowest applicable reason and verify both the event and a successful safe
+withdrawal probe. Do not represent `ExitOnly` as a complete halt. M22 provides no
+accepted full-pause transaction; if the withdrawal/custody path itself appears unsafe,
+follow the incident-escalation policy and do not invent or reuse a weaker authority.
 
 ---
 
@@ -623,7 +639,7 @@ cargo fmt --all -- --check
 # 2. Build program and generated IDL (must exit 0, zero warnings)
 anchor build --ignore-keys
 
-# 3. Rust checks (all 66 tests must pass)
+# 3. Rust checks (all 70 tests must pass)
 cargo clippy --all-targets --all-features -- -D warnings
 cargo test
 

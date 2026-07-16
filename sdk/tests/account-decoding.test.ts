@@ -6,6 +6,9 @@ import {
   decodeVaultState,
   decodeUserPosition,
   inspectVaultStateAccount,
+  canDeposit,
+  canWithdraw,
+  operationalStateLabel,
   OperationalState,
 } from "../src/accounts";
 
@@ -75,6 +78,24 @@ function buildUserPositionBuffer(fields: {
 }
 
 describe("accounts", () => {
+  describe("operational-state availability", () => {
+    it("implements the exact Active/ExitOnly/FullyPaused matrix", () => {
+      expect(canDeposit(OperationalState.Active)).to.equal(true);
+      expect(canWithdraw(OperationalState.Active)).to.equal(true);
+      expect(canDeposit(OperationalState.ExitOnly)).to.equal(false);
+      expect(canWithdraw(OperationalState.ExitOnly)).to.equal(true);
+      expect(canDeposit(OperationalState.FullyPaused)).to.equal(false);
+      expect(canWithdraw(OperationalState.FullyPaused)).to.equal(false);
+      expect(operationalStateLabel(OperationalState.Active)).to.equal("Active");
+      expect(operationalStateLabel(OperationalState.ExitOnly)).to.equal(
+        "Exit only"
+      );
+      expect(operationalStateLabel(OperationalState.FullyPaused)).to.equal(
+        "Fully paused"
+      );
+    });
+  });
+
   describe("decodeVaultState", () => {
     it("round-trips every field", () => {
       const pauseAuthority = randomPubkey();

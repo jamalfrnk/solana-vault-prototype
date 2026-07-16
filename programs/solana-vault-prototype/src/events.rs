@@ -28,15 +28,14 @@ pub struct Withdrawn {
 }
 
 #[event]
-pub struct Paused {
+pub struct OperationalStateChanged {
     pub vault: Pubkey,
-    pub pause_authority: Pubkey,
-}
-
-#[event]
-pub struct Unpaused {
-    pub vault: Pubkey,
-    pub pause_authority: Pubkey,
+    pub previous_state: u8,
+    pub new_state: u8,
+    pub authority: Pubkey,
+    pub slot: u64,
+    pub unix_timestamp: i64,
+    pub reason_code: u8,
 }
 
 #[event]

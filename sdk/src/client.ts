@@ -25,6 +25,7 @@ import {
 import {
   fetchUserPosition,
   fetchVaultState,
+  OperationalStateReason,
   UserPosition,
   VaultState,
 } from "./accounts";
@@ -63,12 +64,18 @@ export class VaultClient {
     return buildWithdrawIx({ user, mint: this.mint, sharesIn });
   }
 
-  buildPauseIx(pauseAuthority: PublicKey): TransactionInstruction {
-    return buildPauseIx({ pauseAuthority, mint: this.mint });
+  buildPauseIx(
+    pauseAuthority: PublicKey,
+    reason: OperationalStateReason
+  ): TransactionInstruction {
+    return buildPauseIx({ pauseAuthority, mint: this.mint, reason });
   }
 
-  buildUnpauseIx(pauseAuthority: PublicKey): TransactionInstruction {
-    return buildUnpauseIx({ pauseAuthority, mint: this.mint });
+  buildUnpauseIx(
+    pauseAuthority: PublicKey,
+    reason: OperationalStateReason
+  ): TransactionInstruction {
+    return buildUnpauseIx({ pauseAuthority, mint: this.mint, reason });
   }
 
   /** M18: current authority proposes the next one (two-step rotation, step 1). */

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { Keypair } from "@solana/web3.js";
+import { OperationalState } from "../../sdk/src";
 
 const sendTransactionMock = vi.fn();
 const useWalletMock = vi.fn();
@@ -13,7 +14,9 @@ vi.mock("@solana/wallet-adapter-react", () => ({
 import { DepositForm } from "../components/DepositForm";
 import type { VaultClient } from "../../sdk/src";
 
-const buildDepositIxMock = vi.fn().mockReturnValue({ keys: [], programId: {}, data: {} });
+const buildDepositIxMock = vi
+  .fn()
+  .mockReturnValue({ keys: [], programId: {}, data: {} });
 const fakeVaultClient = {
   buildDepositIx: buildDepositIxMock,
 } as unknown as VaultClient;
@@ -51,46 +54,111 @@ describe("DepositForm", () => {
       publicKey: null,
       sendTransaction: sendTransactionMock,
     });
-    render(<DepositForm vaultClient={fakeVaultClient} isPaused={false} decimals={0} />);
-    expect(screen.getByRole("button", { name: /deposit/i })).to.have.property("disabled", true);
+    render(
+      <DepositForm
+        vaultClient={fakeVaultClient}
+        operationalState={OperationalState.Active}
+        decimals={0}
+      />
+    );
+    expect(screen.getByRole("button", { name: /deposit/i })).to.have.property(
+      "disabled",
+      true
+    );
     expect(screen.getByText(/connect your wallet/i)).to.exist;
   });
 
-  it("is disabled with a reason when the vault is paused", () => {
+  it("is disabled in exit-only mode while explaining that withdrawals remain available", () => {
     connectWallet();
-    render(<DepositForm vaultClient={fakeVaultClient} isPaused={true} decimals={0} />);
-    expect(screen.getByRole("button", { name: /deposit/i })).to.have.property("disabled", true);
-    expect(screen.getByText(/vault is paused/i)).to.exist;
+    render(
+      <DepositForm
+        vaultClient={fakeVaultClient}
+        operationalState={OperationalState.ExitOnly}
+        decimals={0}
+      />
+    );
+    expect(screen.getByRole("button", { name: /deposit/i })).to.have.property(
+      "disabled",
+      true
+    );
+    expect(screen.getByText(/exit-only.*withdrawals remain available/i)).to
+      .exist;
+  });
+
+  it("is disabled in fully-paused mode", () => {
+    connectWallet();
+    render(
+      <DepositForm
+        vaultClient={fakeVaultClient}
+        operationalState={OperationalState.FullyPaused}
+        decimals={0}
+      />
+    );
+    expect(screen.getByRole("button", { name: /deposit/i })).to.have.property(
+      "disabled",
+      true
+    );
+    expect(screen.getByText(/fully paused.*deposits are disabled/i)).to.exist;
   });
 
   it("is enabled when connected and not paused", () => {
     connectWallet();
-    render(<DepositForm vaultClient={fakeVaultClient} isPaused={false} decimals={0} />);
-    expect(screen.getByRole("button", { name: /deposit/i })).to.have.property("disabled", false);
+    render(
+      <DepositForm
+        vaultClient={fakeVaultClient}
+        operationalState={OperationalState.Active}
+        decimals={0}
+      />
+    );
+    expect(screen.getByRole("button", { name: /deposit/i })).to.have.property(
+      "disabled",
+      false
+    );
   });
 
   it("scales token-denominated input by mint decimals", async () => {
     connectWallet();
     sendTransactionMock.mockResolvedValue("sig-scale");
-    render(<DepositForm vaultClient={fakeVaultClient} isPaused={false} decimals={6} />);
+    render(
+      <DepositForm
+        vaultClient={fakeVaultClient}
+        operationalState={OperationalState.Active}
+        decimals={6}
+      />
+    );
 
-    fireEvent.change(screen.getByLabelText(/amount/i), { target: { value: "1.5" } });
+    fireEvent.change(screen.getByLabelText(/amount/i), {
+      target: { value: "1.5" },
+    });
     fireEvent.click(screen.getByRole("button", { name: /deposit/i }));
 
     await waitFor(() => {
-      expect(buildDepositIxMock).toHaveBeenCalledWith(userPublicKey, 1_500_000n);
+      expect(buildDepositIxMock).toHaveBeenCalledWith(
+        userPublicKey,
+        1_500_000n
+      );
     });
   });
 
   it("rejects invalid amounts before any wallet interaction", async () => {
     connectWallet();
-    render(<DepositForm vaultClient={fakeVaultClient} isPaused={false} decimals={2} />);
+    render(
+      <DepositForm
+        vaultClient={fakeVaultClient}
+        operationalState={OperationalState.Active}
+        decimals={2}
+      />
+    );
 
-    fireEvent.change(screen.getByLabelText(/amount/i), { target: { value: "1.234" } });
+    fireEvent.change(screen.getByLabelText(/amount/i), {
+      target: { value: "1.234" },
+    });
     fireEvent.click(screen.getByRole("button", { name: /deposit/i }));
 
     await waitFor(() => {
-      expect(screen.getByRole("alert").textContent).to.match(/too many decimal places/i);
+      expect(screen.getByRole("alert").textContent).to.match(
+        /too many decimal places/i
+      );
     });
     expect(sendTransactionMock).not.toHaveBeenCalled();
   });
@@ -102,13 +170,15 @@ describe("DepositForm", () => {
     render(
       <DepositForm
         vaultClient={fakeVaultClient}
-        isPaused={false}
+        operationalState={OperationalState.Active}
         decimals={0}
         onConfirmed={onConfirmed}
-      />,
+      />
     );
 
-    fireEvent.change(screen.getByLabelText(/amount/i), { target: { value: "100" } });
+    fireEvent.change(screen.getByLabelText(/amount/i), {
+      target: { value: "100" },
+    });
     fireEvent.click(screen.getByRole("button", { name: /deposit/i }));
 
     await waitFor(() => {
@@ -126,11 +196,21 @@ describe("DepositForm", () => {
     connectWallet();
     sendTransactionMock.mockResolvedValue("sig-pending");
     useConnectionMock.mockReturnValue({
-      connection: makeConnection({ confirmTransaction: vi.fn(() => new Promise(() => {})) }),
+      connection: makeConnection({
+        confirmTransaction: vi.fn(() => new Promise(() => {})),
+      }),
     });
-    render(<DepositForm vaultClient={fakeVaultClient} isPaused={false} decimals={0} />);
+    render(
+      <DepositForm
+        vaultClient={fakeVaultClient}
+        operationalState={OperationalState.Active}
+        decimals={0}
+      />
+    );
 
-    fireEvent.change(screen.getByLabelText(/amount/i), { target: { value: "5" } });
+    fireEvent.change(screen.getByLabelText(/amount/i), {
+      target: { value: "5" },
+    });
     fireEvent.click(screen.getByRole("button", { name: /deposit/i }));
 
     await waitFor(() => {
@@ -141,10 +221,20 @@ describe("DepositForm", () => {
 
   it("treats wallet rejection as cancellation, not success or error", async () => {
     connectWallet();
-    sendTransactionMock.mockRejectedValue(new Error("User rejected the request"));
-    render(<DepositForm vaultClient={fakeVaultClient} isPaused={false} decimals={0} />);
+    sendTransactionMock.mockRejectedValue(
+      new Error("User rejected the request")
+    );
+    render(
+      <DepositForm
+        vaultClient={fakeVaultClient}
+        operationalState={OperationalState.Active}
+        decimals={0}
+      />
+    );
 
-    fireEvent.change(screen.getByLabelText(/amount/i), { target: { value: "5" } });
+    fireEvent.change(screen.getByLabelText(/amount/i), {
+      target: { value: "5" },
+    });
     fireEvent.click(screen.getByRole("button", { name: /deposit/i }));
 
     await waitFor(() => {
@@ -162,13 +252,23 @@ describe("DepositForm", () => {
         "Program log: AnchorError thrown in programs/solana-vault-prototype/src/instructions/deposit.rs:64. Error Code: ZeroAmount. Error Number: 6002. Error Message: Amount must be greater than zero.",
       ],
     });
-    render(<DepositForm vaultClient={fakeVaultClient} isPaused={false} decimals={0} />);
+    render(
+      <DepositForm
+        vaultClient={fakeVaultClient}
+        operationalState={OperationalState.Active}
+        decimals={0}
+      />
+    );
 
-    fireEvent.change(screen.getByLabelText(/amount/i), { target: { value: "5" } });
+    fireEvent.change(screen.getByLabelText(/amount/i), {
+      target: { value: "5" },
+    });
     fireEvent.click(screen.getByRole("button", { name: /deposit/i }));
 
     await waitFor(() => {
-      expect(screen.getByRole("alert").textContent).to.match(/amount must be greater than zero/i);
+      expect(screen.getByRole("alert").textContent).to.match(
+        /amount must be greater than zero/i
+      );
     });
   });
 
@@ -177,14 +277,22 @@ describe("DepositForm", () => {
     sendTransactionMock.mockResolvedValue("sig-chain-err");
     useConnectionMock.mockReturnValue({
       connection: makeConnection({
-        confirmTransaction: vi
-          .fn()
-          .mockResolvedValue({ value: { err: { InstructionError: [0, "Custom"] } } }),
+        confirmTransaction: vi.fn().mockResolvedValue({
+          value: { err: { InstructionError: [0, "Custom"] } },
+        }),
       }),
     });
-    render(<DepositForm vaultClient={fakeVaultClient} isPaused={false} decimals={0} />);
+    render(
+      <DepositForm
+        vaultClient={fakeVaultClient}
+        operationalState={OperationalState.Active}
+        decimals={0}
+      />
+    );
 
-    fireEvent.change(screen.getByLabelText(/amount/i), { target: { value: "5" } });
+    fireEvent.change(screen.getByLabelText(/amount/i), {
+      target: { value: "5" },
+    });
     fireEvent.click(screen.getByRole("button", { name: /deposit/i }));
 
     await waitFor(() => {
@@ -197,11 +305,19 @@ describe("DepositForm", () => {
     connectWallet();
     let resolveSend: (sig: string) => void = () => {};
     sendTransactionMock.mockImplementation(
-      () => new Promise<string>((resolve) => (resolveSend = resolve)),
+      () => new Promise<string>((resolve) => (resolveSend = resolve))
     );
-    render(<DepositForm vaultClient={fakeVaultClient} isPaused={false} decimals={0} />);
+    render(
+      <DepositForm
+        vaultClient={fakeVaultClient}
+        operationalState={OperationalState.Active}
+        decimals={0}
+      />
+    );
 
-    fireEvent.change(screen.getByLabelText(/amount/i), { target: { value: "5" } });
+    fireEvent.change(screen.getByLabelText(/amount/i), {
+      target: { value: "5" },
+    });
     const button = screen.getByRole("button", { name: /deposit/i });
     fireEvent.click(button);
     fireEvent.click(button);

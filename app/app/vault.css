@@ -373,10 +373,17 @@
     inset 0 -1px 2px rgba(0, 0, 0, 0.35);
 }
 
-.vault-led[data-paused="true"] {
+.vault-led[data-operational-state="ExitOnly"] {
   background: #e3b341;
   box-shadow:
     0 0 12px rgba(227, 179, 65, 0.9),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.35);
+}
+
+.vault-led[data-operational-state="FullyPaused"] {
+  background: #f85149;
+  box-shadow:
+    0 0 12px rgba(248, 81, 73, 0.9),
     inset 0 -1px 2px rgba(0, 0, 0, 0.35);
 }
 

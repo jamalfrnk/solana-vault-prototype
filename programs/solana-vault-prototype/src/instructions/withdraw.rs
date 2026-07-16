@@ -5,7 +5,7 @@ use crate::{
     constants::{USER_POSITION_SEED, VAULT_AUTHORITY_SEED, VAULT_SEED},
     error::VaultError,
     events::Withdrawn,
-    state::{OperationalState, UserPosition, VaultState, VAULT_STATE_VERSION_V1},
+    state::{UserPosition, VaultState, VAULT_STATE_VERSION_V1},
 };
 
 #[derive(Accounts)]
@@ -18,7 +18,7 @@ pub struct Withdraw<'info> {
         bump = vault_state.vault_bump,
         constraint = vault_state.version == VAULT_STATE_VERSION_V1
             @ VaultError::UnsupportedVaultVersion,
-        constraint = vault_state.operational_state == OperationalState::Active
+        constraint = vault_state.operational_state.allows_withdrawals()
             @ VaultError::VaultPaused,
     )]
     pub vault_state: Account<'info, VaultState>,

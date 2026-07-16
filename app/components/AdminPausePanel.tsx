@@ -2,7 +2,11 @@
 
 import { useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
-import { VaultClient } from "@vault-sdk";
+import {
+  OperationalState,
+  OperationalStateReason,
+  VaultClient,
+} from "@vault-sdk";
 
 import { useTransactionLifecycle } from "../hooks/useTransactionLifecycle";
 import { TransactionStatus } from "./TransactionStatus";
@@ -17,12 +21,12 @@ import { TransactionStatus } from "./TransactionStatus";
 export function AdminPausePanel({
   vaultClient,
   pauseAuthority,
-  isPaused,
+  operationalState,
   onConfirmed,
 }: {
   vaultClient: VaultClient;
   pauseAuthority: PublicKey;
-  isPaused: boolean;
+  operationalState: OperationalState;
   /** Refreshes authoritative vault state after confirmation — without this the
    *  button label / LED / status froze on the pre-transaction value (the M17
    *  "unpause doesn't work" bug: the tx landed, the UI never followed). */
@@ -35,14 +39,35 @@ export function AdminPausePanel({
     return null;
   }
 
-  const op = isPaused ? "unpause" : "pause";
+  if (operationalState === OperationalState.FullyPaused) {
+    return (
+      <section className="panel">
+        <h3>Admin</h3>
+        <p>
+          Fully paused. The ordinary pause authority cannot change this state;
+          emergency-governance recovery is required.
+        </p>
+      </section>
+    );
+  }
+
+  const isExitOnly = operationalState === OperationalState.ExitOnly;
+  const op = isExitOnly ? "unpause" : "pause";
 
   async function handleClick() {
     if (busy) return;
     await run({
       validate: () => null,
       buildIx: () =>
-        isPaused ? vaultClient.buildUnpauseIx(publicKey!) : vaultClient.buildPauseIx(publicKey!),
+        isExitOnly
+          ? vaultClient.buildUnpauseIx(
+              publicKey!,
+              OperationalStateReason.IncidentResolved
+            )
+          : vaultClient.buildPauseIx(
+              publicKey!,
+              OperationalStateReason.IncidentResponse
+            ),
       onConfirmed,
     });
   }
@@ -51,7 +76,7 @@ export function AdminPausePanel({
     <section className="panel">
       <h3>Admin</h3>
       <button type="button" onClick={handleClick} disabled={busy}>
-        {isPaused ? "Unpause" : "Pause"}
+        {isExitOnly ? "Unpause" : "Pause"}
       </button>
       <TransactionStatus op={op} state={state} />
     </section>

@@ -3,8 +3,8 @@ use anchor_lang::prelude::*;
 use crate::{
     constants::VAULT_SEED,
     error::VaultError,
-    events::{Paused, Unpaused},
-    state::{OperationalState, VaultState, VAULT_STATE_VERSION_V1},
+    events::OperationalStateChanged,
+    state::{OperationalState, OperationalStateReason, VaultState, VAULT_STATE_VERSION_V1},
 };
 
 #[derive(Accounts)]
@@ -24,12 +24,24 @@ pub struct Pause<'info> {
     pub vault_state: Account<'info, VaultState>,
 }
 
-pub fn pause_handler(ctx: Context<Pause>) -> Result<()> {
-    ctx.accounts.vault_state.operational_state = OperationalState::ExitOnly;
+pub fn pause_handler(ctx: Context<Pause>, reason: OperationalStateReason) -> Result<()> {
+    let clock = Clock::get()?;
+    let vault_state = &mut ctx.accounts.vault_state;
+    let previous_state = vault_state.operational_state;
+    require!(
+        previous_state != OperationalState::FullyPaused,
+        VaultError::InvalidOperationalStateTransition
+    );
+    vault_state.operational_state = OperationalState::ExitOnly;
 
-    emit!(Paused {
-        vault: ctx.accounts.vault_state.key(),
-        pause_authority: ctx.accounts.pause_authority.key(),
+    emit!(OperationalStateChanged {
+        vault: vault_state.key(),
+        previous_state: previous_state as u8,
+        new_state: OperationalState::ExitOnly as u8,
+        authority: ctx.accounts.pause_authority.key(),
+        slot: clock.slot,
+        unix_timestamp: clock.unix_timestamp,
+        reason_code: reason as u8,
     });
 
     Ok(())
@@ -54,12 +66,24 @@ pub struct Unpause<'info> {
     pub vault_state: Account<'info, VaultState>,
 }
 
-pub fn unpause_handler(ctx: Context<Unpause>) -> Result<()> {
-    ctx.accounts.vault_state.operational_state = OperationalState::Active;
+pub fn unpause_handler(ctx: Context<Unpause>, reason: OperationalStateReason) -> Result<()> {
+    let clock = Clock::get()?;
+    let vault_state = &mut ctx.accounts.vault_state;
+    let previous_state = vault_state.operational_state;
+    require!(
+        previous_state != OperationalState::FullyPaused,
+        VaultError::InvalidOperationalStateTransition
+    );
+    vault_state.operational_state = OperationalState::Active;
 
-    emit!(Unpaused {
-        vault: ctx.accounts.vault_state.key(),
-        pause_authority: ctx.accounts.pause_authority.key(),
+    emit!(OperationalStateChanged {
+        vault: vault_state.key(),
+        previous_state: previous_state as u8,
+        new_state: OperationalState::Active as u8,
+        authority: ctx.accounts.pause_authority.key(),
+        slot: clock.slot,
+        unix_timestamp: clock.unix_timestamp,
+        reason_code: reason as u8,
     });
 
     Ok(())

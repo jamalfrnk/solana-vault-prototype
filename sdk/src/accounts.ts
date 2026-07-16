@@ -15,6 +15,34 @@ export enum OperationalState {
   FullyPaused = 2,
 }
 
+export enum OperationalStateReason {
+  IncidentResponse = 0,
+  ExposureReduction = 1,
+  IncidentResolved = 2,
+  GovernanceAction = 3,
+}
+
+export function canDeposit(state: OperationalState): boolean {
+  return state === OperationalState.Active;
+}
+
+export function canWithdraw(state: OperationalState): boolean {
+  return (
+    state === OperationalState.Active || state === OperationalState.ExitOnly
+  );
+}
+
+export function operationalStateLabel(state: OperationalState): string {
+  switch (state) {
+    case OperationalState.Active:
+      return "Active";
+    case OperationalState.ExitOnly:
+      return "Exit only";
+    case OperationalState.FullyPaused:
+      return "Fully paused";
+  }
+}
+
 function checkDiscriminator(data: Buffer, expectedName: string): void {
   if (data.length < 8) {
     throw new Error(
@@ -128,8 +156,8 @@ export interface VaultState {
   totalAssets: bigint;
   totalShares: bigint;
   operationalState: OperationalState;
-  /** Transitional M21 compatibility value. Both non-Active states remain
-   * blocked by program gates until the separate exit-first milestone. */
+  /** @deprecated Use operationalState with canDeposit/canWithdraw. This only
+   * indicates that the vault is not Active; ExitOnly still permits withdrawals. */
   isPaused: boolean;
   pendingPauseAuthority: PublicKey;
   version: typeof VAULT_STATE_VERSION_V1;

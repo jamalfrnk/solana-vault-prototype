@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { VaultClient } from "@vault-sdk";
+import { canDeposit, OperationalState, VaultClient } from "@vault-sdk";
 
 import { useTransactionLifecycle } from "../hooks/useTransactionLifecycle";
 import { parseTokenAmount } from "../lib/solana/amounts";
@@ -10,12 +10,12 @@ import { TransactionStatus } from "./TransactionStatus";
 
 export function DepositForm({
   vaultClient,
-  isPaused,
+  operationalState,
   decimals,
   onConfirmed,
 }: {
   vaultClient: VaultClient;
-  isPaused: boolean;
+  operationalState: OperationalState;
   /** Mint decimals — user input is token-denominated and scaled by this. */
   decimals: number;
   /** Runs after on-chain confirmation with the tx signature — balance
@@ -29,9 +29,11 @@ export function DepositForm({
 
   const disabledReason = !connected
     ? "Connect your wallet to deposit."
-    : isPaused
-      ? "Vault is paused; deposits are disabled."
-      : null;
+    : !canDeposit(operationalState)
+    ? operationalState === OperationalState.ExitOnly
+      ? "Vault is exit-only; deposits are disabled while withdrawals remain available."
+      : "Vault is fully paused; deposits are disabled."
+    : null;
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -68,7 +70,9 @@ export function DepositForm({
       <TransactionStatus
         op="deposit"
         state={state}
-        successDetail={confirmedAmount ? `Deposited ${confirmedAmount} tokens.` : undefined}
+        successDetail={
+          confirmedAmount ? `Deposited ${confirmedAmount} tokens.` : undefined
+        }
       />
     </form>
   );

@@ -14,7 +14,10 @@ use {
     solana_transaction::versioned::VersionedTransaction,
     solana_vault_prototype::{
         constants::{VAULT_AUTHORITY_SEED, VAULT_SEED},
-        state::{OperationalState, VaultState, VAULT_STATE_VERSION_V0, VAULT_STATE_VERSION_V1},
+        state::{
+            OperationalState, OperationalStateReason, VaultState, VAULT_STATE_VERSION_V0,
+            VAULT_STATE_VERSION_V1,
+        },
     },
 };
 
@@ -134,7 +137,10 @@ fn migrate_ix(vault_state: Pubkey) -> Instruction {
 fn pause_ix(pause_authority: Pubkey, vault_state: Pubkey) -> Instruction {
     Instruction::new_with_bytes(
         program_id(),
-        &solana_vault_prototype::instruction::Pause {}.data(),
+        &solana_vault_prototype::instruction::Pause {
+            reason: OperationalStateReason::IncidentResponse,
+        }
+        .data(),
         solana_vault_prototype::accounts::Pause {
             pause_authority,
             vault_state,
