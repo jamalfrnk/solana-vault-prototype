@@ -11,7 +11,7 @@ This is public devnet account evidence, not a record of secrets or production as
 The read-only command was:
 
 ```bash
-corepack yarn inventory:legacy
+corepack yarn inventory:legacy --program-id FYqCCoAnM9tUYRcSRbeLbUE9LBPv8bN2uyuhcz46pSgq
 ```
 
 It found two incompatible 113-byte vaults, two canonical linked UserPosition accounts,
@@ -67,10 +67,32 @@ If either signer is unavailable or the compatible binary cannot safely return al
 accounted test assets, stop. ADR 0005 requires a separate recovery ADR, implementation,
 rehearsal, and review; M21 does not authorize a recovery shortcut.
 
+## M23 devnet/UI follow-up non-mutation evidence
+
+The follow-up deployed the reviewed v1 program under the separate address
+`HaryVUcfDqxpzFS7JyNe1XuqscFWyYFVAJdYoUX6jEcS`. It did not upgrade or send a
+transaction to the legacy program. The legacy inventory still reports two 113-byte
+vaults, two positions, no v0/v1 vaults, no orphans, and two retirement blockers.
+
+Before and after the follow-up's live devnet operations, the legacy account hashes were
+identical:
+
+| Account | Bytes | SHA-256 |
+|---|---:|---|
+| legacy program | 36 | `da87e4f0ad606930fbccfb6d84645266339fd2939d039d3f7e26f82603d837f6` |
+| vault `3c94…BnCL` | 113 | `f6062bf845c8c9dfbcf5ca610b9b4ef20f68f0e0b4ea70cf23da97c846731be8` |
+| vault `E268…B9GV` | 113 | `83c95924f4d3ba806319cfe845e9f36f6f7372471b7a5130c1f94abd4de0feb4` |
+
+The complete new-deployment and fixture evidence is in
+`docs/DEVNET_V1_DEPLOYMENT.md`. These hashes prove the accounts were unchanged during
+this follow-up; they do not retire the blockers.
+
 For a machine-enforced launch check, use:
 
 ```bash
-corepack yarn inventory:legacy --fail-on-blockers
+corepack yarn inventory:legacy \
+  --program-id FYqCCoAnM9tUYRcSRbeLbUE9LBPv8bN2uyuhcz46pSgq \
+  --fail-on-blockers
 ```
 
 That command exits nonzero whenever the live inventory reports retirement, migration,

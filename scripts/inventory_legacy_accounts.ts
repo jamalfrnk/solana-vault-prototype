@@ -9,6 +9,7 @@
  * Usage:
  *   corepack yarn inventory:legacy
  *   corepack yarn inventory:legacy --url https://api.devnet.solana.com
+ *   corepack yarn inventory:legacy --program-id <PROGRAM_ID>
  *   corepack yarn inventory:legacy --fail-on-blockers
  */
 
@@ -44,10 +45,11 @@ function hasDiscriminator(data: Buffer, name: string): boolean {
 
 async function getProgramAccountsBySize(
   connection: Connection,
-  size: number
+  size: number,
+  programId: PublicKey
 ): Promise<ProgramAccount[]> {
   return [
-    ...(await connection.getProgramAccounts(PROGRAM_ID, {
+    ...(await connection.getProgramAccounts(programId, {
       commitment: COMMITMENT,
       filters: [{ dataSize: size }],
     })),
@@ -84,20 +86,25 @@ function publicRpcLabel(endpoint: string): string {
 function parseCli(argv: string[]): {
   endpoint: string;
   failOnBlockers: boolean;
+  programId: PublicKey;
 } {
   let endpoint = process.env.SOLANA_RPC_URL ?? DEFAULT_DEVNET_RPC;
   let failOnBlockers = false;
+  let programId = PROGRAM_ID;
   for (let i = 0; i < argv.length; i += 1) {
     if (argv[i] === "--url") {
       if (!argv[i + 1]) throw new Error("--url requires an RPC endpoint");
       endpoint = argv[++i];
     } else if (argv[i] === "--fail-on-blockers") {
       failOnBlockers = true;
+    } else if (argv[i] === "--program-id") {
+      if (!argv[i + 1]) throw new Error("--program-id requires a public key");
+      programId = new PublicKey(argv[++i]);
     } else {
       throw new Error(`Unknown argument: ${argv[i]}`);
     }
   }
-  return { endpoint, failOnBlockers };
+  return { endpoint, failOnBlockers, programId };
 }
 
 function custodyFacts(
@@ -137,12 +144,16 @@ function custodyFacts(
   };
 }
 
-export async function buildInventory(connection: Connection, rpcLabel: string) {
+export async function buildInventory(
+  connection: Connection,
+  rpcLabel: string,
+  programId: PublicKey = PROGRAM_ID
+) {
   const [legacyCandidates, currentCandidates, positionCandidates] =
     await Promise.all([
-      getProgramAccountsBySize(connection, LEGACY_VAULT_STATE_LEN),
-      getProgramAccountsBySize(connection, VAULT_STATE_LEN),
-      getProgramAccountsBySize(connection, USER_POSITION_LEN),
+      getProgramAccountsBySize(connection, LEGACY_VAULT_STATE_LEN, programId),
+      getProgramAccountsBySize(connection, VAULT_STATE_LEN, programId),
+      getProgramAccountsBySize(connection, USER_POSITION_LEN, programId),
     ]);
 
   const vaultAccounts = [...legacyCandidates, ...currentCandidates].filter(
@@ -152,7 +163,11 @@ export async function buildInventory(connection: Connection, rpcLabel: string) {
     .filter(({ account }) => hasDiscriminator(account.data, "UserPosition"))
     .map(({ pubkey, account }) => {
       const decoded = decodeUserPosition(account.data);
-      const expected = deriveUserPositionPda(decoded.vault, decoded.owner);
+      const expected = deriveUserPositionPda(
+        decoded.vault,
+        decoded.owner,
+        programId
+      );
       return {
         address: pubkey.toBase58(),
         owner: decoded.owner.toBase58(),
@@ -171,7 +186,7 @@ export async function buildInventory(connection: Connection, rpcLabel: string) {
     inspection: inspectVaultStateAccount(account.data),
   }));
   const custodyAddresses = inspectedVaults.map(({ pubkey, inspection }) => {
-    const authority = deriveVaultAuthorityPda(pubkey);
+    const authority = deriveVaultAuthorityPda(pubkey, programId);
     return deriveAssociatedTokenAddress(authority.address, inspection.mint);
   });
   const custodyAccounts = await getMultipleAccounts(
@@ -181,8 +196,8 @@ export async function buildInventory(connection: Connection, rpcLabel: string) {
 
   const vaults = inspectedVaults.map(
     ({ pubkey, account, inspection }, index) => {
-      const expectedVault = deriveVaultStatePda(inspection.mint);
-      const expectedAuthority = deriveVaultAuthorityPda(pubkey);
+      const expectedVault = deriveVaultStatePda(inspection.mint, programId);
+      const expectedAuthority = deriveVaultAuthorityPda(pubkey, programId);
       const linkedPositions = positions.filter(
         (position) => position.vault === pubkey.toBase58()
       );
@@ -282,7 +297,7 @@ export async function buildInventory(connection: Connection, rpcLabel: string) {
     generatedAt: new Date().toISOString(),
     rpc: rpcLabel,
     commitment: COMMITMENT,
-    programId: PROGRAM_ID.toBase58(),
+    programId: programId.toBase58(),
     summary: {
       vaults: vaults.length,
       legacy113: vaults.filter((vault) => vault.layout === "legacy-113").length,
@@ -301,9 +316,15 @@ export async function buildInventory(connection: Connection, rpcLabel: string) {
 }
 
 async function main(): Promise<void> {
-  const { endpoint, failOnBlockers } = parseCli(process.argv.slice(2));
+  const { endpoint, failOnBlockers, programId } = parseCli(
+    process.argv.slice(2)
+  );
   const connection = new Connection(endpoint, COMMITMENT);
-  const inventory = await buildInventory(connection, publicRpcLabel(endpoint));
+  const inventory = await buildInventory(
+    connection,
+    publicRpcLabel(endpoint),
+    programId
+  );
   process.stdout.write(`${JSON.stringify(inventory, null, 2)}\n`);
   if (failOnBlockers && inventory.summary.blockerCount > 0)
     process.exitCode = 2;

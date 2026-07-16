@@ -19,6 +19,18 @@ timestamped transition evidence. Milestone 23 implements the frozen version-1
 initialization, caps, role rotation/timelocks, excess recovery, production multisig
 configuration, and 113-byte account retirement remain unimplemented.
 
+## Devnet deployment generations
+
+The current program/SDK identity is the separate M23 devnet deployment
+`HaryVUcfDqxpzFS7JyNe1XuqscFWyYFVAJdYoUX6jEcS`. The original
+`FYqCCoAnM9tUYRcSRbeLbUE9LBPv8bN2uyuhcz46pSgq` deployment is retained unchanged
+because it owns the two inventoried 113-byte vaults. New SDK derivations default to
+the current program but accept an explicit program ID for read-only legacy inventory.
+This generation split preserves the old withdrawal-compatible binary while allowing a
+fresh 145-byte v1 demonstration; it is not account migration or legacy retirement.
+Public deployment and non-mutation evidence is recorded in
+[`docs/DEVNET_V1_DEPLOYMENT.md`](docs/DEVNET_V1_DEPLOYMENT.md).
+
 ## Accepted pre-audit target and implementation status
 
 | Area | Accepted target | ADR |

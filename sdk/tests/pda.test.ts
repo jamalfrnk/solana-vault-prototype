@@ -3,6 +3,7 @@ import { Keypair, PublicKey } from "@solana/web3.js";
 
 import {
   PROGRAM_ID,
+  LEGACY_DEVNET_PROGRAM_ID,
   ASSOCIATED_TOKEN_PROGRAM_ID,
   TOKEN_PROGRAM_ID,
   VAULT_SEED,
@@ -25,6 +26,57 @@ function randomPubkey(): PublicKey {
 }
 
 describe("pdas", () => {
+  it("supports an explicit program ID for legacy inventory without changing defaults", () => {
+    const mint = randomPubkey();
+    const user = randomPubkey();
+    const vault = deriveVaultStatePda(mint, LEGACY_DEVNET_PROGRAM_ID);
+    const authority = deriveVaultAuthorityPda(
+      vault.address,
+      LEGACY_DEVNET_PROGRAM_ID
+    );
+    const position = deriveUserPositionPda(
+      vault.address,
+      user,
+      LEGACY_DEVNET_PROGRAM_ID
+    );
+    const config = deriveProtocolConfigPda(LEGACY_DEVNET_PROGRAM_ID);
+    const programData = deriveProgramDataPda(LEGACY_DEVNET_PROGRAM_ID);
+
+    expect(
+      PublicKey.findProgramAddressSync(
+        [VAULT_SEED, mint.toBuffer()],
+        LEGACY_DEVNET_PROGRAM_ID
+      )[0].equals(vault.address)
+    ).to.equal(true);
+    expect(
+      PublicKey.findProgramAddressSync(
+        [VAULT_AUTHORITY_SEED, vault.address.toBuffer()],
+        LEGACY_DEVNET_PROGRAM_ID
+      )[0].equals(authority.address)
+    ).to.equal(true);
+    expect(
+      PublicKey.findProgramAddressSync(
+        [USER_POSITION_SEED, vault.address.toBuffer(), user.toBuffer()],
+        LEGACY_DEVNET_PROGRAM_ID
+      )[0].equals(position.address)
+    ).to.equal(true);
+    expect(
+      PublicKey.findProgramAddressSync(
+        [PROTOCOL_CONFIG_SEED],
+        LEGACY_DEVNET_PROGRAM_ID
+      )[0].equals(config.address)
+    ).to.equal(true);
+    expect(
+      PublicKey.findProgramAddressSync(
+        [LEGACY_DEVNET_PROGRAM_ID.toBuffer()],
+        BPF_UPGRADEABLE_LOADER_PROGRAM_ID
+      )[0].equals(programData.address)
+    ).to.equal(true);
+    expect(deriveVaultStatePda(mint).address.equals(vault.address)).to.equal(
+      false
+    );
+  });
+
   describe("deriveProtocolConfigPda / deriveProgramDataPda", () => {
     it("matches the singleton protocol-config derivation", () => {
       const [expected, bump] = PublicKey.findProgramAddressSync(

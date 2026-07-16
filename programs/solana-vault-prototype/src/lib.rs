@@ -18,7 +18,7 @@ pub use events::*;
 pub use instructions::*;
 pub use state::*;
 
-declare_id!("FYqCCoAnM9tUYRcSRbeLbUE9LBPv8bN2uyuhcz46pSgq");
+declare_id!("HaryVUcfDqxpzFS7JyNe1XuqscFWyYFVAJdYoUX6jEcS");
 
 #[program]
 pub mod solana_vault_prototype {

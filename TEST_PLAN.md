@@ -1,10 +1,9 @@
 # Test Plan
 
-**Status: M21 and M22 are complete through PRs #34/#35; M23 ProtocolConfig and
-emergency controls are in review — 78 Rust tests, 87 SDK tests, and 94 dApp tests.
-The pinned local Anchor/SBF build, all Rust/SDK/dApp suites, clippy, SDK build,
-typechecks, and generated-IDL verifier are observed green for M23; pull-request CI
-remains the publication and dependency-audit gate.**
+**Status: M21–M23 are complete through PRs #34–#36; the M23 devnet/UI follow-up is
+in review — 78 Rust tests, 89 SDK tests, and 94 dApp tests. The new isolated devnet
+deployment, exact v1 fixture, strict decoder, browser route, and legacy non-mutation
+evidence are observed; full local validation and pull-request CI remain gates.**
 
 ## Repository hygiene (complete)
 
@@ -421,7 +420,7 @@ enums. All five jobs were green and GitHub reported the draft PR cleanly mergeab
 
 Merged through PR #35 as `da15843` on 2026-07-15.
 
-## M23 ProtocolConfig and emergency pause controls (in review)
+## M23 ProtocolConfig and emergency pause controls (complete — PR #36)
 
 All new Rust integration cases are in `tests/test_protocol.rs`; SDK wire and strict
 decoder cases are in the existing SDK suites.
@@ -462,6 +461,46 @@ unavailable because MSVC `link.exe` is absent; WSL supplied the complete Rust/SB
 vulnerability; dApp `npm audit --audit-level=high` reported 0 vulnerabilities. Yarn
 Classic's retired quick-audit endpoint returned HTTP 410 locally, so the existing CI
 severity-bitmask audit remains authoritative for the root package.
+
+Observed in PR #36 CI run `29471576382`: the Rust/Anchor, cargo-audit, SDK,
+dApp, and generated-IDL jobs all passed. GitHub merged PR #36 as `7aa260b` on
+2026-07-16.
+
+## M23 devnet/UI follow-up (in progress)
+
+- [x] The legacy program remains at
+      `FYqCCoAnM9tUYRcSRbeLbUE9LBPv8bN2uyuhcz46pSgq`; no transaction was sent to it.
+- [x] A separate v1 program was deployed at
+      `HaryVUcfDqxpzFS7JyNe1XuqscFWyYFVAJdYoUX6jEcS`, with local and on-chain
+      ProgramData payloads both 389072 bytes and SHA-256
+      `d0ad545ae18985c25ccbeed278395138616756d4d8315aa2ec5708f62714b881`.
+- [x] The new ProtocolConfig is exactly 200 bytes and the clean UI fixture VaultState
+      is exactly 145 bytes, version 1, and Active.
+- [x] The inventory can explicitly target either deployment. The legacy deployment
+      still reports two 113-byte blockers; the new deployment reports one v1 vault
+      and zero blockers.
+- [x] SDK PDA overrides preserve explicit legacy derivation and raise the SDK suite
+      from 87 to 89 tests.
+- [x] The direct UI route returned HTTP 200 and rendered Active with deposits and
+      withdrawals enabled, no load alert, and no console error.
+- [x] The devnet burner secret remains in a gitignored keypair, was copied locally
+      without being printed, and is never committed or included in documentation.
+- [x] Before/after hashes for the legacy program and both 113-byte vault accounts are
+      identical. See `docs/DEVNET_V1_DEPLOYMENT.md` for the complete evidence record.
+- [x] The full local matrix passes: formatting, Anchor/SBF build, warning-denying
+      clippy, 78 Rust tests, Rust audit, root typecheck, 89 SDK tests/build, dApp
+      typecheck/build/94 tests/audit, IDL verification, local documentation links,
+      secret scan, and whitespace checks.
+- [ ] Observe every pull-request CI job green before merge.
+
+Observed locally (2026-07-16): all gates above exited 0. The first parallel
+`cargo test` link attempt hit an Ubuntu Binutils 2.38 internal BFD error in
+`_bfd_merged_section_offset`; rerunning only that failed gate with
+`CARGO_BUILD_JOBS=1` linked successfully and all 78 tests passed. `cargo audit`
+reported seven allowed upstream warnings and no blocking vulnerability; the dApp
+audit reported zero vulnerabilities. Yarn Classic's retired audit endpoint again
+returned HTTP 410 locally, so the existing CI severity-bitmask audit remains the root
+package's authoritative dependency gate.
 
 ## Anchor scaffold baseline (complete — M2)
 

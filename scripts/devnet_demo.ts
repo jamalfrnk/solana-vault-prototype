@@ -25,14 +25,12 @@ import {
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
+import { PROGRAM_ID } from "../sdk/src/constants";
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const PROGRAM_ID = new PublicKey(
-  "FYqCCoAnM9tUYRcSRbeLbUE9LBPv8bN2uyuhcz46pSgq"
-);
 const VAULT_SEED = Buffer.from("vault");
 const VAULT_AUTHORITY_SEED = Buffer.from("vault_authority");
 const TOKEN_PROGRAM_ID = new PublicKey(

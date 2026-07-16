@@ -7,7 +7,11 @@ import {
   USER_POSITION_LEN,
   VAULT_STATE_LEN,
 } from "../src/accounts";
-import { PROGRAM_ID, TOKEN_PROGRAM_ID } from "../src/constants";
+import {
+  LEGACY_DEVNET_PROGRAM_ID,
+  PROGRAM_ID,
+  TOKEN_PROGRAM_ID,
+} from "../src/constants";
 import { accountDiscriminator } from "../src/discriminator";
 import {
   deriveAssociatedTokenAddress,
@@ -32,9 +36,11 @@ function vaultFixture(params: {
   operationalState?: number;
   version?: number;
   nonzeroReserved?: boolean;
+  programId?: PublicKey;
 }) {
-  const vault = deriveVaultStatePda(params.mint);
-  const authority = deriveVaultAuthorityPda(vault.address);
+  const programId = params.programId ?? PROGRAM_ID;
+  const vault = deriveVaultStatePda(params.mint, programId);
+  const authority = deriveVaultAuthorityPda(vault.address, programId);
   const data = Buffer.alloc(params.length);
   accountDiscriminator("VaultState").copy(data);
   key(90).toBuffer().copy(data, 8);
@@ -62,8 +68,13 @@ function vaultFixture(params: {
   return { vault, authority, custody, data };
 }
 
-function positionFixture(vault: PublicKey, owner: PublicKey, shares: bigint) {
-  const position = deriveUserPositionPda(vault, owner);
+function positionFixture(
+  vault: PublicKey,
+  owner: PublicKey,
+  shares: bigint,
+  programId: PublicKey = PROGRAM_ID
+) {
+  const position = deriveUserPositionPda(vault, owner, programId);
   const data = Buffer.alloc(USER_POSITION_LEN);
   accountDiscriminator("UserPosition").copy(data);
   owner.toBuffer().copy(data, 8);
@@ -111,6 +122,50 @@ function mockConnection(
 }
 
 describe("legacy account inventory", () => {
+  it("targets and derives against an explicit legacy program ID", async () => {
+    const legacy = vaultFixture({
+      mint: key(11),
+      length: LEGACY_VAULT_STATE_LEN,
+      programId: LEGACY_DEVNET_PROGRAM_ID,
+    });
+    const requestedProgramIds: string[] = [];
+    const connection = {
+      getProgramAccounts: async (programId: PublicKey, config: any) => {
+        requestedProgramIds.push(programId.toBase58());
+        const dataSize = config.filters[0].dataSize as number;
+        if (dataSize === LEGACY_VAULT_STATE_LEN) {
+          return [
+            {
+              pubkey: legacy.vault.address,
+              account: account(legacy.data, LEGACY_DEVNET_PROGRAM_ID),
+            },
+          ];
+        }
+        return [];
+      },
+      getMultipleAccountsInfo: async () => [
+        custodyFixture(key(11), legacy.authority.address, 0n),
+      ],
+    } as unknown as Connection;
+
+    const inventory = await buildInventory(
+      connection,
+      "mock://rpc",
+      LEGACY_DEVNET_PROGRAM_ID
+    );
+
+    expect(inventory.programId).to.equal(LEGACY_DEVNET_PROGRAM_ID.toBase58());
+    expect(requestedProgramIds).to.deep.equal([
+      LEGACY_DEVNET_PROGRAM_ID.toBase58(),
+      LEGACY_DEVNET_PROGRAM_ID.toBase58(),
+      LEGACY_DEVNET_PROGRAM_ID.toBase58(),
+    ]);
+    expect(inventory.vaults[0].canonical.vaultPda).to.equal(true);
+    expect(inventory.vaults[0].blockers).to.deep.equal([
+      "legacy-113-retirement-required",
+    ]);
+  });
+
   it("classifies 113-byte, v0, and healthy v1 vaults and reconciles positions/custody", async () => {
     const legacy = vaultFixture({
       mint: key(1),

@@ -525,9 +525,12 @@ candidate.
 Inventory is deliberately read-only and requires no wallet:
 
 ```bash
-corepack yarn inventory:legacy --url https://api.devnet.solana.com
-corepack yarn inventory:legacy --url https://api.devnet.solana.com --fail-on-blockers
+corepack yarn inventory:legacy --program-id FYqCCoAnM9tUYRcSRbeLbUE9LBPv8bN2uyuhcz46pSgq
+corepack yarn inventory:legacy --program-id FYqCCoAnM9tUYRcSRbeLbUE9LBPv8bN2uyuhcz46pSgq --fail-on-blockers
 ```
+
+The explicit program ID is required because the SDK default now targets the separate
+current-layout devnet deployment. Omitting `--program-id` inventories that new program.
 
 The second form exits with code 2 while any incompatible, unsupported, orphaned, or
 accounting/custody blocker exists. It does not create a transaction, request a signer,
@@ -551,83 +554,89 @@ are documented in
 
 ## 8. Run the devnet demo
 
-The program is already deployed to Solana devnet at:
+### Current and legacy program addresses
 
+The reviewed current-layout M23 binary is deployed to Solana devnet at:
+
+```text
+HaryVUcfDqxpzFS7JyNe1XuqscFWyYFVAJdYoUX6jEcS
 ```
-FYqCCoAnM9tUYRcSRbeLbUE9LBPv8bN2uyuhcz46pSgq
-```
 
-The demo script creates a fresh SPL mint, funds a user ATA, and calls all four
-instructions in sequence: initialize → deposit → withdraw → pause.
+The old `FYqC…pSgq` program remains live only because it owns the two inventoried
+113-byte vaults. Do not upgrade or use it for new fixtures. See
+[the devnet deployment manifest](docs/DEVNET_V1_DEPLOYMENT.md) for program-data,
+binary-hash, ProtocolConfig, fixture, and legacy non-mutation evidence.
 
-### Prerequisites
-
-- A funded devnet wallet at `~/.config/solana/id.json` with at least 0.3 SOL.
-  Check balance: `solana balance --url devnet`
-- If your balance is low, airdrop (may be rate-limited):
-  `solana airdrop 1 --url devnet`
-- Node dependencies installed: `npm install`
-
-### Step 1 — Verify the deployed program exists
+Verify the current program with a local devnet-only signer path:
 
 ```bash
-solana account FYqCCoAnM9tUYRcSRbeLbUE9LBPv8bN2uyuhcz46pSgq --url devnet
+solana program show HaryVUcfDqxpzFS7JyNe1XuqscFWyYFVAJdYoUX6jEcS \
+  --url devnet --keypair keys/ui-payer.json
 ```
 
-Expect `Executable: true`. If this fails, the program slot may have been garbage-
-collected by devnet. Re-deploy with:
+### Clean Phantom UI fixture
+
+The checked fixture is:
+
+| Item | Value |
+|---|---|
+| Wallet | `G3jgkUU8uixa3k2SLVahb65R6YpnxrgTvBHp1iMnBayE` |
+| Mint to enter in the app | `DbZn3QHLUFv4mARLEDwWa3mnwenjF67Ww87TtKLQsm2H` |
+| VaultState PDA | `9nuZydLWagtgzv12jeK98FST3J46i4JJiCeeJe66YnMs` |
+| Local port | `3000` |
+| Direct URL | `http://localhost:3000/vault/DbZn3QHLUFv4mARLEDwWa3mnwenjF67Ww87TtKLQsm2H` |
+
+The wallet has 0.05 devnet SOL and 10,000 fixture tokens. Its private key is stored
+only in gitignored `keys/ui-wallet-v1.json`. From the repository root, copy the key
+straight to the local Windows clipboard without printing it:
+
+```powershell
+$secret = node -e "const fs=require('fs');const{Keypair}=require('@solana/web3.js');const b=require('bs58');const e=(b.default??b).encode;const k=Keypair.fromSecretKey(Uint8Array.from(JSON.parse(fs.readFileSync('keys/ui-wallet-v1.json','utf8'))));process.stdout.write(e(k.secretKey))"
+Set-Clipboard -Value $secret
+Remove-Variable secret
+```
+
+Do not paste that value into chat, an issue, a PR, source, or documentation. In the
+Phantom extension:
+
+1. Profile avatar → **Settings** → **Manage Accounts** → **Add Account** →
+   **Import Private Key**.
+2. Select **Solana**, name it `Vault Devnet v1`, paste from the clipboard, and import.
+3. Confirm the resulting address is exactly `G3jg…BayE`; otherwise stop.
+4. Settings → **Developer Settings** → enable **Testnet Mode** → choose
+   **Solana Devnet**.
+5. After import, clear the clipboard: `Set-Clipboard -Value ""`.
+
+Start Next.js on the exact expected port. Supplying `--port 3000` prevents Next.js
+from silently choosing 3001 when another process already occupies the port:
+
+```powershell
+npm --prefix app run dev -- --port 3000
+```
+
+Open the direct URL above, connect `G3jg…BayE`, and expect `Active`, “Deposits and
+withdrawals enabled,” the deposit/withdraw forms, a 10,000-token wallet balance after
+refresh, and the ordinary admin panel because this burner is the vault pause authority.
+Never use the screenshot's old `HqeV…XjD5` mint; it intentionally remains a visible
+113-byte compatibility error.
+
+To generate another clean burner and current-layout vault without touching the old
+fixture or printing a key:
 
 ```bash
-anchor build
-anchor deploy --provider.cluster devnet
+npx ts-node scripts/ui_test_vault_setup.ts gen
+npx ts-node scripts/ui_test_vault_setup.ts init
 ```
 
-Then update the program ID in `Anchor.toml` and `programs/solana-vault-prototype/src/lib.rs`
-if it changed, rebuild, and re-run.
+`gen-roles` and `bootstrap` are one-time deployment-ceremony commands. ProtocolConfig
+is already initialized; do not rerun those commands with newly generated role files.
 
-### Step 2 — Run the demo
+### Scripted lifecycle demos
 
-```bash
-./node_modules/.bin/ts-node scripts/devnet_demo.ts
-```
-
-Expected output (addresses will differ from yours):
-
-```
-Payer: <your-wallet-pubkey>
-Balance: X.XXXXX SOL
-
-Mint created: <mint-pubkey>
-User ATA created: <ata-pubkey>
-Vault state PDA:     <vault-state-pubkey>
-Vault authority PDA: <vault-authority-pubkey>
-Custody ATA:         <custody-pubkey>
-
-[1/4] initialize
-  https://explorer.solana.com/tx/<sig>?cluster=devnet
-
-[2/4] deposit 1 000 tokens
-  User ATA balance after: 9000 tokens
-  https://explorer.solana.com/tx/<sig>?cluster=devnet
-
-[3/4] withdraw 500 shares
-  User ATA balance after: 9500 tokens
-  https://explorer.solana.com/tx/<sig>?cluster=devnet
-
-[4/4] pause
-  https://explorer.solana.com/tx/<sig>?cluster=devnet
-
-✓ All four instructions confirmed on devnet.
-```
-
-Open each Explorer URL in a browser to verify the on-chain transactions.
-
-### Step 3 — Verify balances make sense
-
-- After deposit of 1 000 from a 10 000-token ATA: balance should be 9 000.
-- First depositor gets shares 1:1 (no other depositors yet).
-- After withdrawing 500 shares at 1:1 ratio: 500 tokens returned, balance should be 9 500.
-- Custody ATA should hold the remaining 500 tokens.
+`scripts/devnet_demo.ts` creates a fresh mint and calls initialize → deposit →
+withdraw → pause against the current program. It requires a funded keypair at
+`~/.config/solana/id.json`. `scripts/sdk_devnet_smoke.ts` extends that flow through
+two-step authority rotation and final unpause.
 
 ### SDK rotation smoke (M18/M19 follow-up)
 
@@ -743,6 +752,11 @@ use `migrate_v0_to_v1` after the reviewed binary is deployed; a 113-byte account
 be upgraded in place and must follow the documented drain/reconcile/retire procedure.
 Do not treat a decode/RPC failure as an uninitialized vault, initialize a replacement
 without reconciling ownership, or assume migration can resize an account.
+
+For the recorded `HqeV…XjD5` mint, the 113-byte error is expected and should remain
+visible. Do not weaken the decoder or retry initialization at that PDA. For a clean UI
+test, use the `DbZn…sm2H` mint and port 3000 from Section 8; that route points to the
+separate current-layout program and a strictly verified 145-byte version-1 vault.
 
 ### `anchor test` fails with "Failed to spawn surfpool"
 
@@ -936,6 +950,7 @@ are unaffected — the authority gates only `pause`/`unpause`.
 | [docs/decisions/0002-vault-architecture.md](docs/decisions/0002-vault-architecture.md) | Architecture Decision Record with rationale for every structural choice |
 | [docs/decisions/0005-account-versioning-and-migration.md](docs/decisions/0005-account-versioning-and-migration.md) | Accepted versioning, same-size migration, and 113-byte retirement policy |
 | [docs/LEGACY_ACCOUNT_INVENTORY.md](docs/LEGACY_ACCOUNT_INVENTORY.md) | Initial devnet legacy inventory, public evidence, blockers, and retirement requirements |
+| [docs/DEVNET_V1_DEPLOYMENT.md](docs/DEVNET_V1_DEPLOYMENT.md) | Current program, ProtocolConfig, v1 UI fixture, verifiable-build, and legacy non-mutation evidence |
 | [programs/solana-vault-prototype/src/lib.rs](programs/solana-vault-prototype/src/lib.rs) | Program entry point, `declare_id!`, instruction dispatch |
 | [programs/solana-vault-prototype/src/state.rs](programs/solana-vault-prototype/src/state.rs) | `VaultState` and `UserPosition` struct definitions |
 | [programs/solana-vault-prototype/src/error.rs](programs/solana-vault-prototype/src/error.rs) | `VaultError` enum — every assertable on-chain error |
@@ -943,4 +958,5 @@ are unaffected — the authority gates only `pause`/`unpause`.
 | [scripts/devnet_demo.ts](scripts/devnet_demo.ts) | End-to-end devnet lifecycle: mint → initialize → deposit → withdraw → pause |
 | [scripts/sdk_devnet_smoke.ts](scripts/sdk_devnet_smoke.ts) | SDK devnet lifecycle including two-step authority rotation and unpause by the new authority |
 | [scripts/inventory_legacy_accounts.ts](scripts/inventory_legacy_accounts.ts) | Read-only account-generation, PDA, position, custody, and accounting inventory |
+| [scripts/ui_test_vault_setup.ts](scripts/ui_test_vault_setup.ts) | Secret-safe devnet role/bootstrap and fresh Phantom v1 UI fixture setup |
 | [scripts/verify_idl_discriminators.ts](scripts/verify_idl_discriminators.ts) | Generated-IDL discriminator, field-order/type/size, and enum verifier |
