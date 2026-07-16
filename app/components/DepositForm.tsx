@@ -2,7 +2,12 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { canDeposit, OperationalState, VaultClient } from "@vault-sdk";
+import {
+  canDeposit,
+  MintConfig,
+  OperationalState,
+  VaultClient,
+} from "@vault-sdk";
 
 import { useTransactionLifecycle } from "../hooks/useTransactionLifecycle";
 import { formatTokenAmount, parseTokenAmount } from "../lib/solana/amounts";
@@ -12,6 +17,9 @@ import { TransactionStatus } from "./TransactionStatus";
 export function DepositForm({
   vaultClient,
   operationalState,
+  mintConfig,
+  mintConfigStatus,
+  totalAssets,
   decimals,
   availableAssets,
   balanceStatus,
@@ -22,6 +30,9 @@ export function DepositForm({
 }: {
   vaultClient: VaultClient;
   operationalState: OperationalState;
+  mintConfig: MintConfig | null;
+  mintConfigStatus: "loading" | "ready" | "missing" | "error";
+  totalAssets: bigint;
   /** Mint decimals — user input is token-denominated and scaled by this. */
   decimals: number;
   availableAssets: bigint | null;
@@ -52,12 +63,38 @@ export function DepositForm({
       ? "Waiting for a confirmed wallet balance."
       : null;
 
+  const remainingVaultCapacity = mintConfig
+    ? mintConfig.maxTotalAssets > totalAssets
+      ? mintConfig.maxTotalAssets - totalAssets
+      : 0n
+    : null;
+  const protocolDepositLimit =
+    mintConfig && remainingVaultCapacity !== null
+      ? mintConfig.maxDepositAssetsPerTransaction < remainingVaultCapacity
+        ? mintConfig.maxDepositAssetsPerTransaction
+        : remainingVaultCapacity
+      : null;
+  const mintConfigUnavailableReason =
+    mintConfigStatus === "loading"
+      ? "Loading on-chain mint approval and deposit limits."
+      : mintConfigStatus === "missing"
+      ? "Deposits are unavailable because this mint has no on-chain MintConfig. Withdrawals remain available."
+      : mintConfigStatus === "error"
+      ? "Deposits are unavailable because on-chain mint limits could not be verified. Withdrawals remain available."
+      : !mintConfig?.enabled
+      ? "This mint is disabled for deposits by its on-chain MintConfig. Withdrawals remain available."
+      : protocolDepositLimit === 0n
+      ? "The on-chain deposit capacity is currently zero. Withdrawals remain available."
+      : null;
+
   const disabledReason = !connected
     ? "Connect your wallet to deposit."
     : !canDeposit(operationalState)
     ? operationalState === OperationalState.ExitOnly
       ? "Vault is exit-only; deposits are disabled while withdrawals remain available."
       : "Vault is fully paused; deposits are disabled."
+    : mintConfigUnavailableReason
+    ? mintConfigUnavailableReason
     : transactionPending && !busy
     ? "Another transaction is in progress."
     : balanceUnavailableReason
@@ -68,6 +105,10 @@ export function DepositForm({
       availableAssets !== null &&
       parsed.baseUnits > availableAssets
     ? "Requested amount exceeds your available assets."
+    : parsed.problem === null &&
+      protocolDepositLimit !== null &&
+      parsed.baseUnits > protocolDepositLimit
+    ? "Requested amount exceeds the on-chain per-transaction or remaining vault-capacity limit."
     : null;
 
   async function handleSubmit(e: FormEvent) {
@@ -84,6 +125,12 @@ export function DepositForm({
             ? "A confirmed wallet balance is required before depositing."
             : parsed.baseUnits > availableAssets
             ? "Requested amount exceeds your available assets."
+            : protocolDepositLimit === null ||
+              mintConfigStatus !== "ready" ||
+              !mintConfig?.enabled
+            ? "Verified on-chain mint approval and deposit limits are required."
+            : parsed.baseUnits > protocolDepositLimit
+            ? "Requested amount exceeds the on-chain deposit limit."
             : null),
         buildIx: () => vaultClient.buildDepositIx(publicKey, parsed.baseUnits),
         onConfirmed: async (signature) => {
@@ -114,6 +161,27 @@ export function DepositForm({
           (busy || transactionPending || balanceStatus !== "ready") && (
             <small>Last confirmed</small>
           )}
+      </p>
+      <p className="action-availability" aria-live="polite">
+        <span>On-chain maximum this deposit</span>
+        <strong>
+          {protocolDepositLimit === null
+            ? mintConfigStatus === "error" || mintConfigStatus === "missing"
+              ? "Unavailable"
+              : "Loading..."
+            : formatTokenAmount(protocolDepositLimit, decimals)}
+        </strong>
+        {mintConfig && (
+          <small>
+            Per transaction:{" "}
+            {formatTokenAmount(
+              mintConfig.maxDepositAssetsPerTransaction,
+              decimals
+            )}{" "}
+            · Remaining vault capacity:{" "}
+            {formatTokenAmount(remainingVaultCapacity ?? 0n, decimals)}
+          </small>
+        )}
       </p>
       <label htmlFor="deposit-amount">Amount (tokens)</label>
       <input

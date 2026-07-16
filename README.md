@@ -24,8 +24,9 @@ vault product without building custody logic from zero.
 **All 14 MVP milestones and post-MVP M15–M23 are merged.** M23's separate
 ProtocolConfig and emergency-control milestone merged through PR #36, its isolated
 devnet/UI follow-up through PR #37, and the persistent wallet-header follow-up through
-PR #38. A connected-wallet balance UX follow-up is in review; see `ROADMAP.md` for the
-full history.
+PR #38. The connected-wallet balance UX merged through PR #39. M24 MintConfig,
+governed initialization, and exposure caps are in review; see `ROADMAP.md` for the full
+history.
 
 The original lifecycle was confirmed live on Solana devnet in June 2026. The reviewed
 M23 binary is now deployed separately at the current-layout devnet address; its
@@ -34,12 +35,12 @@ the legacy program. A CI pipeline (fmt, build, clippy, test, audit) gates every
 PR. A production-hardening pass closed four MVP-accepted risks and added instruction
 events. A TypeScript SDK (`sdk/`) and a minimal Next.js dApp (`app/`) sit on top of
 the program, both IDL-free and independently testable offline. The current recorded
-suite contains 78 Rust tests, 89 SDK tests, and 117 dApp tests. Current architecture is
+suite contains 89 Rust tests, 112 SDK tests, and 122 dApp tests. Current architecture is
 accepted in ADR 0002; ADRs 0003–0009 define the narrower pre-audit production target.
 M21 implements its account-versioning slice, M22 its exit-first availability slice,
-and M23 the ProtocolConfig/emergency-control slice. Mint/cap governance, role
-rotation/timelocks, upgrade governance, recovery, audit, and launch requirements
-remain incomplete.
+M23 the ProtocolConfig/emergency-control slice, and M24 the governed mint/exposure
+slice. Production role/timelock configuration, deployment of M24, upgrade governance,
+recovery, audit, and launch requirements remain incomplete.
 
 This is an interview-grade educational prototype. It is **not** audited, **not**
 production-safe, **not** mainnet-ready, and **not** formally verified. See
@@ -80,8 +81,10 @@ A single vault custodies one SPL token mint:
 
 ## Instruction set
 
-- [x] `initialize` — create the vault state PDA and custody ATA bound to one mint.
-- [x] `deposit` — transfer tokens into custody and credit shares.
+- [x] `initialize` — governance-approved creation of the vault/custody for an enabled
+  fixed-supply configured mint.
+- [x] `deposit` — transfer tokens into custody and credit shares only within both
+  on-chain MintConfig caps.
 - [x] `withdraw` — redeem shares and transfer tokens out via PDA-signed CPI.
 - [x] `pause` / `unpause` — set `ExitOnly` / `Active` under an explicit authority and
   bounded reason; exit-only blocks deposits while preserving valid withdrawals.
@@ -94,6 +97,12 @@ A single vault custodies one SPL token mint:
 - [x] `emergency_pause` / `emergency_resume` — only the configured emergency
   authority may enter `FullyPaused` or recover first to `ExitOnly`; it cannot reopen
   deposits.
+- [x] `initialize_mint_config` — governance creates a disabled, zero-cap per-mint
+  configuration only for a mint with no mint/freeze authority.
+- [x] `propose_mint_config_update` / `execute_mint_config_update` — commit and apply an
+  exact risk-increasing target behind a 48-hour delay.
+- [x] `disable_mint` / `lower_mint_caps` — immediate risk reduction that cancels any
+  pending increase and never affects withdrawals.
 
 ## Security goals
 
@@ -115,6 +124,10 @@ SBF hash, ProtocolConfig is initialized, and a clean v1 UI fixture is live. Full
 addresses, transaction evidence, hashes, and the legacy non-mutation proof are in
 [`docs/DEVNET_V1_DEPLOYMENT.md`](docs/DEVNET_V1_DEPLOYMENT.md).
 
+M24 is not deployed. The source's governed initialize/deposit account contracts and
+MintConfig instructions are incompatible with the M23 address until a separate
+reviewed deployment creates a verified binary and compatible fixture.
+
 The earlier M10 program at `FYqCCoAnM9tUYRcSRbeLbUE9LBPv8bN2uyuhcz46pSgq`
 remains unchanged because it owns the two inventoried 113-byte vaults. Never upgrade
 that address before their separately reviewed retirement.
@@ -130,10 +143,10 @@ account decoders, and Anchor error parsing — with **no runtime dependency on
 `target/idl/*.json`**. Every Anchor discriminator is computed directly via
 `sha256("global:<name>")` / `sha256("account:<Name>")`, matching Anchor's own
 codegen, which makes the SDK fully testable without the Anchor CLI installed. Since
-M19, discriminator matches are verified on every CI run. M21–M23 expand the same gate:
+M19, discriminator matches are verified on every CI run. M21–M24 expand the same gate:
 CI runs `anchor build` and verifies all instruction discriminators and argument schemas,
 all account discriminators, exact account field order and types, fixed serialized
-sizes, and both operational-state enums against the real generated IDL.
+sizes, bounded enums, and MintConfig events against the real generated IDL.
 
 `sdk/` is now a versioned, buildable package (`solana-vault-prototype-sdk`, see
 `sdk/README.md`) — **not yet published to npm**. Until then, import it directly from
@@ -141,7 +154,7 @@ the repo as shown below.
 
 ```bash
 corepack yarn install
-corepack yarn test:sdk    # 89 tests, offline, no RPC, no compiled program
+corepack yarn test:sdk    # 112 tests, offline, no RPC, no compiled program
 corepack yarn typecheck
 corepack yarn sdk:build   # emits sdk/dist/*.js + *.d.ts
 ```
@@ -158,11 +171,10 @@ const pauseIx = client.buildPauseIx(
 const state = await client.fetchVaultState();
 ```
 
-`scripts/sdk_devnet_smoke.ts` mirrors `devnet_demo.ts`'s flow but built entirely on
-`sdk/`. It has not been run against a live cluster in this environment — its
-correctness rests on the 87 offline unit tests plus manual review; run it yourself
-against a funded devnet keypair before trusting it live. It does not initialize or
-exercise M23 ProtocolConfig/emergency controls.
+`scripts/sdk_devnet_smoke.ts` documents the pre-M24 lifecycle and is retained for the
+deployed M23 generation. Do not run the current source's M24 builders against that
+address: the governed account contracts differ. A later deployment milestone must
+update and verify a new live lifecycle without exposing signer material.
 
 ## dApp
 
@@ -171,7 +183,10 @@ a mint, view vault state, deposit, withdraw, view confirmed wallet assets and va
 shares, use an admin pause/unpause panel, and see a cluster warning banner. Wallet
 assets come from the connected owner's canonical legacy-SPL ATA; withdrawable shares
 come from the program's `UserPosition`, and the displayed redeemable-asset value uses
-the same floor formula as the program. Deliberately not a polished product: no charts,
+the same floor formula as the program. Under M24 it also reads MintConfig separately,
+shows the effective on-chain maximum deposit, and fails only deposits closed when the
+config is absent, malformed, disabled, or exhausted; withdrawal state remains visible.
+Deliberately not a polished product: no charts,
 no analytics, plain CSS only — see the Post-MVP Roadmap for what a real product version
 would add.
 
@@ -179,7 +194,7 @@ would add.
 cd app
 npm install
 npm run dev     # http://localhost:3000
-npm run test    # 117 tests, offline, mocked wallet + SDK, no live RPC
+npm run test    # 122 tests, offline, mocked wallet + SDK, no live RPC
 npm run build
 ```
 
@@ -194,9 +209,12 @@ Two known, deliberate limitations:
   client-side); real enforcement is the on-chain constraint already tested in the
   Rust program.
 
-Manual browser verification against the fresh devnet v1 fixture confirmed the vault
-route renders `Active`, deposits/withdrawals enabled, no visible alert, and no console
-error. The shared header now keeps a single `Connect Wallet` control available on the
+Manual browser verification of the merged M23 UI against the fresh devnet v1 fixture
+confirmed the vault route rendered `Active`, deposits/withdrawals enabled, no visible
+alert, and no console error. The M24 UI intentionally disables deposits against that
+same fixture because the M23 program has no MintConfig; this is safe generation
+mismatch behavior, not authorization to create a live config. The shared header keeps
+a single `Connect Wallet` control available on the
 landing and vault routes; desktop and narrow-viewport checks confirmed that it does
 not overlap the devnet warning or page content, and its modal lists only Phantom and
 Solflare. The dedicated Phantom burner is funded; Malcolm still performs the final
@@ -232,8 +250,8 @@ GitHub, **Code → Codespaces → Create codespace on main**, and wait for
 
 ## Testing strategy
 
-> See `TEST_PLAN.md`. The current suites contain 78 Rust tests, 89 SDK tests, and
-> 117 dApp tests; M23's local Rust/SBF/generated-IDL results are recorded there and PR
+> See `TEST_PLAN.md`. The current suites contain 89 Rust tests, 112 SDK tests, and
+> 122 dApp tests; M24's local Rust/SBF/generated-IDL results are recorded there and PR
 > CI remains the publication gate.
 
 ```bash
@@ -242,7 +260,7 @@ corepack yarn test:sdk  # SDK tests, no Rust/Solana/Anchor toolchain, no live cl
 cd app && npm run test  # dApp tests, no Rust/Solana/Anchor toolchain, no live cluster
 ```
 
-Program coverage spans unit (arithmetic), integration (all 11 instructions),
+Program coverage spans unit (arithmetic), integration (all 16 instructions),
 happy-path, negative, account-substitution, arithmetic-boundary, adversarial (12
 targeted attack scenarios), and event emission.
 
@@ -250,11 +268,11 @@ targeted attack scenarios), and event emission.
 
 See `ROADMAP.md` for the full milestone-by-milestone history. M20 accepted the
 production-target decisions; M21 implemented account versioning/migration/inventory,
-M22 implemented exit-first behavior, and M23 implemented the singleton ProtocolConfig
-and emergency state transitions. The devnet/UI follow-up deploys that reviewed slice
-for testing but does not retire legacy accounts or make production claims. After it
-merges, the next numbered implementation slice is MintConfig, governed initialization,
-and exposure caps; it remains unstarted here.
+M22 implemented exit-first behavior, M23 implemented the singleton ProtocolConfig and
+emergency state transitions, and M24 implements governed MintConfig and exposure caps.
+The devnet/UI follow-up deploys only the reviewed M23 slice; it does not retire legacy
+accounts or make production claims. After M24 merges, ADR 0009's next numbered slice
+is constrained exact-excess recovery and reconciliation tests.
 
 ## Interview walkthrough
 

@@ -1,3 +1,5 @@
+mod support;
+
 use {
     anchor_lang::{
         solana_program::instruction::Instruction, AccountDeserialize, InstructionData,
@@ -49,10 +51,9 @@ fn system_program_id() -> Pubkey {
 // ---------------------------------------------------------------------------
 
 /// Build an 82-byte SPL Token Mint account (COption layout, is_initialized=true).
-fn make_mint_account(mint_authority: &Pubkey, decimals: u8) -> Account {
+fn make_mint_account(_mint_authority: &Pubkey, decimals: u8) -> Account {
     let mut data = vec![0u8; 82];
-    data[0] = 1; // COption::Some tag for mint_authority
-    data[4..36].copy_from_slice(mint_authority.as_ref());
+    // [0..36] COption::None mint_authority: fixed supply required by M24.
     // [36..44] supply = 0
     data[44] = decimals;
     data[45] = 1; // is_initialized
@@ -163,6 +164,9 @@ fn make_initialize_ix(
             token_program: spl_token_id(),
             associated_token_program: ata_program_id(),
             system_program: system_program_id(),
+            protocol_governance_authority: payer,
+            protocol_config: support::find_protocol_config().0,
+            mint_config: support::find_mint_config(&mint).0,
         }
         .to_account_metas(None),
     )
@@ -192,6 +196,7 @@ fn make_deposit_ix(
             mint,
             token_program: spl_token_id(),
             system_program: system_program_id(),
+            mint_config: support::find_mint_config(&mint).0,
         }
         .to_account_metas(None),
     )
@@ -230,6 +235,7 @@ impl VaultFixture {
             make_mint_account(&keypair_pubkey(&mint_authority), 6),
         )
         .unwrap();
+        support::install_enabled_test_configs(&mut svm, keypair_pubkey(&payer), mint_pk);
 
         let (vault_state_pda, _) = find_vault_state(&mint_pk, &pid);
         let (vault_authority_pda, _) = find_vault_authority(&vault_state_pda, &pid);

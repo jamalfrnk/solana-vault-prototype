@@ -3,6 +3,7 @@ import { Connection, PublicKey } from "@solana/web3.js";
 import { accountDiscriminator } from "./discriminator";
 import {
   deriveProtocolConfigPda,
+  deriveMintConfigPda,
   deriveUserPositionPda,
   deriveVaultStatePda,
 } from "./pdas";
@@ -12,9 +13,11 @@ export const LEGACY_VAULT_STATE_LEN = 113;
 export const VAULT_STATE_LEN = 145;
 export const USER_POSITION_LEN = 81;
 export const PROTOCOL_CONFIG_LEN = 200;
+export const MINT_CONFIG_LEN = 160;
 export const VAULT_STATE_VERSION_V0 = 0;
 export const VAULT_STATE_VERSION_V1 = 1;
 export const PROTOCOL_CONFIG_VERSION_V1 = 1;
+export const MINT_CONFIG_VERSION_V1 = 1;
 
 export enum OperationalState {
   Active = 0,
@@ -27,6 +30,13 @@ export enum OperationalStateReason {
   ExposureReduction = 1,
   IncidentResolved = 2,
   GovernanceAction = 3,
+}
+
+export enum RolloutStage {
+  Devnet = 0,
+  Canary = 1,
+  Limited = 2,
+  Expanded = 3,
 }
 
 export function canDeposit(state: OperationalState): boolean {
@@ -225,6 +235,138 @@ export interface ProtocolConfig {
   tokenProgram: PublicKey;
 }
 
+export interface MintConfig {
+  version: typeof MINT_CONFIG_VERSION_V1;
+  bump: number;
+  mint: PublicKey;
+  enabled: boolean;
+  maxTotalAssets: bigint;
+  maxDepositAssetsPerTransaction: bigint;
+  rolloutStage: RolloutStage;
+  hasPendingUpdate: boolean;
+  pendingEnabled: boolean;
+  pendingMaxTotalAssets: bigint;
+  pendingMaxDepositAssetsPerTransaction: bigint;
+  pendingRolloutStage: RolloutStage;
+  pendingEffectiveUnixTimestamp: bigint;
+}
+
+function readBool(data: Buffer, offset: number, field: string): boolean {
+  const value = data.readUInt8(offset);
+  if (value !== 0 && value !== 1) {
+    throw new Error(
+      `MintConfig ${field} must be encoded as 0 or 1, got ${value}`
+    );
+  }
+  return value === 1;
+}
+
+function readRolloutStage(
+  data: Buffer,
+  offset: number,
+  field: string
+): RolloutStage {
+  const value = data.readUInt8(offset);
+  if (value < RolloutStage.Devnet || value > RolloutStage.Expanded) {
+    throw new Error(`Unsupported MintConfig ${field} ${value}`);
+  }
+  return value;
+}
+
+/** Strict decoder for the frozen 160-byte MintConfig v1 account. */
+export function decodeMintConfig(
+  data: Buffer,
+  expectedMint: PublicKey
+): MintConfig {
+  if (data.length !== MINT_CONFIG_LEN) {
+    throw new Error(
+      `Unsupported MintConfig account length: expected exactly ${MINT_CONFIG_LEN} bytes, got ${data.length}`
+    );
+  }
+  checkDiscriminator(data, "MintConfig");
+  const version = data.readUInt8(8);
+  if (version !== MINT_CONFIG_VERSION_V1) {
+    throw new Error(`Unsupported MintConfig version ${version}`);
+  }
+  const bump = data.readUInt8(9);
+  const expectedBump = deriveMintConfigPda(expectedMint).bump;
+  if (bump !== expectedBump) {
+    throw new Error(
+      `MintConfig bump mismatch: expected ${expectedBump}, got ${bump}`
+    );
+  }
+  const mint = new PublicKey(data.subarray(10, 42));
+  if (!mint.equals(expectedMint)) {
+    throw new Error(
+      `MintConfig mint mismatch: expected ${expectedMint.toBase58()}, got ${mint.toBase58()}`
+    );
+  }
+  if (!data.subarray(87, 160).every((byte) => byte === 0)) {
+    throw new Error("MintConfig v1 reserved bytes must all be zero");
+  }
+
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  const enabled = readBool(data, 42, "enabled");
+  const maxTotalAssets = view.getBigUint64(43, true);
+  const maxDepositAssetsPerTransaction = view.getBigUint64(51, true);
+  if (maxDepositAssetsPerTransaction > maxTotalAssets) {
+    throw new Error("MintConfig per-transaction cap exceeds total-assets cap");
+  }
+  const rolloutStage = readRolloutStage(data, 59, "rollout stage");
+  const hasPendingUpdate = readBool(data, 60, "has_pending_update");
+  const pendingEnabled = readBool(data, 61, "pending_enabled");
+  const pendingMaxTotalAssets = view.getBigUint64(62, true);
+  const pendingMaxDepositAssetsPerTransaction = view.getBigUint64(70, true);
+  const pendingRolloutStage = readRolloutStage(
+    data,
+    78,
+    "pending rollout stage"
+  );
+  const pendingEffectiveUnixTimestamp = view.getBigInt64(79, true);
+
+  const inactivePendingIsCanonical =
+    !pendingEnabled &&
+    pendingMaxTotalAssets === 0n &&
+    pendingMaxDepositAssetsPerTransaction === 0n &&
+    pendingRolloutStage === RolloutStage.Devnet &&
+    pendingEffectiveUnixTimestamp === 0n;
+  const stageDelta = pendingRolloutStage - rolloutStage;
+  const activePendingIsCanonical =
+    pendingEnabled &&
+    pendingEffectiveUnixTimestamp > 0n &&
+    pendingMaxDepositAssetsPerTransaction <= pendingMaxTotalAssets &&
+    pendingMaxTotalAssets >= maxTotalAssets &&
+    pendingMaxDepositAssetsPerTransaction >= maxDepositAssetsPerTransaction &&
+    stageDelta >= 0 &&
+    stageDelta <= 1 &&
+    (!enabled ||
+      pendingMaxTotalAssets > maxTotalAssets ||
+      pendingMaxDepositAssetsPerTransaction > maxDepositAssetsPerTransaction ||
+      pendingRolloutStage !== rolloutStage);
+  if (
+    (hasPendingUpdate && !activePendingIsCanonical) ||
+    (!hasPendingUpdate && !inactivePendingIsCanonical)
+  ) {
+    throw new Error("MintConfig pending-update fields are malformed");
+  }
+
+  return {
+    version: MINT_CONFIG_VERSION_V1,
+    bump,
+    mint,
+    enabled,
+    maxTotalAssets,
+    maxDepositAssetsPerTransaction,
+    rolloutStage,
+    hasPendingUpdate,
+    pendingEnabled,
+    pendingMaxTotalAssets,
+    pendingMaxDepositAssetsPerTransaction,
+    pendingRolloutStage,
+    pendingEffectiveUnixTimestamp,
+  };
+}
+
 /** Strict decoder for the frozen 200-byte ProtocolConfig v1 singleton. */
 export function decodeProtocolConfig(data: Buffer): ProtocolConfig {
   if (data.length !== PROTOCOL_CONFIG_LEN) {
@@ -320,6 +462,17 @@ export async function fetchProtocolConfig(
   const account = await connection.getAccountInfo(address);
   if (!account) return null;
   return decodeProtocolConfig(account.data);
+}
+
+/** Fetches and strictly decodes this mint's MintConfig v1, or null if absent. */
+export async function fetchMintConfig(
+  connection: Connection,
+  mint: PublicKey
+): Promise<MintConfig | null> {
+  const { address } = deriveMintConfigPda(mint);
+  const account = await connection.getAccountInfo(address);
+  if (!account) return null;
+  return decodeMintConfig(account.data, mint);
 }
 
 /** Fetches and decodes a user's frozen UserPositionV1, or null when absent. */

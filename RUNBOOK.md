@@ -111,7 +111,7 @@ solana-vault-prototype/
 │
 ├── programs/solana-vault-prototype/src/
 │   ├── lib.rs                    ← program entry point, declare_id!
-│   ├── state.rs                  ← VaultState + UserPosition + ProtocolConfig structs
+│   ├── state.rs                  ← VaultState + UserPosition + ProtocolConfig + MintConfig
 │   ├── constants.rs              ← PDA seed byte constants
 │   ├── error.rs                  ← VaultError codes
 │   ├── instructions.rs           ← glob re-exports for Anchor macro
@@ -121,6 +121,7 @@ solana-vault-prototype/
 │       ├── withdraw.rs           ← withdraw instruction (M6)
 │       ├── pause.rs              ← exit-first pause / unpause controls (M7/M21/M22)
 │       ├── protocol.rs           ← config bootstrap + emergency controls (M23)
+│       ├── mint_config.rs        ← mint approval, timelock, and exposure controls (M24)
 │       ├── rotate.rs             ← two-step authority rotation (M18)
 │       └── migrate.rs            ← exact-size VaultState v0 → v1 migration (M21)
 │
@@ -131,7 +132,8 @@ solana-vault-prototype/
 │   ├── test_pause.rs             ← 5 tests (set, clear, idempotent, wrong authority ×2)
 │   ├── test_adversarial.rs       ← substitution, ownership, arithmetic, and donation cases
 │   ├── test_migration.rs         ← 10 independent raw-wire migration/version cases
-│   └── test_protocol.rs          ← 8 config/bootstrap/emergency-control cases
+│   ├── test_protocol.rs          ← 8 config/bootstrap/emergency-control cases
+│   └── test_mint_config.rs       ← 11 governance/timelock/cap/exit cases
 │
 ├── scripts/
 │   ├── devnet_demo.ts            ← end-to-end devnet lifecycle demo
@@ -177,22 +179,22 @@ file is what gets deployed to devnet or loaded by the LiteSVM test harness.
 
 ## 5. Run the full test suite
 
-### Step 1 — Run all 70 Rust tests
+### Step 1 — Run all 89 Rust tests
 
 ```bash
 cargo test
 ```
 
-All 78 tests must pass. Expected output (abbreviated):
+All 89 tests must pass. Expected output (abbreviated):
 
 ```
-running 78 tests across the program test targets
+running 89 tests across the program test targets
 test test_id ... ok
 test test_vault_initialize_creates_correct_state ... ok
 test test_pause_sets_exit_only ... ok
 test test_migrate_v0_active_to_v1_permissionless_preserves_state ... ok
 test test_migrate_v0_paused_maps_to_exit_only ... ok
-test result: ok. 70 passed; 0 failed
+test result: ok. 89 passed; 0 failed
 ```
 
 If any test fails, do not continue — diagnose and fix before proceeding.
@@ -282,6 +284,32 @@ M23 mutation or rotation instruction. Do not initialize it with temporary produc
 roles: bootstrap is a one-time transaction and M23 deliberately chooses no live
 addresses.
 
+### MintConfig account layout (160 bytes on the wire)
+
+```text
+8  bytes  — Anchor discriminator
+1  byte   — version (exactly 1)
+1  byte   — canonical mint_config PDA bump
+32 bytes  — approved legacy-SPL mint
+1  byte   — enabled
+8  bytes  — max_total_assets
+8  bytes  — max_deposit_assets_per_transaction
+1  byte   — rollout_stage (Devnet/Canary/Limited/Expanded)
+1  byte   — has_pending_update
+1  byte   — pending_enabled
+8  bytes  — pending_max_total_assets
+8  bytes  — pending_max_deposit_assets_per_transaction
+1  byte   — pending_rollout_stage
+8  bytes  — pending_effective_unix_timestamp
+73 bytes  — reserved (must be all zero)
+= 160 bytes (Borsh wire size)
+```
+
+Derive it only from `["mint_config", mint]`. A freshly initialized config must be
+disabled, both caps must be zero, stage must be `Devnet`, and every pending/reserved
+byte must be canonical zero. Never interpret zero as unlimited. MintConfig and caps
+are denominated in mint base units and do not use an oracle.
+
 ### Custody token account
 
 The vault holds tokens in an Associated Token Account (ATA) owned by `vault_authority`:
@@ -321,7 +349,7 @@ operations — this is the standard ERC-4626 pattern and is intentional.
 
 ```
 Uninitialized
-     │ initialize(v1)
+     │ initialize(v1; governance + enabled MintConfig)
      ▼
   Active  ◄────── unpause
      │                ▲
@@ -337,7 +365,8 @@ Uninitialized
 `ExitOnly`, so the default incident response stops new exposure without trapping users.
 `FullyPaused` blocks both paths. Only the ProtocolConfig emergency authority may enter
 it or recover first to `ExitOnly`; emergency recovery can never reopen deposits.
-`initialize` runs exactly once, regardless of pause state.
+`initialize` runs exactly once and only with ProtocolConfig governance plus an enabled,
+matching MintConfig. MintConfig state never enters the withdrawal instruction.
 
 ---
 
@@ -368,6 +397,32 @@ These are exceptional governance transactions, not frontend controls. Use
 After remediation, verify invariants before `emergency_resume`; then verify safe exits
 in `ExitOnly`. Reopening deposits remains a separate ordinary `unpause` decision.
 
+### MintConfig lifecycle and exposure controls (M24)
+
+**File:** [programs/solana-vault-prototype/src/instructions/mint_config.rs](programs/solana-vault-prototype/src/instructions/mint_config.rs)
+
+This milestone supplies the on-chain workflow but does not authorize a live ceremony:
+
+1. Independently verify ProtocolConfig, governance identity, mint owner, absent mint
+   and freeze authorities, mint decimals/supply, and the canonical MintConfig PDA.
+2. `initialize_mint_config` creates only disabled, zero-cap `Devnet` state.
+3. Governance proposes the complete enabled/caps/stage target. Record its transaction,
+   slot, proposal Unix timestamp, exact activation timestamp, and decoded account.
+4. Wait at least 172,800 on-chain seconds. Anyone may then execute only that committed
+   target. Re-fetch and reconcile every field before allowing vault initialization.
+5. Governed `initialize` creates the vault; deposits remain bounded by the smaller of
+   the per-transaction cap and remaining total-assets capacity.
+
+For incident reduction, protocol governance may disable immediately and the current
+vault pause authority may lower one or both caps immediately, including to zero. Both
+actions clear a pending update. Never treat a client-side cap display, token symbol,
+metadata, or RPC response as authority; the program-owned config is authoritative.
+Withdrawals never require MintConfig.
+
+Before any future production proposal, record the exact mint base-unit values and
+their ADR 0007 stage evidence in a signed, independently reviewed manifest. This
+repository does not choose those values or provide the required production multisig.
+
 ### `initialize`
 
 **File:** [programs/solana-vault-prototype/src/instructions/initialize.rs](programs/solana-vault-prototype/src/instructions/initialize.rs)
@@ -382,7 +437,10 @@ re-running `find_program_address` on-chain.
 constraint = pause_authority.key() != payer.key() @ VaultError::Unauthorized
 ```
 
-This prevents the deployer's hot wallet from also being the pause authority.
+This prevents the deployer's hot wallet from also being the pause authority. M24 also
+requires the ProtocolConfig governance signer plus the canonical enabled MintConfig,
+and it rejects any mint with a live mint or freeze authority. An arbitrary caller can
+no longer occupy the canonical vault for an approved mint.
 
 **What to check after running it:**
 - `vault_state.total_assets == 0`
@@ -567,6 +625,13 @@ The old `FYqC…pSgq` program remains live only because it owns the two inventor
 [the devnet deployment manifest](docs/DEVNET_V1_DEPLOYMENT.md) for program-data,
 binary-hash, ProtocolConfig, fixture, and legacy non-mutation evidence.
 
+This is an M23 binary. The repository's M24 source adds MintConfig instructions and
+changes initialize/deposit account contracts, so do not send current builders to this
+address. A separate deployment milestone must verify a new program, initialize a
+compatible config through governance, and create a new fixture. Until then, a current
+M24 dApp build correctly reports the missing MintConfig and disables deposits while
+leaving the existing withdrawal state visible.
+
 Verify the current program with a local devnet-only signer path:
 
 ```bash
@@ -614,14 +679,15 @@ from silently choosing 3001 when another process already occupies the port:
 npm --prefix app run dev -- --port 3000
 ```
 
-Open the direct URL above, connect `G3jg…BayE`, and expect `Active`, “Deposits and
-withdrawals enabled,” the deposit/withdraw forms, a 10,000-token wallet balance after
-refresh, and the ordinary admin panel because this burner is the vault pause authority.
-Never use the screenshot's old `HqeV…XjD5` mint; it intentionally remains a visible
-113-byte compatibility error.
+With the merged M23 UI checkout, the route historically showed `Active`, deposits and
+withdrawals enabled, a 10,000-token wallet balance, and the ordinary admin panel. With
+the M24 source checkout, expect `Active` plus a clear missing-MintConfig warning:
+deposits are disabled and withdrawals/balances remain visible. That is the correct
+fail-closed result against an older binary. Never use the screenshot's old
+`HqeV…XjD5` mint; it intentionally remains a visible 113-byte compatibility error.
 
-To generate another clean burner and current-layout vault without touching the old
-fixture or printing a key:
+The following setup commands are historical M23 tooling; do not run them from the M24
+checkout until a later deployment milestone updates the governed account contract:
 
 ```bash
 npx ts-node scripts/ui_test_vault_setup.ts gen
@@ -637,6 +703,10 @@ is already initialized; do not rerun those commands with newly generated role fi
 withdraw → pause against the current program. It requires a funded keypair at
 `~/.config/solana/id.json`. `scripts/sdk_devnet_smoke.ts` extends that flow through
 two-step authority rotation and final unpause.
+
+These scripts describe the pre-M24 deployed interface. Do not run them from an M24
+checkout against the M23 address; the new governed account contracts require a later
+deployment-specific lifecycle update.
 
 ### SDK rotation smoke (M18/M19 follow-up)
 
@@ -697,7 +767,7 @@ cargo fmt --all -- --check
 # 2. Build program and generated IDL (must exit 0, zero warnings)
 anchor build --ignore-keys
 
-# 3. Rust checks (all 78 tests must pass)
+# 3. Rust checks (all 89 tests must pass)
 cargo clippy --all-targets --all-features -- -D warnings
 cargo test
 

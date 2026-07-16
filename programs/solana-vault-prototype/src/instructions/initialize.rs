@@ -5,10 +5,13 @@ use anchor_spl::{
 };
 
 use crate::{
-    constants::{VAULT_AUTHORITY_SEED, VAULT_SEED},
+    constants::{MINT_CONFIG_SEED, PROTOCOL_CONFIG_SEED, VAULT_AUTHORITY_SEED, VAULT_SEED},
     error::VaultError,
     events::VaultInitialized,
-    state::{OperationalState, VaultState, VAULT_STATE_VERSION_V1},
+    state::{
+        MintConfig, OperationalState, ProtocolConfig, VaultState, MINT_CONFIG_VERSION_V1,
+        PROTOCOL_CONFIG_VERSION_V1, VAULT_STATE_VERSION_V1,
+    },
 };
 
 #[derive(Accounts)]
@@ -22,6 +25,7 @@ pub struct Initialize<'info> {
     pub pause_authority: Signer<'info>,
 
     #[account(
+        constraint = mint.mint_authority.is_none() @ VaultError::MintAuthorityPresent,
         constraint = mint.freeze_authority.is_none() @ VaultError::FreezeAuthorityPresent,
     )]
     pub mint: Account<'info, Mint>,
@@ -54,6 +58,38 @@ pub struct Initialize<'info> {
     pub token_program: Program<'info, Token>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
+
+    #[account(
+        constraint = protocol_governance_authority.key()
+            == protocol_config.protocol_governance_authority @ VaultError::Unauthorized,
+    )]
+    pub protocol_governance_authority: Signer<'info>,
+
+    #[account(
+        seeds = [PROTOCOL_CONFIG_SEED],
+        bump = protocol_config.bump,
+        constraint = protocol_config.version == PROTOCOL_CONFIG_VERSION_V1
+            @ VaultError::UnsupportedProtocolConfigVersion,
+        constraint = protocol_config.reserved.iter().all(|byte| *byte == 0)
+            @ VaultError::InvalidProtocolConfigReservedBytes,
+        constraint = protocol_config.token_program == anchor_spl::token::ID
+            @ VaultError::InvalidProtocolTokenProgram,
+    )]
+    pub protocol_config: Account<'info, ProtocolConfig>,
+
+    #[account(
+        seeds = [MINT_CONFIG_SEED, mint.key().as_ref()],
+        bump = mint_config.bump,
+        constraint = mint_config.version == MINT_CONFIG_VERSION_V1
+            @ VaultError::UnsupportedMintConfigVersion,
+        constraint = mint_config.mint == mint.key() @ VaultError::InvalidMintConfigMint,
+        constraint = mint_config.enabled @ VaultError::MintDisabled,
+        constraint = mint_config.reserved.iter().all(|byte| *byte == 0)
+            @ VaultError::InvalidMintConfigReservedBytes,
+        constraint = mint_config.pending_state_is_valid()
+            @ VaultError::InvalidMintConfigPendingState,
+    )]
+    pub mint_config: Account<'info, MintConfig>,
 }
 
 pub fn handler(ctx: Context<Initialize>) -> Result<()> {

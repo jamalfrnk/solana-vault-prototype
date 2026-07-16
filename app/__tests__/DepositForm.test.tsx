@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { Keypair } from "@solana/web3.js";
 import type { ComponentProps } from "react";
-import { OperationalState } from "../../sdk/src";
+import { MintConfig, OperationalState, RolloutStage } from "../../sdk/src";
 
 const sendTransactionMock = vi.fn();
 const useWalletMock = vi.fn();
@@ -16,23 +16,40 @@ import { DepositForm as DepositFormComponent } from "../components/DepositForm";
 import type { VaultClient } from "../../sdk/src";
 
 type DepositFormProps = ComponentProps<typeof DepositFormComponent>;
-type TestDepositFormProps = Omit<
-  DepositFormProps,
-  "availableAssets" | "balanceStatus" | "transactionPending"
-> &
-  Partial<
-    Pick<
-      DepositFormProps,
-      "availableAssets" | "balanceStatus" | "transactionPending"
-    >
-  >;
+type DefaultedDepositFormProps =
+  | "availableAssets"
+  | "balanceStatus"
+  | "transactionPending"
+  | "mintConfig"
+  | "mintConfigStatus"
+  | "totalAssets";
+type TestDepositFormProps = Omit<DepositFormProps, DefaultedDepositFormProps> &
+  Partial<Pick<DepositFormProps, DefaultedDepositFormProps>>;
 
 function DepositForm(props: TestDepositFormProps) {
+  const mintConfig: MintConfig = {
+    version: 1,
+    bump: 255,
+    mint: Keypair.generate().publicKey,
+    enabled: true,
+    maxTotalAssets: 10_000_000_000n,
+    maxDepositAssetsPerTransaction: 1_000_000_000n,
+    rolloutStage: RolloutStage.Devnet,
+    hasPendingUpdate: false,
+    pendingEnabled: false,
+    pendingMaxTotalAssets: 0n,
+    pendingMaxDepositAssetsPerTransaction: 0n,
+    pendingRolloutStage: RolloutStage.Devnet,
+    pendingEffectiveUnixTimestamp: 0n,
+  };
   return (
     <DepositFormComponent
       availableAssets={1_000_000_000n}
       balanceStatus="ready"
       transactionPending={false}
+      mintConfig={mintConfig}
+      mintConfigStatus="ready"
+      totalAssets={0n}
       {...props}
     />
   );
@@ -141,6 +158,105 @@ describe("DepositForm", () => {
       "disabled",
       false
     );
+  });
+
+  it("fails closed when MintConfig is missing or cannot be verified", () => {
+    connectWallet();
+    const view = render(
+      <DepositForm
+        vaultClient={fakeVaultClient}
+        operationalState={OperationalState.Active}
+        decimals={0}
+        mintConfig={null}
+        mintConfigStatus="missing"
+      />
+    );
+    expect(screen.getByText(/no on-chain MintConfig/i)).to.exist;
+    expect(screen.getByText(/withdrawals remain available/i)).to.exist;
+    expect(screen.getByRole("button", { name: /deposit/i })).toBeDisabled();
+
+    view.rerender(
+      <DepositForm
+        vaultClient={fakeVaultClient}
+        operationalState={OperationalState.Active}
+        decimals={0}
+        mintConfig={null}
+        mintConfigStatus="error"
+      />
+    );
+    expect(screen.getByText(/limits could not be verified/i)).to.exist;
+    expect(screen.getByRole("button", { name: /deposit/i })).toBeDisabled();
+  });
+
+  it("shows and enforces the lesser of the transaction cap and remaining TVL capacity", () => {
+    connectWallet();
+    const cappedConfig: MintConfig = {
+      version: 1,
+      bump: 255,
+      mint: Keypair.generate().publicKey,
+      enabled: true,
+      maxTotalAssets: 100n,
+      maxDepositAssetsPerTransaction: 25n,
+      rolloutStage: RolloutStage.Canary,
+      hasPendingUpdate: false,
+      pendingEnabled: false,
+      pendingMaxTotalAssets: 0n,
+      pendingMaxDepositAssetsPerTransaction: 0n,
+      pendingRolloutStage: RolloutStage.Devnet,
+      pendingEffectiveUnixTimestamp: 0n,
+    };
+    render(
+      <DepositForm
+        vaultClient={fakeVaultClient}
+        operationalState={OperationalState.Active}
+        decimals={0}
+        availableAssets={1_000n}
+        mintConfig={cappedConfig}
+        totalAssets={90n}
+      />
+    );
+    expect(screen.getByText(/on-chain maximum this deposit/i)).to.exist;
+    expect(screen.getByText("10")).to.exist;
+    expect(
+      screen.getByText(/per transaction: 25.*remaining vault capacity: 10/i)
+    ).to.exist;
+
+    fireEvent.change(screen.getByLabelText(/amount/i), {
+      target: { value: "11" },
+    });
+    expect(screen.getByText(/exceeds the on-chain/i)).to.exist;
+    expect(screen.getByRole("button", { name: /deposit/i })).toBeDisabled();
+  });
+
+  it("keeps withdrawals available while a disabled or zero-cap MintConfig blocks deposits", () => {
+    connectWallet();
+    const disabled: MintConfig = {
+      version: 1,
+      bump: 255,
+      mint: Keypair.generate().publicKey,
+      enabled: false,
+      maxTotalAssets: 0n,
+      maxDepositAssetsPerTransaction: 0n,
+      rolloutStage: RolloutStage.Devnet,
+      hasPendingUpdate: false,
+      pendingEnabled: false,
+      pendingMaxTotalAssets: 0n,
+      pendingMaxDepositAssetsPerTransaction: 0n,
+      pendingRolloutStage: RolloutStage.Devnet,
+      pendingEffectiveUnixTimestamp: 0n,
+    };
+    render(
+      <DepositForm
+        vaultClient={fakeVaultClient}
+        operationalState={OperationalState.Active}
+        decimals={0}
+        mintConfig={disabled}
+      />
+    );
+    expect(
+      screen.getByText(/disabled for deposits.*withdrawals remain available/i)
+    ).to.exist;
+    expect(screen.getByRole("button", { name: /deposit/i })).toBeDisabled();
   });
 
   it("shows the confirmed wallet assets available to deposit", () => {

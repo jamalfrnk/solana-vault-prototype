@@ -3,10 +3,11 @@
 - **Status:** Accepted
 - **Date:** 2026-07-15
 - **Milestone:** 20 — Pre-Audit Production Design
-- **Implementation status:** Partially implemented through M23; the repository now
-  enforces versioning, exit-first gates, and a separated emergency state-transition
-  path, while production roles, manifests, monitoring, rehearsal, audit, and most
-  launch gates remain unmet
+- **Implementation status:** Partially implemented through M24; the repository now
+  enforces versioning, exit-first gates, separated emergency transitions, governed
+  fixed-supply mint approval, delayed risk increases, and deposit exposure caps, while
+  production roles, deployment/manifests, excess recovery, monitoring, rehearsal,
+  audit, and most launch gates remain unmet
 
 ## Context
 
@@ -138,7 +139,8 @@ milestones:
    IDL account-layout verification.
 2. Exit-first operational-state program/SDK/dApp behavior and tests.
 3. ProtocolConfig singleton and emergency state-transition controls (M23).
-4. MintConfig, governed vault initialization, mint policy, and caps.
+4. MintConfig, governed vault initialization, mint policy, and caps (implemented in
+   M24; production deployment/values remain gated).
 5. Constrained excess recovery and reconciliation tests.
 6. Verifiable release automation, secret scanning, authority manifests, RPC/monitoring,
    and incident runbook rehearsal.

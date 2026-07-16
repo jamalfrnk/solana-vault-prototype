@@ -15,6 +15,7 @@ import {
   deriveAssociatedTokenAddress,
   deriveProtocolConfigPda,
   deriveProgramDataPda,
+  deriveMintConfigPda,
 } from "../src/pdas";
 import {
   buildInitializeIx,
@@ -28,10 +29,15 @@ import {
   buildInitializeProtocolConfigIx,
   buildEmergencyPauseIx,
   buildEmergencyResumeIx,
+  buildInitializeMintConfigIx,
+  buildProposeMintConfigUpdateIx,
+  buildExecuteMintConfigUpdateIx,
+  buildDisableMintIx,
+  buildLowerMintCapsIx,
 } from "../src/instructions";
 import { VaultClient } from "../src/client";
 import { Connection } from "@solana/web3.js";
-import { OperationalStateReason } from "../src/accounts";
+import { OperationalStateReason, RolloutStage } from "../src/accounts";
 
 function randomPubkey(): PublicKey {
   return Keypair.generate().publicKey;
@@ -63,18 +69,26 @@ describe("instructions", () => {
   describe("buildInitializeIx", () => {
     const payer = randomPubkey();
     const pauseAuthority = randomPubkey();
+    const protocolGovernanceAuthority = randomPubkey();
     const mint = randomPubkey();
-    const ix = buildInitializeIx({ payer, pauseAuthority, mint });
+    const ix = buildInitializeIx({
+      payer,
+      pauseAuthority,
+      protocolGovernanceAuthority,
+      mint,
+    });
 
     const vaultState = deriveVaultStatePda(mint);
     const vaultAuthority = deriveVaultAuthorityPda(vaultState.address);
     const custody = deriveAssociatedTokenAddress(vaultAuthority.address, mint);
+    const protocolConfig = deriveProtocolConfigPda();
+    const mintConfig = deriveMintConfigPda(mint);
 
     it("targets the vault program", () => {
       expect(ix.programId.toBase58()).to.equal(PROGRAM_ID.toBase58());
     });
 
-    it("has the exact 9-account order the Rust Accounts struct declares", () => {
+    it("has the exact 12-account governed order the Rust Accounts struct declares", () => {
       assertKeys(ix.keys, [
         { pubkey: payer, isSigner: true, isWritable: true },
         { pubkey: pauseAuthority, isSigner: true, isWritable: false },
@@ -89,6 +103,13 @@ describe("instructions", () => {
           isWritable: false,
         },
         { pubkey: SYSTEM_PROGRAM_ID, isSigner: false, isWritable: false },
+        {
+          pubkey: protocolGovernanceAuthority,
+          isSigner: true,
+          isWritable: false,
+        },
+        { pubkey: protocolConfig.address, isSigner: false, isWritable: false },
+        { pubkey: mintConfig.address, isSigner: false, isWritable: false },
       ]);
     });
 
@@ -111,8 +132,9 @@ describe("instructions", () => {
     const custody = deriveAssociatedTokenAddress(vaultAuthority.address, mint);
     const userTokenAccount = deriveAssociatedTokenAddress(user, mint);
     const userPosition = deriveUserPositionPda(vaultState.address, user);
+    const mintConfig = deriveMintConfigPda(mint);
 
-    it("has the exact 9-account order the Rust Accounts struct declares", () => {
+    it("has the exact 10-account order including read-only MintConfig", () => {
       assertKeys(ix.keys, [
         { pubkey: user, isSigner: true, isWritable: true },
         { pubkey: vaultState.address, isSigner: false, isWritable: true },
@@ -123,6 +145,7 @@ describe("instructions", () => {
         { pubkey: mint, isSigner: false, isWritable: false },
         { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
         { pubkey: SYSTEM_PROGRAM_ID, isSigner: false, isWritable: false },
+        { pubkey: mintConfig.address, isSigner: false, isWritable: false },
       ]);
     });
 
@@ -362,6 +385,108 @@ describe("instructions", () => {
     });
   });
 
+  describe("MintConfig governance builders", () => {
+    const payer = randomPubkey();
+    const governance = randomPubkey();
+    const pauseAuthority = randomPubkey();
+    const mint = randomPubkey();
+    const protocolConfig = deriveProtocolConfigPda();
+    const mintConfig = deriveMintConfigPda(mint);
+
+    it("buildInitializeMintConfigIx pins account order and program-assigned zero-cap initialization", () => {
+      const ix = buildInitializeMintConfigIx({
+        payer,
+        protocolGovernanceAuthority: governance,
+        mint,
+      });
+      assertKeys(ix.keys, [
+        { pubkey: payer, isSigner: true, isWritable: true },
+        { pubkey: governance, isSigner: true, isWritable: false },
+        { pubkey: protocolConfig.address, isSigner: false, isWritable: false },
+        { pubkey: mint, isSigner: false, isWritable: false },
+        { pubkey: mintConfig.address, isSigner: false, isWritable: true },
+        { pubkey: SYSTEM_PROGRAM_ID, isSigner: false, isWritable: false },
+      ]);
+      expect(ix.data).to.have.lengthOf(8);
+      expect(ix.data.subarray(0, 8)).to.deep.equal(
+        instructionDiscriminator("initialize_mint_config")
+      );
+    });
+
+    it("buildProposeMintConfigUpdateIx commits every exact target field", () => {
+      const ix = buildProposeMintConfigUpdateIx({
+        protocolGovernanceAuthority: governance,
+        mint,
+        enabled: true,
+        maxTotalAssets: 20_000n,
+        maxDepositAssetsPerTransaction: 2_000n,
+        rolloutStage: RolloutStage.Canary,
+      });
+      assertKeys(ix.keys, [
+        { pubkey: governance, isSigner: true, isWritable: false },
+        { pubkey: protocolConfig.address, isSigner: false, isWritable: false },
+        { pubkey: mintConfig.address, isSigner: false, isWritable: true },
+      ]);
+      expect(ix.data).to.have.lengthOf(26);
+      expect(ix.data[8]).to.equal(1);
+      expect(ix.data.readBigUInt64LE(9)).to.equal(20_000n);
+      expect(ix.data.readBigUInt64LE(17)).to.equal(2_000n);
+      expect(ix.data[25]).to.equal(RolloutStage.Canary);
+    });
+
+    it("rejects an unknown rollout stage before constructing a transaction", () => {
+      expect(() =>
+        buildProposeMintConfigUpdateIx({
+          protocolGovernanceAuthority: governance,
+          mint,
+          enabled: true,
+          maxTotalAssets: 1n,
+          maxDepositAssetsPerTransaction: 1n,
+          rolloutStage: 4 as RolloutStage,
+        })
+      ).to.throw(/rollout-stage/i);
+    });
+
+    it("builds permissionless execution and governance disable account contracts", () => {
+      assertKeys(buildExecuteMintConfigUpdateIx(mint).keys, [
+        { pubkey: protocolConfig.address, isSigner: false, isWritable: false },
+        { pubkey: mintConfig.address, isSigner: false, isWritable: true },
+      ]);
+      assertKeys(
+        buildDisableMintIx({
+          protocolGovernanceAuthority: governance,
+          mint,
+        }).keys,
+        [
+          { pubkey: governance, isSigner: true, isWritable: false },
+          {
+            pubkey: protocolConfig.address,
+            isSigner: false,
+            isWritable: false,
+          },
+          { pubkey: mintConfig.address, isSigner: false, isWritable: true },
+        ]
+      );
+    });
+
+    it("buildLowerMintCapsIx never adds ProtocolConfig or a withdrawal account", () => {
+      const vault = deriveVaultStatePda(mint);
+      const ix = buildLowerMintCapsIx({
+        pauseAuthority,
+        mint,
+        maxTotalAssets: 5_000n,
+        maxDepositAssetsPerTransaction: 500n,
+      });
+      assertKeys(ix.keys, [
+        { pubkey: pauseAuthority, isSigner: true, isWritable: false },
+        { pubkey: vault.address, isSigner: false, isWritable: false },
+        { pubkey: mintConfig.address, isSigner: false, isWritable: true },
+      ]);
+      expect(ix.data.readBigUInt64LE(8)).to.equal(5_000n);
+      expect(ix.data.readBigUInt64LE(16)).to.equal(500n);
+    });
+  });
+
   describe("VaultClient delegation", () => {
     const connection = new Connection("http://localhost:8899");
     const mint = randomPubkey();
@@ -438,6 +563,41 @@ describe("instructions", () => {
       );
     });
 
+    it("delegates every MintConfig builder and fetch target", () => {
+      const governance = randomPubkey();
+      const pauseAuthority = randomPubkey();
+      expect(
+        client
+          .buildInitializeMintConfigIx(randomPubkey(), governance)
+          .keys[4].pubkey.equals(deriveMintConfigPda(mint).address)
+      ).to.equal(true);
+      expect(
+        client
+          .buildProposeMintConfigUpdateIx(
+            governance,
+            true,
+            20_000n,
+            2_000n,
+            RolloutStage.Canary
+          )
+          .data.equals(
+            buildProposeMintConfigUpdateIx({
+              protocolGovernanceAuthority: governance,
+              mint,
+              enabled: true,
+              maxTotalAssets: 20_000n,
+              maxDepositAssetsPerTransaction: 2_000n,
+              rolloutStage: RolloutStage.Canary,
+            }).data
+          )
+      ).to.equal(true);
+      expect(client.buildExecuteMintConfigUpdateIx().keys).to.have.lengthOf(2);
+      expect(client.buildDisableMintIx(governance).keys).to.have.lengthOf(3);
+      expect(
+        client.buildLowerMintCapsIx(pauseAuthority, 5_000n, 500n).keys
+      ).to.have.lengthOf(3);
+    });
+
     it("delegates ProtocolConfig bootstrap and emergency controls", () => {
       const payer = randomPubkey();
       const upgradeAuthority = randomPubkey();
@@ -491,13 +651,18 @@ describe("instructions", () => {
     });
   });
 
-  it("all eleven instructions have pairwise-distinct data discriminators", () => {
+  it("all sixteen instructions have pairwise-distinct data discriminators", () => {
     const mint = randomPubkey();
     const user = randomPubkey();
     const pauseAuthority = randomPubkey();
     const payer = randomPubkey();
     const ixs = [
-      buildInitializeIx({ payer, pauseAuthority, mint }),
+      buildInitializeIx({
+        payer,
+        pauseAuthority,
+        protocolGovernanceAuthority: user,
+        mint,
+      }),
       buildDepositIx({ user, mint, amount: 1n }),
       buildWithdrawIx({ user, mint, sharesIn: 1n }),
       buildPauseIx({
@@ -533,6 +698,27 @@ describe("instructions", () => {
         emergencyAuthority: user,
         mint,
         reason: OperationalStateReason.IncidentResolved,
+      }),
+      buildInitializeMintConfigIx({
+        payer,
+        protocolGovernanceAuthority: user,
+        mint,
+      }),
+      buildProposeMintConfigUpdateIx({
+        protocolGovernanceAuthority: user,
+        mint,
+        enabled: true,
+        maxTotalAssets: 20n,
+        maxDepositAssetsPerTransaction: 2n,
+        rolloutStage: RolloutStage.Canary,
+      }),
+      buildExecuteMintConfigUpdateIx(mint),
+      buildDisableMintIx({ protocolGovernanceAuthority: user, mint }),
+      buildLowerMintCapsIx({
+        pauseAuthority,
+        mint,
+        maxTotalAssets: 5n,
+        maxDepositAssetsPerTransaction: 1n,
       }),
     ];
     const prefixes = ixs.map((ix) => ix.data.subarray(0, 8).toString("hex"));

@@ -19,7 +19,9 @@ import {
   deriveAssociatedTokenAddress,
   deriveProtocolConfigPda,
   deriveProgramDataPda,
+  deriveMintConfigPda,
 } from "./pdas";
+import { RolloutStage } from "./accounts";
 
 function meta(
   pubkey: PublicKey,
@@ -46,6 +48,7 @@ function amountData(name: string, amount: bigint): Buffer {
 export interface InitializeIxParams {
   payer: PublicKey;
   pauseAuthority: PublicKey;
+  protocolGovernanceAuthority?: PublicKey;
   mint: PublicKey;
 }
 
@@ -56,6 +59,10 @@ export function buildInitializeIx(
   const vaultState = deriveVaultStatePda(p.mint);
   const vaultAuthority = deriveVaultAuthorityPda(vaultState.address);
   const custody = deriveAssociatedTokenAddress(vaultAuthority.address, p.mint);
+  const protocolConfig = deriveProtocolConfigPda();
+  const mintConfig = deriveMintConfigPda(p.mint);
+  const protocolGovernanceAuthority =
+    p.protocolGovernanceAuthority ?? p.pauseAuthority;
 
   return new TransactionInstruction({
     programId: PROGRAM_ID,
@@ -69,6 +76,9 @@ export function buildInitializeIx(
       meta(TOKEN_PROGRAM_ID, false, false),
       meta(ASSOCIATED_TOKEN_PROGRAM_ID, false, false),
       meta(SYSTEM_PROGRAM_ID, false, false),
+      meta(protocolGovernanceAuthority, true, false),
+      meta(protocolConfig.address, false, false),
+      meta(mintConfig.address, false, false),
     ],
     data: instructionDiscriminator("initialize"),
   });
@@ -86,6 +96,7 @@ export function buildDepositIx(p: DepositIxParams): TransactionInstruction {
   const custody = deriveAssociatedTokenAddress(vaultAuthority.address, p.mint);
   const userTokenAccount = deriveAssociatedTokenAddress(p.user, p.mint);
   const userPosition = deriveUserPositionPda(vaultState.address, p.user);
+  const mintConfig = deriveMintConfigPda(p.mint);
 
   return new TransactionInstruction({
     programId: PROGRAM_ID,
@@ -99,6 +110,7 @@ export function buildDepositIx(p: DepositIxParams): TransactionInstruction {
       meta(p.mint, false, false),
       meta(TOKEN_PROGRAM_ID, false, false),
       meta(SYSTEM_PROGRAM_ID, false, false),
+      meta(mintConfig.address, false, false),
     ],
     data: amountData("deposit", p.amount),
   });
@@ -300,5 +312,147 @@ export function buildMigrateV0ToV1Ix(
     programId: PROGRAM_ID,
     keys: [meta(vaultState.address, false, true)],
     data: instructionDiscriminator("migrate_v0_to_v1"),
+  });
+}
+
+function mintCapsData(
+  name: "lower_mint_caps",
+  maxTotalAssets: bigint,
+  maxDepositAssetsPerTransaction: bigint
+): Buffer {
+  const data = Buffer.alloc(24);
+  instructionDiscriminator(name).copy(data, 0);
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  view.setBigUint64(8, maxTotalAssets, true);
+  view.setBigUint64(16, maxDepositAssetsPerTransaction, true);
+  return data;
+}
+
+function assertRolloutStage(stage: RolloutStage): void {
+  if (!Number.isInteger(stage) || stage < 0 || stage > 3) {
+    throw new RangeError(`Unsupported rollout-stage code ${stage}`);
+  }
+}
+
+export interface InitializeMintConfigIxParams {
+  payer: PublicKey;
+  protocolGovernanceAuthority: PublicKey;
+  mint: PublicKey;
+}
+
+export function buildInitializeMintConfigIx(
+  p: InitializeMintConfigIxParams
+): TransactionInstruction {
+  const protocolConfig = deriveProtocolConfigPda();
+  const mintConfig = deriveMintConfigPda(p.mint);
+  return new TransactionInstruction({
+    programId: PROGRAM_ID,
+    keys: [
+      meta(p.payer, true, true),
+      meta(p.protocolGovernanceAuthority, true, false),
+      meta(protocolConfig.address, false, false),
+      meta(p.mint, false, false),
+      meta(mintConfig.address, false, true),
+      meta(SYSTEM_PROGRAM_ID, false, false),
+    ],
+    data: instructionDiscriminator("initialize_mint_config"),
+  });
+}
+
+export interface ProposeMintConfigUpdateIxParams {
+  protocolGovernanceAuthority: PublicKey;
+  mint: PublicKey;
+  enabled: boolean;
+  maxTotalAssets: bigint;
+  maxDepositAssetsPerTransaction: bigint;
+  rolloutStage: RolloutStage;
+}
+
+export function buildProposeMintConfigUpdateIx(
+  p: ProposeMintConfigUpdateIxParams
+): TransactionInstruction {
+  assertRolloutStage(p.rolloutStage);
+  const data = Buffer.alloc(26);
+  instructionDiscriminator("propose_mint_config_update").copy(data, 0);
+  data[8] = p.enabled ? 1 : 0;
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  view.setBigUint64(9, p.maxTotalAssets, true);
+  view.setBigUint64(17, p.maxDepositAssetsPerTransaction, true);
+  data[25] = p.rolloutStage;
+  return governedMintConfigInstruction(
+    "propose_mint_config_update",
+    p.protocolGovernanceAuthority,
+    p.mint,
+    data
+  );
+}
+
+function governedMintConfigInstruction(
+  name: "propose_mint_config_update" | "disable_mint",
+  protocolGovernanceAuthority: PublicKey,
+  mint: PublicKey,
+  data: Buffer = instructionDiscriminator(name)
+): TransactionInstruction {
+  return new TransactionInstruction({
+    programId: PROGRAM_ID,
+    keys: [
+      meta(protocolGovernanceAuthority, true, false),
+      meta(deriveProtocolConfigPda().address, false, false),
+      meta(deriveMintConfigPda(mint).address, false, true),
+    ],
+    data,
+  });
+}
+
+export interface GovernMintConfigIxParams {
+  protocolGovernanceAuthority: PublicKey;
+  mint: PublicKey;
+}
+
+export function buildDisableMintIx(
+  p: GovernMintConfigIxParams
+): TransactionInstruction {
+  return governedMintConfigInstruction(
+    "disable_mint",
+    p.protocolGovernanceAuthority,
+    p.mint
+  );
+}
+
+export function buildExecuteMintConfigUpdateIx(
+  mint: PublicKey
+): TransactionInstruction {
+  return new TransactionInstruction({
+    programId: PROGRAM_ID,
+    keys: [
+      meta(deriveProtocolConfigPda().address, false, false),
+      meta(deriveMintConfigPda(mint).address, false, true),
+    ],
+    data: instructionDiscriminator("execute_mint_config_update"),
+  });
+}
+
+export interface LowerMintCapsIxParams {
+  pauseAuthority: PublicKey;
+  mint: PublicKey;
+  maxTotalAssets: bigint;
+  maxDepositAssetsPerTransaction: bigint;
+}
+
+export function buildLowerMintCapsIx(
+  p: LowerMintCapsIxParams
+): TransactionInstruction {
+  return new TransactionInstruction({
+    programId: PROGRAM_ID,
+    keys: [
+      meta(p.pauseAuthority, true, false),
+      meta(deriveVaultStatePda(p.mint).address, false, false),
+      meta(deriveMintConfigPda(p.mint).address, false, true),
+    ],
+    data: mintCapsData(
+      "lower_mint_caps",
+      p.maxTotalAssets,
+      p.maxDepositAssetsPerTransaction
+    ),
   });
 }

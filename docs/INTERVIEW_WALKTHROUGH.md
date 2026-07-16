@@ -23,7 +23,7 @@ Key points to hit:
 
 ## 2 — The account model
 
-### Four PDAs
+### Five PDAs
 
 | PDA | Seeds | Purpose |
 |-----|-------|---------|
@@ -31,6 +31,7 @@ Key points to hit:
 | `vault_authority` | `["vault_authority", vault_state]` | Owns the custody ATA; signs withdrawals |
 | `user_position` | `["user_position", vault_state, user]` | Per-user share ledger |
 | `protocol_config` | `["protocol_config"]` | Singleton protocol roles and canonical token program |
+| `mint_config` | `["mint_config", mint]` | Per-mint approval, exposure caps, and committed delayed update |
 
 **Why chain `vault_authority` off `vault_state`?**
 Prevents seed collision: two different mints produce two different `vault_state`
@@ -68,6 +69,15 @@ ProgramData account. The gotcha is first-caller takeover: a permissionless singl
 initializer would let an attacker assign themselves emergency authority before the
 intended operator.
 
+### MintConfig layout (160 bytes Borsh)
+
+M24 freezes a per-mint account containing version/bump/mint, enabled state, total and
+per-transaction caps, rollout stage, a complete pending target plus activation time,
+and 73 reserved zero bytes. A new config is always disabled with zero caps. The gotcha
+is initialization-time risk bypass: if governance could choose a nonzero initial cap,
+a mistaken floor could not be reduced before a vault pause authority exists. Requiring
+the first enable/caps to traverse the same 48-hour proposal path removes that gap.
+
 ---
 
 ## 3 — Initialize
@@ -76,9 +86,9 @@ intended operator.
 pub fn initialize(ctx: Context<Initialize>) -> Result<()>
 ```
 
-**What it does:** Allocates `vault_state` PDA, `vault_authority` PDA, and the custody
-ATA in one atomic transaction. Stores both bumps, the mint pubkey, and the
-`pause_authority`.
+**What it does:** With ProtocolConfig governance and an enabled matching MintConfig,
+allocates `vault_state` PDA, `vault_authority` PDA, and the custody ATA in one atomic
+transaction. Stores both bumps, the mint pubkey, and the `pause_authority`.
 
 **Key constraint:**
 ```rust
@@ -86,6 +96,11 @@ constraint = pause_authority.key() != payer.key() @ VaultError::Unauthorized
 ```
 This on-chain constraint forces the deployer to specify a separate ordinary pause
 authority — a hot wallet cannot be both deployment payer and pause control.
+
+M24 additionally requires the configured protocol-governance signer, the canonical
+ProtocolConfig/MintConfig accounts, and a mint with neither mint nor freeze authority.
+This closes canonical-PDA front-running: an untrusted caller cannot preempt an approved
+mint with an attacker-selected pause authority.
 
 **Security detail:** The custody ATA address is deterministic and public, so any party
 can pre-create it before `initialize` runs. M12 changed the account constraint to
@@ -119,6 +134,13 @@ back to u64 via `try_from` — checked, never silent truncation.
 **CPI detail:** `transfer_checked` (not `transfer`) requires passing the mint's
 `decimals`, which prevents a category of attacks where a malicious mint claims a
 different decimal count than the actual token.
+
+**Exposure checks:** Before CPI or state mutation, M24 verifies the canonical enabled
+MintConfig, `amount <= max_deposit_assets_per_transaction`, and checked
+`total_assets + amount <= max_total_assets`. Zero means disabled. The read-only config
+is boxed because Anchor's generated account parser otherwise exceeded Solana's 4 KiB
+stack frame by eight bytes; boxing changes storage placement, not the wire/account
+contract.
 
 **Anchor 1.0.x gotcha:** `CpiContext::new` takes `Pubkey`, not `AccountInfo`.
 Use the program ID constant (`anchor_spl::token::ID`), not `.to_account_info()`.
@@ -215,9 +237,10 @@ version 1. It never transfers tokens or reallocates an account.
 
 In-process Solana VM. Load the compiled `.so` via `include_bytes!`, airdrop SOL,
 inject SPL mint and token accounts via `svm.set_account()`, send transactions.
-No external validator. The current program suite contains 78 tests, including 10 raw-
-wire migration/version cases, 8 ProtocolConfig/emergency cases, and explicit exit-first
-gate/transition/event coverage.
+No external validator. The current program suite contains 89 tests, including 10 raw-
+wire migration/version cases, 8 ProtocolConfig/emergency cases, 11 MintConfig/
+governance/timelock/cap/exit cases, and explicit exit-first gate/transition/event
+coverage.
 
 ### SPL account injection
 

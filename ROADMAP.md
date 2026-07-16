@@ -34,7 +34,8 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 | 23 | ProtocolConfig and emergency pause controls | `[x]` complete |
 | — | M23 follow-up — isolated devnet v1 deployment + clean UI fixture | `[x]` complete |
 | — | UI follow-up — persistent header wallet control | `[x]` complete |
-| — | UI follow-up — authoritative wallet assets and vault shares | `[~]` in review |
+| — | UI follow-up — authoritative wallet assets and vault shares | `[x]` complete |
+| 24 | MintConfig, governed initialization, and exposure caps | `[~]` in review |
 
 ## Milestone 0 — Repository bootstrap (complete)
 
@@ -796,7 +797,7 @@ and whitespace checks passed.
 Observed in PR #38 CI run `29493805747`: all five Rust, audit, SDK, dApp, and
 generated-IDL jobs passed. Merged through PR #38 as `821bf1e` on 2026-07-16.
 
-## UI follow-up — authoritative wallet assets and vault shares (in review)
+## UI follow-up — authoritative wallet assets and vault shares (complete)
 
 Approved by Malcolm on 2026-07-16 as a dApp-only production-readiness follow-up on
 `codex/share-balance-ux`:
@@ -824,14 +825,55 @@ integration tests rather than a live devnet transaction.
 
 This follow-up changes no program, SDK wire contract, account layout, program ID,
 devnet state, keypair, token balance, or transaction authorization. MintConfig,
-governed initialization, and on-chain exposure caps remain the next numbered program
-slice after this pull request merges.
+governed initialization, and on-chain exposure caps were intentionally left for M24.
 
 Observed locally: root and dApp typechecks, the Next.js production build, all 117 dApp
 tests, high-severity npm audit, focused source formatting, 50 local documentation links,
 milestone-only attribution/secret scans, and whitespace checks passed. Vitest retained
 the known non-fatal jsdom canvas warning; the real-browser canvas rendered and browser
 warning/error logs were empty.
+
+Observed in PR #39 CI run `29497391680`: all five jobs passed. GitHub merged PR #39
+as `332807c` on 2026-07-16.
+
+## Milestone 24 — MintConfig, governed initialization, and exposure caps (in review)
+
+Implements ADR 0007's next independently safe program/SDK/dApp slice on
+`codex/mint-config-exposure-caps`:
+
+- freezes the exact 160-byte version-1 per-mint MintConfig PDA and bounded
+  `Devnet`/`Canary`/`Limited`/`Expanded` stage contract;
+- requires ProtocolConfig governance and a mint with neither mint nor freeze authority
+  to create a disabled, zero-cap config, preventing initialization from bypassing risk
+  approval;
+- commits complete risk-increasing targets behind a checked 48-hour delay with
+  permissionless exact-target execution, while governance disablement and current
+  pause-authority cap reductions act immediately and cancel stale proposals;
+- governs ordinary vault initialization and enforces enabled, per-transaction, and
+  checked total-assets caps before deposit CPI/state mutation;
+- keeps `withdraw` entirely independent of MintConfig so disablement, zero caps, and
+  incident reductions never restrict safe exits;
+- adds strict SDK decoding/builders/error mapping and expands generated-IDL verification
+  to 16 instructions, four exact account layouts, bounded enums, and MintConfig events;
+- surfaces config health and the effective on-chain deposit maximum in the dApp while
+  preserving withdrawal visibility and function when config loading fails closed.
+
+M24 does not deploy or upgrade a program, initialize a live config, mutate devnet,
+choose production mint/cap/role values, rotate ProtocolConfig roles, recover excess,
+retire 113-byte accounts, move assets, engage an auditor, or authorize mainnet. The
+public devnet address remains an M23 binary and is incompatible with M24 instruction
+contracts until a later separately approved deployment.
+
+Observed locally: Anchor/SBF build, Rust formatting, warning-denying clippy, all 89
+Rust tests, root typecheck, 112 SDK tests/build, generated-IDL verification, dApp
+typecheck/build/122 tests, Rust audit, and high-severity dApp audit passed. The real
+IDL gate confirmed all 16 instructions and exact 145/81/200/160-byte account layouts.
+Yarn Classic's retired local audit endpoint returned HTTP 410, leaving the existing CI
+severity-bitmask audit as the authoritative root-package gate.
+
+Observed in initial PR #40 CI run `29506354190` on commit `cbc832c`: all five jobs
+passed, including the dependent M24 generated-IDL verifier, and GitHub reported the
+draft pull request mergeable.
 
 ## Post-MVP Roadmap (candidate pool — implementation requires separate approval)
 

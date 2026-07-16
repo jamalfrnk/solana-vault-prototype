@@ -4,6 +4,13 @@
 
 **Observed:** 2026-07-16 at confirmed commitment
 
+> **Generation warning (M24):** this manifest proves the deployed M23 binary only.
+> Repository source after M24 adds MintConfig instructions and governed
+> initialize/deposit account contracts that are not present at this address. Do not
+> send M24 builders here or treat the absence of MintConfig as an operator error; a
+> current M24 UI must disable deposits while preserving withdrawal visibility. A new
+> deployment requires its own reviewed manifest and compatible fixture.
+
 ## Why this is a new program
 
 The original devnet program still owns two accounted 113-byte VaultState accounts.

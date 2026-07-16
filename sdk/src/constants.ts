@@ -29,3 +29,7 @@ export const VAULT_SEED = Buffer.from("vault");
 export const VAULT_AUTHORITY_SEED = Buffer.from("vault_authority");
 export const USER_POSITION_SEED = Buffer.from("user_position");
 export const PROTOCOL_CONFIG_SEED = Buffer.from("protocol_config");
+export const MINT_CONFIG_SEED = Buffer.from("mint_config");
+
+/** ADR 0007 ordinary configuration delay: exactly 48 hours. */
+export const MINT_CONFIG_UPDATE_DELAY_SECONDS = 48 * 60 * 60;

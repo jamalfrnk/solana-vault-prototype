@@ -86,4 +86,40 @@ pub mod solana_vault_prototype {
     ) -> Result<()> {
         protocol::emergency_resume_handler(ctx, reason)
     }
+
+    pub fn initialize_mint_config(ctx: Context<InitializeMintConfig>) -> Result<()> {
+        mint_config::initialize_handler(ctx)
+    }
+
+    pub fn propose_mint_config_update(
+        ctx: Context<GovernMintConfig>,
+        enabled: bool,
+        max_total_assets: u64,
+        max_deposit_assets_per_transaction: u64,
+        rollout_stage: RolloutStage,
+    ) -> Result<()> {
+        mint_config::propose_update_handler(
+            ctx,
+            enabled,
+            max_total_assets,
+            max_deposit_assets_per_transaction,
+            rollout_stage,
+        )
+    }
+
+    pub fn execute_mint_config_update(ctx: Context<ExecuteMintConfigUpdate>) -> Result<()> {
+        mint_config::execute_update_handler(ctx)
+    }
+
+    pub fn disable_mint(ctx: Context<GovernMintConfig>) -> Result<()> {
+        mint_config::disable_handler(ctx)
+    }
+
+    pub fn lower_mint_caps(
+        ctx: Context<LowerMintCaps>,
+        max_total_assets: u64,
+        max_deposit_assets_per_transaction: u64,
+    ) -> Result<()> {
+        mint_config::lower_caps_handler(ctx, max_total_assets, max_deposit_assets_per_transaction)
+    }
 }

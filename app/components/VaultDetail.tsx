@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { VaultClient, VaultState } from "@vault-sdk";
+import { MintConfig, VaultClient, VaultState } from "@vault-sdk";
 
 import { parseMintAddress } from "../lib/solana/mint";
 import { fetchMintDecimals } from "../lib/solana/amounts";
@@ -36,6 +36,10 @@ export function VaultDetail({ mintInput }: { mintInput: string }) {
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [vaultState, setVaultState] = useState<VaultState | null>(null);
+  const [mintConfig, setMintConfig] = useState<MintConfig | null>(null);
+  const [mintConfigStatus, setMintConfigStatus] = useState<
+    "loading" | "ready" | "missing" | "error"
+  >("loading");
   const [balances, setBalances] = useState<UserBalanceSnapshot | null>(null);
   const [balanceStatus, setBalanceStatus] =
     useState<BalanceStatus>("disconnected");
@@ -61,6 +65,28 @@ export function VaultDetail({ mintInput }: { mintInput: string }) {
         setLoadState("error");
       });
 
+    return () => {
+      cancelled = true;
+    };
+  }, [vaultClient]);
+
+  useEffect(() => {
+    if (!vaultClient) return;
+    let cancelled = false;
+    setMintConfig(null);
+    setMintConfigStatus("loading");
+    vaultClient
+      .fetchMintConfig()
+      .then((config) => {
+        if (cancelled) return;
+        setMintConfig(config);
+        setMintConfigStatus(config ? "ready" : "missing");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setMintConfig(null);
+        setMintConfigStatus("error");
+      });
     return () => {
       cancelled = true;
     };
@@ -132,6 +158,16 @@ export function VaultDetail({ mintInput }: { mintInput: string }) {
       setVaultState(state);
       setBalances({ walletAssets, shares: position?.shares ?? 0n });
       setBalanceStatus("ready");
+      try {
+        const config = await vaultClient.fetchMintConfig();
+        if (requestId !== balanceRequestId.current) return;
+        setMintConfig(config);
+        setMintConfigStatus(config ? "ready" : "missing");
+      } catch {
+        if (requestId !== balanceRequestId.current) return;
+        setMintConfig(null);
+        setMintConfigStatus("error");
+      }
     } catch (error) {
       if (requestId === balanceRequestId.current) setBalanceStatus("error");
       throw error;
@@ -256,6 +292,9 @@ export function VaultDetail({ mintInput }: { mintInput: string }) {
           <DepositForm
             vaultClient={vaultClient!}
             operationalState={vaultState.operationalState}
+            mintConfig={mintConfig}
+            mintConfigStatus={mintConfigStatus}
+            totalAssets={vaultState.totalAssets}
             decimals={displayDecimals}
             availableAssets={balances?.walletAssets ?? null}
             balanceStatus={balanceStatus}

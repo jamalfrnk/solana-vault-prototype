@@ -8,6 +8,7 @@ import {
   VAULT_AUTHORITY_SEED,
   USER_POSITION_SEED,
   PROTOCOL_CONFIG_SEED,
+  MINT_CONFIG_SEED,
   BPF_UPGRADEABLE_LOADER_PROGRAM_ID,
 } from "./constants";
 
@@ -57,6 +58,14 @@ export function deriveProtocolConfigPda(
   programId: PublicKey = PROGRAM_ID
 ): PdaResult {
   return derive([PROTOCOL_CONFIG_SEED], programId);
+}
+
+/** Per-mint allowlist/exposure configuration: seeds = ["mint_config", mint]. */
+export function deriveMintConfigPda(
+  mint: PublicKey,
+  programId: PublicKey = PROGRAM_ID
+): PdaResult {
+  return derive([MINT_CONFIG_SEED, mint.toBuffer()], programId);
 }
 
 /** Canonical upgradeable-loader ProgramData account for this program. */

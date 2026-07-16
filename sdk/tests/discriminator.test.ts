@@ -3,6 +3,7 @@ import { expect } from "chai";
 import {
   instructionDiscriminator,
   accountDiscriminator,
+  eventDiscriminator,
 } from "../src/discriminator";
 
 // Golden values: sha256(`global:${name}`).subarray(0, 8) / sha256(`account:${Name}`).subarray(0, 8),
@@ -18,12 +19,24 @@ const GOLDEN_INSTRUCTION_DISCRIMINATORS: Record<string, string> = {
   initialize_protocol_config: "1c322be9f4627b76",
   emergency_pause: "158f1b8ec8b5d2ff",
   emergency_resume: "00f330b90649be53",
+  initialize_mint_config: "3d8da1a7099955aa",
+  propose_mint_config_update: "6bcd18967b0e932f",
+  execute_mint_config_update: "638da8ec769fee8e",
+  disable_mint: "7973d207b88ec3ef",
+  lower_mint_caps: "287b50086679cd45",
 };
 
 const GOLDEN_ACCOUNT_DISCRIMINATORS: Record<string, string> = {
   VaultState: "e4c452a562d2eb98",
   UserPosition: "fbf8d1f553ea111b",
   ProtocolConfig: "cf5bfa1c98b3d7d1",
+  MintConfig: "a8fc58b6dbcd2735",
+};
+
+const GOLDEN_EVENT_DISCRIMINATORS: Record<string, string> = {
+  MintConfigInitialized: "d915caaa65497502",
+  MintConfigUpdateProposed: "ec41f34bcd6e96a7",
+  MintConfigChanged: "943937dd5e431f88",
 };
 
 describe("discriminator", () => {
@@ -64,5 +77,13 @@ describe("discriminator", () => {
     it("returns exactly 8 bytes", () => {
       expect(accountDiscriminator("VaultState")).to.have.lengthOf(8);
     });
+  });
+
+  describe("eventDiscriminator", () => {
+    for (const [name, hex] of Object.entries(GOLDEN_EVENT_DISCRIMINATORS)) {
+      it(`matches the golden value for "${name}"`, () => {
+        expect(eventDiscriminator(name).toString("hex")).to.equal(hex);
+      });
+    }
   });
 });

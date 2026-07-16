@@ -3,10 +3,11 @@
 - **Status:** Accepted
 - **Date:** 2026-07-15
 - **Milestone:** 20 — Pre-Audit Production Design
-- **Implementation status:** Partially implemented through M23: the frozen version-1
-  ProtocolConfig singleton, canonical token-program identity, and separated role
-  addresses exist; MintConfig, governed vault initialization, mint policy, caps, and
-  configuration rotation/timelocks remain unimplemented
+- **Implementation status:** Program/SDK/dApp mechanics implemented through M24: the
+  exact version-1 MintConfig, governed vault initialization, fixed-supply mint policy,
+  48-hour risk-increase delay, immediate risk reduction, and deposit caps exist.
+  Production mint/cap/role selection, multisig enforcement, deployment, manifests,
+  monitoring, and staged-rollout approval remain unimplemented launch gates
 
 ## Context
 
@@ -34,12 +35,18 @@ Both types use explicit version bytes and compiler-derived allocation. M23 freez
 ProtocolConfig v1 at exactly 200 bytes and bootstraps it only through the live
 program's current upgrade authority; its role addresses are non-default and pairwise
 distinct, and its legacy SPL Token Program identity is assigned by program code.
-MintConfig's exact layout remains to be locked by its own milestone.
+M24 freezes MintConfig v1 at exactly 160 bytes. It stores the canonical mint,
+enabled/cap/stage values, and one complete pending target with an activation timestamp;
+all consumers validate its canonical PDA/bump, bounded enums/pending state, and 73 zero
+reserved bytes.
 
 ### Initialization and mint approval
 
 - `initialize` requires the canonical `ProtocolConfig`, the matching enabled
   `MintConfig`, and the protocol-governance signer.
+- `initialize_mint_config` itself requires that signer and creates only disabled,
+  zero-cap `Devnet` state. The first enablement and nonzero caps therefore traverse the
+  same 48-hour delayed proposal path as every later risk increase.
 - The mint passed to `initialize` must match the mint stored in `MintConfig` and the
   existing vault PDA derivation.
 - This prevents an untrusted party from front-running the one canonical vault for an
@@ -132,7 +139,7 @@ defects or operational failure.
 
 - Deposits gain one read-only `MintConfig` account and constant-time checks.
 - Initialization and configuration builders, IDL, SDK, dApp, events, and negative tests
-  require coordinated later milestones.
+  are implemented together in M24 and remain subject to pull-request review/CI.
 - Final token-denominated caps, mint address, and governance addresses remain human
   launch inputs and are launch blockers until recorded and independently verified.
 - The policy deliberately excludes common issuer-controlled stablecoins from the first
