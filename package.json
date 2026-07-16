@@ -10,6 +10,7 @@
     "test:sdk": "ts-mocha -p tsconfig.json \"sdk/tests/**/*.test.ts\"",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "sdk:build": "corepack yarn workspace solana-vault-prototype-sdk run build",
+    "inventory:legacy": "ts-node scripts/inventory_legacy_accounts.ts",
     "app:dev": "npm --prefix app run dev",
     "app:build": "npm --prefix app run build",
     "app:test": "npm --prefix app run test",

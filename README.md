@@ -21,19 +21,20 @@ vault product without building custody logic from zero.
 
 ## Status
 
-**All 14 MVP milestones and post-MVP M15–M19 are merged.** The M18/M19 fix-up
-merged through PR #32 on 2026-07-15. M20, a documentation-only pre-audit production
-design gate, is in review; see `ROADMAP.md` for the milestone-by-milestone history.
+**All 14 MVP milestones and post-MVP M15–M20 are merged.** M20's pre-audit design
+gate merged through PR #33 on 2026-07-15. M21, the separate VaultState versioning and
+migration milestone, is in review; see `ROADMAP.md` for the full history.
 
-The vault is implemented, tested, and hardened, and every instruction has been
-confirmed live on Solana devnet: `initialize`, `deposit`, `withdraw`, `pause`, and
-`unpause` (2026-06-26). A CI pipeline (fmt, build, clippy, test, audit) gates every
+The original lifecycle was confirmed live on Solana devnet: `initialize`, `deposit`,
+`withdraw`, `pause`, and `unpause` (2026-06-26). The M21 binary and migration are not
+deployed. A CI pipeline (fmt, build, clippy, test, audit) gates every
 PR. A production-hardening pass closed four MVP-accepted risks and added instruction
 events. A TypeScript SDK (`sdk/`) and a minimal Next.js dApp (`app/`) sit on top of
 the program, both IDL-free and independently testable offline. The current recorded
-suite contains 55 Rust tests, 53 SDK tests, and 90 dApp tests. Current architecture is
-accepted in ADR 0002; ADRs 0003–0009 accept a narrower pre-audit production target
-that is explicitly **not implemented yet**.
+suite contains 66 Rust tests, 68 SDK tests, and 90 dApp tests. Current architecture is
+accepted in ADR 0002; ADRs 0003–0009 define the narrower pre-audit production target.
+M21 implements its account-versioning slice, while pause availability, mint/cap,
+upgrade, recovery, audit, and launch requirements remain incomplete.
 
 This is an interview-grade educational prototype. It is **not** audited, **not**
 production-safe, **not** mainnet-ready, and **not** formally verified. See
@@ -60,8 +61,8 @@ not the same thing as an audit.
 
 ## Architecture
 
-> Current implementation accepted in ADR 0002. Pre-audit target accepted but not
-> implemented in ADRs 0003–0009; see `ARCHITECTURE.md`.
+> Current implementation accepted in ADR 0002. The pre-audit target in ADRs 0003–0009
+> is partially implemented beginning with M21; see `ARCHITECTURE.md`.
 
 A single vault custodies one SPL token mint:
 
@@ -77,7 +78,11 @@ A single vault custodies one SPL token mint:
 - [x] `initialize` — create the vault state PDA and custody ATA bound to one mint.
 - [x] `deposit` — transfer tokens into custody and credit shares.
 - [x] `withdraw` — redeem shares and transfer tokens out via PDA-signed CPI.
-- [x] `pause` / `unpause` — toggle blocked instructions under an explicit authority.
+- [x] `pause` / `unpause` — set `ExitOnly` / `Active` under an explicit authority;
+  both deposits and withdrawals still require `Active` until the next milestone.
+- [x] `propose_pause_authority` / `accept_pause_authority` — two-step authority rotation.
+- [x] `migrate_v0_to_v1` — permissionless, deterministic migration of compatible
+  145-byte version-0 VaultState accounts; it never resizes 113-byte accounts.
 
 ## Security goals
 
@@ -93,7 +98,7 @@ production custody.
 
 ## Devnet demonstration
 
-Deployed and executed on **Solana devnet** on 2026-06-26 — program ID
+The earlier binary was deployed and executed on **Solana devnet** on 2026-06-26 — program ID
 `FYqCCoAnM9tUYRcSRbeLbUE9LBPv8bN2uyuhcz46pSgq`. `scripts/devnet_demo.ts` creates a
 fresh SPL mint, funds a user ATA, and calls all four instructions in sequence
 against the live cluster; the full transcript and every transaction link are in
@@ -114,9 +119,10 @@ account decoders, and Anchor error parsing — with **no runtime dependency on
 `target/idl/*.json`**. Every Anchor discriminator is computed directly via
 `sha256("global:<name>")` / `sha256("account:<Name>")`, matching Anchor's own
 codegen, which makes the SDK fully testable without the Anchor CLI installed. Since
-M19, that match is verified on every CI run (not just by one-time research): CI runs
-`anchor build` and diffs the real generated IDL's discriminator bytes against the
-SDK's computed ones.
+M19, discriminator matches are verified on every CI run. M21 expands the same gate:
+CI runs `anchor build` and verifies all instruction/account discriminators, exact
+account field order and types, fixed serialized sizes, and `OperationalState` variants
+against the real generated IDL.
 
 `sdk/` is now a versioned, buildable package (`solana-vault-prototype-sdk`, see
 `sdk/README.md`) — **not yet published to npm**. Until then, import it directly from
@@ -124,7 +130,7 @@ the repo as shown below.
 
 ```bash
 corepack yarn install
-corepack yarn test:sdk    # 53 tests, offline, no RPC, no compiled program
+corepack yarn test:sdk    # 68 tests, offline, no RPC, no compiled program
 corepack yarn typecheck
 corepack yarn sdk:build   # emits sdk/dist/*.js + *.d.ts
 ```
@@ -139,7 +145,7 @@ const state = await client.fetchVaultState();
 
 `scripts/sdk_devnet_smoke.ts` mirrors `devnet_demo.ts`'s flow but built entirely on
 `sdk/`. It has not been run against a live cluster in this environment — its
-correctness rests on the 48 offline unit tests plus manual review; run it yourself
+correctness rests on the 68 offline unit tests plus manual review; run it yourself
 against a funded devnet keypair before trusting it live.
 
 ## dApp
@@ -204,7 +210,8 @@ GitHub, **Code → Codespaces → Create codespace on main**, and wait for
 
 ## Testing strategy
 
-> See `TEST_PLAN.md`. 41 Rust tests, 48 SDK tests, 32 dApp tests all pass.
+> See `TEST_PLAN.md`. The current suites contain 66 Rust tests, 68 SDK tests, and
+> 90 dApp tests; M21's Rust and generated-IDL results are recorded from PR CI.
 
 ```bash
 cargo test              # program tests, LiteSVM, no network required
@@ -212,18 +219,17 @@ corepack yarn test:sdk  # SDK tests, no Rust/Solana/Anchor toolchain, no live cl
 cd app && npm run test  # dApp tests, no Rust/Solana/Anchor toolchain, no live cluster
 ```
 
-Program coverage spans unit (arithmetic), integration (all 5 instructions),
+Program coverage spans unit (arithmetic), integration (all 8 instructions),
 happy-path, negative, account-substitution, arithmetic-boundary, adversarial (12
 targeted attack scenarios), and event emission.
 
 ## Roadmap
 
-See `ROADMAP.md` for the full milestone-by-milestone history. M20 accepts production-
-target design decisions only; it does not start their implementation, an audit, or a
-mainnet rollout. The remaining candidate pool includes multi-asset support, fees,
-audit execution, operational-readiness implementation, yield integration, and further
-SDK/dApp productization. Per project law, each starts only after Malcolm separately
-approves it and the preceding branch is reviewed and merged.
+See `ROADMAP.md` for the full milestone-by-milestone history. M20 accepted the
+production-target decisions; M21 implements account versioning, same-size migration,
+inventory, and full IDL layout verification only. It does not deploy, retire legacy
+accounts, start an audit, or begin mainnet rollout. Each remaining slice starts only
+after Malcolm separately approves it and the preceding branch is reviewed and merged.
 
 ## Interview walkthrough
 

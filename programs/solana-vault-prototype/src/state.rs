@@ -1,5 +1,19 @@
 use anchor_lang::prelude::*;
 
+pub const VAULT_STATE_VERSION_V0: u8 = 0;
+pub const VAULT_STATE_VERSION_V1: u8 = 1;
+
+/// M21 assigns the accepted wire values without yet activating ADR 0004's
+/// exit-first authority/transition behavior. Borsh encodes these unit variants
+/// as their zero-based one-byte indexes, exactly matching the legacy bool byte.
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug, Eq, InitSpace, PartialEq)]
+#[repr(u8)]
+pub enum OperationalState {
+    Active,
+    ExitOnly,
+    FullyPaused,
+}
+
 #[account]
 #[derive(InitSpace)]
 pub struct VaultState {
@@ -9,15 +23,19 @@ pub struct VaultState {
     pub authority_bump: u8,
     pub total_assets: u64,
     pub total_shares: u64,
-    pub is_paused: bool,
+    pub operational_state: OperationalState,
     /// Two-step rotation (M18): the proposed next pause authority, or
-    /// `Pubkey::default()` when no rotation is pending. Appended AFTER
-    /// `is_paused` so every pre-M18 field keeps its byte offset — but note
-    /// this still grows the account: vaults initialized under the pre-M18
-    /// layout are NOT compatible with this program version (accepted for a
-    /// devnet prototype; documented in ARCHITECTURE.md).
+    /// `Pubkey::default()` when no rotation is pending. This remains after the
+    /// operational-state byte so every earlier field keeps its byte offset.
     pub pending_pause_authority: Pubkey,
-    pub reserved: [u8; 22],
+    /// Explicit same-size schema version (M21). Version 0 is the M18 layout;
+    /// version 1 is the first production-target layout.
+    pub version: u8,
+    pub reserved: [u8; 21],
+}
+
+impl VaultState {
+    pub const ACCOUNT_LEN: usize = 8 + Self::INIT_SPACE;
 }
 
 #[account]

@@ -22,6 +22,7 @@ import {
   buildUnpauseIx,
   buildProposePauseAuthorityIx,
   buildAcceptPauseAuthorityIx,
+  buildMigrateV0ToV1Ix,
 } from "../src/instructions";
 import { VaultClient } from "../src/client";
 import { Connection } from "@solana/web3.js";
@@ -36,12 +37,19 @@ interface ExpectedMeta {
   isWritable: boolean;
 }
 
-function assertKeys(actual: { pubkey: PublicKey; isSigner: boolean; isWritable: boolean }[], expected: ExpectedMeta[]) {
+function assertKeys(
+  actual: { pubkey: PublicKey; isSigner: boolean; isWritable: boolean }[],
+  expected: ExpectedMeta[]
+) {
   expect(actual).to.have.lengthOf(expected.length);
   actual.forEach((meta, i) => {
-    expect(meta.pubkey.toBase58(), `key[${i}].pubkey`).to.equal(expected[i].pubkey.toBase58());
+    expect(meta.pubkey.toBase58(), `key[${i}].pubkey`).to.equal(
+      expected[i].pubkey.toBase58()
+    );
     expect(meta.isSigner, `key[${i}].isSigner`).to.equal(expected[i].isSigner);
-    expect(meta.isWritable, `key[${i}].isWritable`).to.equal(expected[i].isWritable);
+    expect(meta.isWritable, `key[${i}].isWritable`).to.equal(
+      expected[i].isWritable
+    );
   });
 }
 
@@ -69,13 +77,19 @@ describe("instructions", () => {
         { pubkey: vaultAuthority.address, isSigner: false, isWritable: false },
         { pubkey: custody, isSigner: false, isWritable: true },
         { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-        { pubkey: ASSOCIATED_TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+        {
+          pubkey: ASSOCIATED_TOKEN_PROGRAM_ID,
+          isSigner: false,
+          isWritable: false,
+        },
         { pubkey: SYSTEM_PROGRAM_ID, isSigner: false, isWritable: false },
       ]);
     });
 
     it("data is exactly the 8-byte instruction discriminator", () => {
-      expect(ix.data.toString("hex")).to.equal(instructionDiscriminator("initialize").toString("hex"));
+      expect(ix.data.toString("hex")).to.equal(
+        instructionDiscriminator("initialize").toString("hex")
+      );
       expect(ix.data).to.have.lengthOf(8);
     });
   });
@@ -109,7 +123,7 @@ describe("instructions", () => {
     it("data is discriminator + 8-byte LE amount (16 bytes total)", () => {
       expect(ix.data).to.have.lengthOf(16);
       expect(ix.data.subarray(0, 8).toString("hex")).to.equal(
-        instructionDiscriminator("deposit").toString("hex"),
+        instructionDiscriminator("deposit").toString("hex")
       );
       expect(ix.data.readBigUInt64LE(8)).to.equal(amount);
     });
@@ -143,7 +157,7 @@ describe("instructions", () => {
     it("data is discriminator + 8-byte LE shares_in (16 bytes total)", () => {
       expect(ix.data).to.have.lengthOf(16);
       expect(ix.data.subarray(0, 8).toString("hex")).to.equal(
-        instructionDiscriminator("withdraw").toString("hex"),
+        instructionDiscriminator("withdraw").toString("hex")
       );
       expect(ix.data.readBigUInt64LE(8)).to.equal(sharesIn);
     });
@@ -160,7 +174,9 @@ describe("instructions", () => {
         { pubkey: pauseAuthority, isSigner: true, isWritable: false },
         { pubkey: vaultState.address, isSigner: false, isWritable: true },
       ]);
-      expect(ix.data.toString("hex")).to.equal(instructionDiscriminator("pause").toString("hex"));
+      expect(ix.data.toString("hex")).to.equal(
+        instructionDiscriminator("pause").toString("hex")
+      );
     });
 
     it("unpause: 2-account order, data is discriminator only", () => {
@@ -170,7 +186,7 @@ describe("instructions", () => {
         { pubkey: vaultState.address, isSigner: false, isWritable: true },
       ]);
       expect(ix.data.toString("hex")).to.equal(
-        instructionDiscriminator("unpause").toString("hex"),
+        instructionDiscriminator("unpause").toString("hex")
       );
     });
   });
@@ -193,10 +209,10 @@ describe("instructions", () => {
       ]);
       expect(ix.data).to.have.lengthOf(40);
       expect(ix.data.subarray(0, 8).toString("hex")).to.equal(
-        instructionDiscriminator("propose_pause_authority").toString("hex"),
+        instructionDiscriminator("propose_pause_authority").toString("hex")
       );
       expect(new PublicKey(ix.data.subarray(8, 40)).toBase58()).to.equal(
-        newPauseAuthority.toBase58(),
+        newPauseAuthority.toBase58()
       );
     });
 
@@ -207,7 +223,22 @@ describe("instructions", () => {
         { pubkey: vaultState.address, isSigner: false, isWritable: true },
       ]);
       expect(ix.data.toString("hex")).to.equal(
-        instructionDiscriminator("accept_pause_authority").toString("hex"),
+        instructionDiscriminator("accept_pause_authority").toString("hex")
+      );
+    });
+  });
+
+  describe("buildMigrateV0ToV1Ix", () => {
+    const mint = randomPubkey();
+    const vaultState = deriveVaultStatePda(mint);
+
+    it("is permissionless and writes only the derived vault state", () => {
+      const ix = buildMigrateV0ToV1Ix({ mint });
+      assertKeys(ix.keys, [
+        { pubkey: vaultState.address, isSigner: false, isWritable: true },
+      ]);
+      expect(ix.data.toString("hex")).to.equal(
+        instructionDiscriminator("migrate_v0_to_v1").toString("hex")
       );
     });
   });
@@ -219,10 +250,12 @@ describe("instructions", () => {
 
     it("vaultStatePda/vaultAuthorityPda match direct pdas.ts calls", () => {
       const vaultState = deriveVaultStatePda(mint);
-      expect(client.vaultStatePda.address.toBase58()).to.equal(vaultState.address.toBase58());
+      expect(client.vaultStatePda.address.toBase58()).to.equal(
+        vaultState.address.toBase58()
+      );
       const vaultAuthority = deriveVaultAuthorityPda(vaultState.address);
       expect(client.vaultAuthorityPda.address.toBase58()).to.equal(
-        vaultAuthority.address.toBase58(),
+        vaultAuthority.address.toBase58()
       );
     });
 
@@ -230,14 +263,16 @@ describe("instructions", () => {
       const user = randomPubkey();
       const viaClient = client.buildDepositIx(user, 42n);
       const viaFreeFunction = buildDepositIx({ user, mint, amount: 42n });
-      expect(viaClient.data.toString("hex")).to.equal(viaFreeFunction.data.toString("hex"));
+      expect(viaClient.data.toString("hex")).to.equal(
+        viaFreeFunction.data.toString("hex")
+      );
       assertKeys(
         viaClient.keys,
         viaFreeFunction.keys.map((k) => ({
           pubkey: k.pubkey,
           isSigner: k.isSigner,
           isWritable: k.isWritable,
-        })),
+        }))
       );
     });
 
@@ -245,14 +280,17 @@ describe("instructions", () => {
       const pauseAuthority = randomPubkey();
       const newAuthority = randomPubkey();
 
-      const proposeViaClient = client.buildProposePauseAuthorityIx(pauseAuthority, newAuthority);
+      const proposeViaClient = client.buildProposePauseAuthorityIx(
+        pauseAuthority,
+        newAuthority
+      );
       const proposeViaFreeFunction = buildProposePauseAuthorityIx({
         pauseAuthority,
         mint,
         newAuthority,
       });
       expect(proposeViaClient.data.toString("hex")).to.equal(
-        proposeViaFreeFunction.data.toString("hex"),
+        proposeViaFreeFunction.data.toString("hex")
       );
 
       const acceptViaClient = client.buildAcceptPauseAuthorityIx(newAuthority);
@@ -261,12 +299,28 @@ describe("instructions", () => {
         mint,
       });
       expect(acceptViaClient.data.toString("hex")).to.equal(
-        acceptViaFreeFunction.data.toString("hex"),
+        acceptViaFreeFunction.data.toString("hex")
+      );
+    });
+
+    it("buildMigrateV0ToV1Ix delegates to the permissionless free-function builder", () => {
+      const viaClient = client.buildMigrateV0ToV1Ix();
+      const viaFreeFunction = buildMigrateV0ToV1Ix({ mint });
+      expect(viaClient.data.toString("hex")).to.equal(
+        viaFreeFunction.data.toString("hex")
+      );
+      assertKeys(
+        viaClient.keys,
+        viaFreeFunction.keys.map((k) => ({
+          pubkey: k.pubkey,
+          isSigner: k.isSigner,
+          isWritable: k.isWritable,
+        }))
       );
     });
   });
 
-  it("all seven instructions have pairwise-distinct data discriminators", () => {
+  it("all eight instructions have pairwise-distinct data discriminators", () => {
     const mint = randomPubkey();
     const user = randomPubkey();
     const pauseAuthority = randomPubkey();
@@ -277,8 +331,13 @@ describe("instructions", () => {
       buildWithdrawIx({ user, mint, sharesIn: 1n }),
       buildPauseIx({ pauseAuthority, mint }),
       buildUnpauseIx({ pauseAuthority, mint }),
-      buildProposePauseAuthorityIx({ pauseAuthority, mint, newAuthority: user }),
+      buildProposePauseAuthorityIx({
+        pauseAuthority,
+        mint,
+        newAuthority: user,
+      }),
       buildAcceptPauseAuthorityIx({ newPauseAuthority: user, mint }),
+      buildMigrateV0ToV1Ix({ mint }),
     ];
     const prefixes = ixs.map((ix) => ix.data.subarray(0, 8).toString("hex"));
     expect(new Set(prefixes).size).to.equal(prefixes.length);

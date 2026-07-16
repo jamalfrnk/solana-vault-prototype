@@ -28,7 +28,7 @@ use {
     solana_transaction::versioned::VersionedTransaction,
     solana_vault_prototype::{
         constants::{VAULT_AUTHORITY_SEED, VAULT_SEED},
-        state::VaultState,
+        state::{OperationalState, VaultState},
     },
 };
 
@@ -280,7 +280,7 @@ fn test_initialize_accepts_multisig_pda_pause_authority() {
         f.multisig_pda,
         "vault state must record the PDA authority verbatim"
     );
-    assert!(!vs.is_paused);
+    assert_eq!(vs.operational_state, OperationalState::Active);
 }
 
 /// pause() and unpause() both succeed when the PDA authority carries signer
@@ -298,7 +298,11 @@ fn test_pause_and_unpause_with_multisig_pda_authority() {
         &f.payer,
     )
     .expect("pause with PDA-signer authority must succeed");
-    assert!(f.vault_state().is_paused, "vault should be paused");
+    assert_eq!(
+        f.vault_state().operational_state,
+        OperationalState::ExitOnly,
+        "vault should carry the paused-compatible state"
+    );
 
     send_with_fabricated_signatures(
         &mut f.svm,
@@ -307,7 +311,11 @@ fn test_pause_and_unpause_with_multisig_pda_authority() {
         &f.payer,
     )
     .expect("unpause with PDA-signer authority must succeed");
-    assert!(!f.vault_state().is_paused, "vault should be unpaused");
+    assert_eq!(
+        f.vault_state().operational_state,
+        OperationalState::Active,
+        "vault should be active"
+    );
 }
 
 /// A keypair impostor (signing for real) cannot pause a vault whose authority
@@ -329,7 +337,7 @@ fn test_pause_with_pda_authority_rejects_keypair_impostor() {
         result.is_err(),
         "an impostor keypair must be rejected even under a PDA authority"
     );
-    assert!(!f.vault_state().is_paused, "vault must remain unpaused");
+    assert_eq!(f.vault_state().operational_state, OperationalState::Active);
 }
 
 /// Naming the multisig PDA as pause_authority WITHOUT signer privilege must
@@ -357,7 +365,7 @@ fn test_pause_rejects_pda_authority_without_signer_privilege() {
         result.is_err(),
         "the PDA authority without signer privilege must be rejected"
     );
-    assert!(!f.vault_state().is_paused, "vault must remain unpaused");
+    assert_eq!(f.vault_state().operational_state, OperationalState::Active);
 }
 
 /// The initialize-time payer != pause_authority constraint still holds when the

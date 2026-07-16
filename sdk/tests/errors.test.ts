@@ -1,9 +1,17 @@
 import { expect } from "chai";
 import { SendTransactionError } from "@solana/web3.js";
 
-import { VaultErrorCode, parseVaultError, parseVaultErrorFromLogs } from "../src/errors";
+import {
+  VaultErrorCode,
+  parseVaultError,
+  parseVaultErrorFromLogs,
+} from "../src/errors";
 
-function anchorErrorLogs(errorCode: string, errorNumber: number, message: string): string[] {
+function anchorErrorLogs(
+  errorCode: string,
+  errorNumber: number,
+  message: string
+): string[] {
   return [
     "Program FYqCCoAnM9tUYRcSRbeLbUE9LBPv8bN2uyuhcz46pSgq invoke [1]",
     `Program log: AnchorError thrown in programs/solana-vault-prototype/src/instructions/deposit.rs:64. Error Code: ${errorCode}. Error Number: ${errorNumber}. Error Message: ${message}.`,
@@ -16,7 +24,7 @@ describe("errors", () => {
   describe("parseVaultErrorFromLogs", () => {
     it("parses VaultPaused (6000)", () => {
       const result = parseVaultErrorFromLogs(
-        anchorErrorLogs("VaultPaused", 6000, "Vault is paused"),
+        anchorErrorLogs("VaultPaused", 6000, "Vault is paused")
       );
       expect(result.code).to.equal(VaultErrorCode.VaultPaused);
       expect(result.message).to.include("Vault is paused");
@@ -24,7 +32,11 @@ describe("errors", () => {
 
     it("parses InsufficientShares (6001)", () => {
       const result = parseVaultErrorFromLogs(
-        anchorErrorLogs("InsufficientShares", 6001, "Insufficient shares for withdrawal"),
+        anchorErrorLogs(
+          "InsufficientShares",
+          6001,
+          "Insufficient shares for withdrawal"
+        )
       );
       expect(result.code).to.equal(VaultErrorCode.InsufficientShares);
     });
@@ -34,11 +46,34 @@ describe("errors", () => {
         anchorErrorLogs(
           "InvalidVaultAuthorityOwner",
           6007,
-          "vault_authority PDA is not owned by the System Program",
-        ),
+          "vault_authority PDA is not owned by the System Program"
+        )
       );
       expect(result.code).to.equal(VaultErrorCode.InvalidVaultAuthorityOwner);
       expect(result.message).to.include("System Program");
+    });
+
+    it("recognizes every M21 migration/version error number", () => {
+      const expected = [
+        VaultErrorCode.UnsupportedVaultVersion,
+        VaultErrorCode.VaultStateAlreadyMigrated,
+        VaultErrorCode.InvalidLegacyReservedBytes,
+        VaultErrorCode.InvalidLegacyOperationalState,
+        VaultErrorCode.InvalidVaultStateSize,
+        VaultErrorCode.InvalidVaultStatePda,
+        VaultErrorCode.InvalidVaultBump,
+        VaultErrorCode.InvalidAuthorityBump,
+      ];
+      for (const number of expected) {
+        const result = parseVaultErrorFromLogs(
+          anchorErrorLogs(
+            VaultErrorCode[number],
+            number,
+            "M21 migration failure"
+          )
+        );
+        expect(result.code).to.equal(number);
+      }
     });
 
     it("returns code undefined, no throw, for logs with no AnchorError line", () => {
@@ -51,7 +86,11 @@ describe("errors", () => {
 
     it("returns code undefined but keeps a message for an out-of-range Anchor error number", () => {
       const result = parseVaultErrorFromLogs(
-        anchorErrorLogs("ConstraintSeeds", 2006, "A seeds constraint was violated"),
+        anchorErrorLogs(
+          "ConstraintSeeds",
+          2006,
+          "A seeds constraint was violated"
+        )
       );
       expect(result.code).to.equal(undefined);
       expect(result.message).to.include("seeds constraint");
@@ -69,14 +108,20 @@ describe("errors", () => {
         action: "send",
         signature: "5x".repeat(32),
         transactionMessage: "Transaction simulation failed",
-        logs: anchorErrorLogs("ZeroAmount", 6002, "Amount must be greater than zero"),
+        logs: anchorErrorLogs(
+          "ZeroAmount",
+          6002,
+          "Amount must be greater than zero"
+        ),
       });
       const result = parseVaultError(err);
       expect(result.code).to.equal(VaultErrorCode.ZeroAmount);
     });
 
     it("falls back to a plain .logs field on a generic error-like object", () => {
-      const err = { logs: anchorErrorLogs("Unauthorized", 6005, "Unauthorized") };
+      const err = {
+        logs: anchorErrorLogs("Unauthorized", 6005, "Unauthorized"),
+      };
       const result = parseVaultError(err);
       expect(result.code).to.equal(VaultErrorCode.Unauthorized);
     });

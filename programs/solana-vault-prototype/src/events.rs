@@ -52,3 +52,11 @@ pub struct PauseAuthorityRotated {
     pub old_authority: Pubkey,
     pub new_authority: Pubkey,
 }
+
+#[event]
+pub struct VaultStateMigrated {
+    pub vault: Pubkey,
+    pub old_version: u8,
+    pub new_version: u8,
+    pub operational_state: u8,
+}

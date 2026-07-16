@@ -41,18 +41,21 @@ On-chain PDA-signed CPIs need the bump in the signer seeds array. Calling
 `find_program_address` on-chain would waste up to 256 iterations. Storing both bumps
 on initialization costs 2 bytes and makes withdrawals O(1).
 
-### VaultState layout (113 bytes Borsh, 120 bytes in-memory)
+### VaultState layout (145 bytes Borsh)
 
 ```
 discriminator (8) + pause_authority (32) + mint (32)
 + vault_bump (1) + authority_bump (1) + total_assets (8)
-+ total_shares (8) + is_paused (1) + reserved (22)
-= 113 bytes wire, 120 bytes in-memory (alignment padding before u64 fields)
++ total_shares (8) + operational_state (1)
++ pending_pause_authority (32) + version (1) + reserved (21)
+= 145 bytes wire
 ```
 
-Gotcha to mention: **Rust in-memory `sizeof` ≠ Borsh wire size**. The `LEN` constant
-is the Borsh wire size (used for `space =`). Using `std::mem::size_of` would
-under-allocate by 7 bytes and corrupt the next account.
+Gotcha to mention: **Rust in-memory `sizeof` ≠ Borsh wire size**. Anchor's
+`InitSpace` derives allocation from the serialized fields. M21 keeps the M18 account
+at 145 bytes: byte 90 is the `OperationalState` enum, byte 123 is version 1, and the
+last 21 bytes are zero reserved space. Exact 145-byte v0 accounts migrate in place;
+pre-M18 113-byte accounts cannot and must be drained/reconciled/retired.
 
 ---
 
@@ -74,10 +77,9 @@ This on-chain constraint forces the deployer to specify a separate pause authori
 a hot wallet cannot be both deployment payer and emergency pause control.
 
 **Security detail:** The custody ATA address is deterministic and public, so any party
-can pre-create it before `initialize` runs. Anchor's `init` constraint would then fail
-(`AccountAlreadyInitialized`). This is a known, accepted MVP risk — documented in
-`SECURITY_CHECKLIST.md`. Production mitigation: use `init_if_needed` with post-init
-owner/mint validation.
+can pre-create it before `initialize` runs. M12 changed the account constraint to
+`init_if_needed` while always validating the canonical mint and authority, removing
+that griefing path without allowing account substitution.
 
 ---
 
@@ -136,9 +138,10 @@ path, and the seeds are auditable and stable.
 1. `user_position.owner == user.key()` — no position theft
 2. `user_position.vault == vault_state.key()` — no cross-vault position confusion
 3. `shares_in <= user_position.shares` — no over-withdrawal
-4. `!is_paused` — no withdrawal while paused
-5. `user_token_account.mint == vault_state.mint` — no wrong destination mint
-6. `user_token_account.owner == user.key()` — tokens go to the correct wallet
+4. `version == 1` — legacy and unsupported account semantics fail closed
+5. `operational_state == Active` — M21 retains blocked withdrawals in `ExitOnly`
+6. `user_token_account.mint == vault_state.mint` — no wrong destination mint
+7. `user_token_account.owner == user.key()` — tokens go to the correct wallet
 
 ---
 
@@ -156,6 +159,19 @@ for clarity.
 **Idempotent:** Pausing an already-paused vault succeeds (no error). This is
 intentional — an emergency pause should never fail because of current state.
 
+M21 represents pause as `OperationalState`: `pause` writes `ExitOnly`, `unpause`
+writes `Active`, and all ordinary instructions require account version 1. Deposits and
+withdrawals both still require `Active`; preserving exits in `ExitOnly` and adding the
+stronger `FullyPaused` authority path are intentionally deferred to the next milestone.
+
+### Version migration
+
+`migrate_v0_to_v1` has one writable account and no signer. Permissionless execution is
+safe because the caller cannot choose the output: the program validates exact length,
+canonical PDA and bumps, version 0, legacy state 0/1, and zero reserved bytes, then
+preserves every authority/accounting field while setting the deterministic state and
+version 1. It never transfers tokens or reallocates an account.
+
 **LiteSVM gotcha:** Calling the same instruction twice in a test produces
 `AlreadyProcessed` (same signature within the same blockhash). Use
 `svm.expire_blockhash()` between identical calls.
@@ -168,7 +184,8 @@ intentional — an emergency pause should never fail because of current state.
 
 In-process Solana VM. Load the compiled `.so` via `include_bytes!`, airdrop SOL,
 inject SPL mint and token accounts via `svm.set_account()`, send transactions.
-No external validator. Runs in < 2 seconds for 29 tests.
+No external validator. The current program suite contains 66 tests, including 10 raw-
+wire migration/version cases.
 
 ### SPL account injection
 

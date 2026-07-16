@@ -5,7 +5,7 @@ use crate::{
     constants::{USER_POSITION_SEED, VAULT_AUTHORITY_SEED, VAULT_SEED},
     error::VaultError,
     events::Withdrawn,
-    state::{UserPosition, VaultState},
+    state::{OperationalState, UserPosition, VaultState, VAULT_STATE_VERSION_V1},
 };
 
 #[derive(Accounts)]
@@ -16,7 +16,10 @@ pub struct Withdraw<'info> {
         mut,
         seeds = [VAULT_SEED, vault_state.mint.as_ref()],
         bump = vault_state.vault_bump,
-        constraint = !vault_state.is_paused @ VaultError::VaultPaused,
+        constraint = vault_state.version == VAULT_STATE_VERSION_V1
+            @ VaultError::UnsupportedVaultVersion,
+        constraint = vault_state.operational_state == OperationalState::Active
+            @ VaultError::VaultPaused,
     )]
     pub vault_state: Account<'info, VaultState>,
 

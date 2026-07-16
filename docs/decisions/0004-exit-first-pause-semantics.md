@@ -3,7 +3,8 @@
 - **Status:** Accepted
 - **Date:** 2026-07-15
 - **Milestone:** 20 — Pre-Audit Production Design
-- **Implementation status:** Not implemented; current `is_paused` still blocks deposits and withdrawals
+- **Implementation status:** Partially implemented in M21: the wire enum is assigned,
+  but exit-first withdrawal behavior and the full-pause authority path remain unimplemented
 - **Supersedes:** ADR 0002 section 6 for the target production design
 
 ## Context

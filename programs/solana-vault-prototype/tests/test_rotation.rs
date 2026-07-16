@@ -22,7 +22,7 @@ use {
     solana_transaction::versioned::VersionedTransaction,
     solana_vault_prototype::{
         constants::{VAULT_AUTHORITY_SEED, VAULT_SEED},
-        state::VaultState,
+        state::{OperationalState, VaultState},
     },
 };
 
@@ -461,14 +461,17 @@ fn test_accept_rotates_authority_end_to_end() {
         &[&new_authority],
         &new_authority,
     );
-    assert!(f.vault_state().is_paused);
+    assert_eq!(
+        f.vault_state().operational_state,
+        OperationalState::ExitOnly
+    );
     send_ok(
         &mut f.svm,
         &[make_unpause_ix(new_pk, f.vault_state_pda)],
         &[&new_authority],
         &new_authority,
     );
-    assert!(!f.vault_state().is_paused);
+    assert_eq!(f.vault_state().operational_state, OperationalState::Active);
 }
 
 /// Nobody but the proposed key may accept — not a stranger, not even the
@@ -600,7 +603,10 @@ fn test_rotate_into_multisig_pda() {
         &f.payer,
     )
     .expect("multisig pause must succeed");
-    assert!(f.vault_state().is_paused);
+    assert_eq!(
+        f.vault_state().operational_state,
+        OperationalState::ExitOnly
+    );
 }
 
 /// Both rotation instructions emit their events.

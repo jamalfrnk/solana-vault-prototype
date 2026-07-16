@@ -101,7 +101,7 @@ solana-vault-prototype/
 ├── RUNBOOK.md                    ← this file
 ├── ARCHITECTURE.md               ← vault design (ACCEPTED)
 ├── SECURITY_CHECKLIST.md         ← what is and isn't hardened
-├── TEST_PLAN.md                  ← 29-test matrix
+├── TEST_PLAN.md                  ← Rust, SDK, dApp, migration, and layout matrix
 ├── ROADMAP.md                    ← milestone history
 ├── LEARNING_LOG.md               ← per-milestone notes for interviews
 ├── rust-toolchain.toml           ← pins Rust 1.89.0
@@ -119,17 +119,22 @@ solana-vault-prototype/
 │       ├── initialize.rs         ← initialize instruction (M4)
 │       ├── deposit.rs            ← deposit instruction (M5)
 │       ├── withdraw.rs           ← withdraw instruction (M6)
-│       └── pause.rs              ← pause / unpause instructions (M7)
+│       ├── pause.rs              ← pause / unpause instructions (M7/M21 state enum)
+│       ├── rotate.rs             ← two-step authority rotation (M18)
+│       └── migrate.rs            ← exact-size VaultState v0 → v1 migration (M21)
 │
 ├── programs/solana-vault-prototype/tests/
 │   ├── test_initialize.rs        ← 3 tests (happy path, duplicate, garbage)
 │   ├── test_deposit.rs           ← 5 tests (1:1, proportional, zero, paused, wrong mint)
 │   ├── test_withdraw.rs          ← 7 tests (full, partial, principal, zero, excess, wrong user, paused)
 │   ├── test_pause.rs             ← 5 tests (set, clear, idempotent, wrong authority ×2)
-│   └── test_adversarial.rs       ← 8 tests (missing signer, wrong PDA, wrong owner, cross-user, wrong token program, overflow, multi-user)
+│   ├── test_adversarial.rs       ← substitution, ownership, arithmetic, and donation cases
+│   └── test_migration.rs         ← 10 independent raw-wire migration/version cases
 │
 ├── scripts/
-│   └── devnet_demo.ts            ← end-to-end devnet lifecycle demo
+│   ├── devnet_demo.ts            ← end-to-end devnet lifecycle demo
+│   ├── inventory_legacy_accounts.ts ← read-only 113/v0/v1 account inventory
+│   └── verify_idl_discriminators.ts ← complete generated-IDL wire-layout gate
 │
 └── docs/
     ├── INTERVIEW_WALKTHROUGH.md  ← guided narrative for technical interviews
@@ -170,47 +175,22 @@ file is what gets deployed to devnet or loaded by the LiteSVM test harness.
 
 ## 5. Run the full test suite
 
-### Step 1 — Run all 29 tests
+### Step 1 — Run all 66 Rust tests
 
 ```bash
 cargo test
 ```
 
-All 29 tests must pass. Expected output (abbreviated):
+All 66 tests must pass. Expected output (abbreviated):
 
 ```
-running 29 tests
+running 66 tests across the program test targets
 test test_id ... ok
 test test_vault_initialize_creates_correct_state ... ok
-test test_vault_initialize_duplicate_fails ... ok
-test test_initialize_rejects_bad_accounts ... ok
-test test_deposit_first_1to1 ... ok
-test test_deposit_proportional_shares ... ok
-test test_deposit_zero_fails ... ok
-test test_deposit_paused_fails ... ok
-test test_deposit_wrong_mint_fails ... ok
-test test_withdraw_full ... ok
-test test_withdraw_partial ... ok
-test test_withdraw_returns_principal ... ok
-test test_withdraw_zero_fails ... ok
-test test_withdraw_excess_fails ... ok
-test test_withdraw_wrong_user_fails ... ok
-test test_withdraw_paused_fails ... ok
-test test_pause_sets_is_paused ... ok
-test test_unpause_clears_is_paused ... ok
-test test_pause_idempotent ... ok
-test test_pause_wrong_authority_fails ... ok
-test test_unpause_wrong_authority_fails ... ok
-test test_deposit_missing_user_signature ... ok
-test test_withdraw_missing_user_signature ... ok
-test test_deposit_wrong_vault_state ... ok
-test test_deposit_wrong_token_account_owner ... ok
-test test_withdraw_cross_user_position_substitution ... ok
-test test_deposit_wrong_token_program ... ok
-test test_deposit_large_amount_no_overflow ... ok
-test test_adversarial_repeated_deposits_withdrawals_consistent ... ok
-
-test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured
+test test_pause_sets_exit_only ... ok
+test test_migrate_v0_active_to_v1_permissionless_preserves_state ... ok
+test test_migrate_v0_paused_maps_to_exit_only ... ok
+test result: ok. 65 passed; 0 failed
 ```
 
 If any test fails, do not continue — diagnose and fix before proceeding.
@@ -266,16 +246,19 @@ possible.
 1  byte   — authority_bump
 8  bytes  — total_assets (u64)
 8  bytes  — total_shares (u64)
-1  byte   — is_paused (bool)
+1  byte   — operational_state (Active=0, ExitOnly=1, FullyPaused=2)
 32 bytes  — pending_pause_authority pubkey (all-zero when no rotation is pending)
-22 bytes  — reserved
+1  byte   — version (must be 1 for ordinary instructions)
+21 bytes  — reserved (must be all zero)
 = 145 bytes (Borsh wire size)
 ```
 
 > M18 appended `pending_pause_authority`, growing the wire layout from 113 to 145
-> bytes. Pre-M18 vault accounts are not binary-compatible and this devnet prototype
-> has no migration instruction. Account allocation is compiler-derived with Anchor's
-> `InitSpace`; do not substitute Rust's aligned in-memory `sizeof` for the Borsh size.
+> bytes. M21 reinterprets the old pause byte and first old reserved byte without
+> changing that 145-byte length. The migration supports only exact-size v0 accounts;
+> pre-M18 113-byte accounts cannot be resized in place. Account allocation is
+> compiler-derived with Anchor's `InitSpace`; do not substitute Rust's aligned
+> in-memory `sizeof` for the Borsh size.
 
 ### Custody token account
 
@@ -316,16 +299,18 @@ operations — this is the standard ERC-4626 pattern and is intentional.
 
 ```
 Uninitialized
-     │ initialize
+     │ initialize(v1)
      ▼
   Active  ◄────── unpause
      │                ▲
      │ pause          │
      ▼                │
-  Paused ─────────────
+ ExitOnly ────────────
 ```
 
-`deposit` and `withdraw` are only available in the `Active` state.
+`deposit` and `withdraw` are both available only in `Active` in M21. `ExitOnly` has
+its accepted wire value but does not preserve withdrawal availability until the next
+separate exit-first milestone. `FullyPaused` is encoded but has no transition yet.
 `initialize` runs exactly once, regardless of pause state.
 
 ---
@@ -351,9 +336,10 @@ This prevents the deployer's hot wallet from also being the pause authority.
 **What to check after running it:**
 - `vault_state.total_assets == 0`
 - `vault_state.total_shares == 0`
-- `vault_state.is_paused == false`
+- `vault_state.operational_state == Active`
+- `vault_state.version == 1`
 - `vault_state.mint == <your mint>`
-- Both bumps are non-zero
+- Both stored bumps equal their independently derived canonical bumps
 
 ---
 
@@ -369,7 +355,8 @@ the user's `UserPosition` PDA (`init_if_needed` creates it on first deposit).
 
 **Preconditions checked on-chain:**
 - `amount > 0`
-- `!vault_state.is_paused`
+- `vault_state.version == 1`
+- `vault_state.operational_state == Active`
 - `user_token_account.mint == vault_state.mint`
 - `user_token_account.owner == user.key()`
 
@@ -391,13 +378,14 @@ Burns shares from the user's position, then issues a `transfer_checked` CPI from
 custody to the user's token account. The CPI is signed by `vault_authority` using
 signer seeds that include the `authority_bump` stored in `VaultState`.
 
-**Six validation checks (in order):**
+**Core validation checks:**
 1. `user_position.owner == user.key()` — prevents position theft
 2. `user_position.vault == vault_state.key()` — prevents cross-vault confusion
 3. `shares_in <= user_position.shares` — prevents over-withdrawal
-4. `!vault_state.is_paused` — blocks withdrawal while paused
-5. `user_token_account.mint == vault_state.mint` — right destination mint
-6. `user_token_account.owner == user.key()` — tokens go to the right wallet
+4. `vault_state.version == 1` — legacy/unknown layouts fail closed
+5. `vault_state.operational_state == Active` — M21 still blocks withdrawal in `ExitOnly`
+6. `user_token_account.mint == vault_state.mint` — right destination mint
+7. `user_token_account.owner == user.key()` — tokens go to the right wallet
 
 **What to check after running it:**
 - `user_position.shares` decreased by `shares_in`
@@ -411,16 +399,18 @@ signer seeds that include the `authority_bump` stored in `VaultState`.
 
 **File:** [programs/solana-vault-prototype/src/instructions/pause.rs](programs/solana-vault-prototype/src/instructions/pause.rs)
 
-Toggle `vault_state.is_paused`. Only the signer stored in
+Set `vault_state.operational_state`. Only the signer stored in
 `vault_state.pause_authority` can call either instruction; that signer may be a
 keypair or a governance PDA exercising signer privilege through `invoke_signed`.
 Double-pausing is idempotent and never returns an error — an emergency pause must
 never fail due to current state.
 
 **What to check:**
-- After `pause`: `vault_state.is_paused == true`
-- After `unpause`: `vault_state.is_paused == false`
-- Any `deposit` or `withdraw` call while paused returns `VaultError::VaultPaused`
+- After `pause`: `vault_state.operational_state == ExitOnly`
+- After `unpause`: `vault_state.operational_state == Active`
+- Both calls require `version == 1`
+- In M21, any `deposit` or `withdraw` call outside `Active` returns
+  `VaultError::VaultPaused`; exit-first behavior is not yet implemented
 
 ---
 
@@ -439,6 +429,58 @@ This proves the destination key is live and supports rotation into a governance 
 - Only the pending authority may accept, and it must sign.
 - After acceptance, the new authority can pause/unpause and the old authority cannot.
 - `pending_pause_authority` returns to the all-zero public key.
+
+### `migrate_v0_to_v1` (M21)
+
+**File:**
+[programs/solana-vault-prototype/src/instructions/migrate.rs](programs/solana-vault-prototype/src/instructions/migrate.rs)
+
+Accepts exactly one writable `vault_state`; no signer or payer is required. The
+permissionless design is safe because the caller cannot select any resulting value.
+Before writing, the program verifies exact 145-byte length, version 0, canonical vault
+PDA and both bumps, a legacy state byte of 0/1, and zero legacy reserved bytes. It maps
+0 to `Active` and 1 to `ExitOnly`, writes version 1, preserves all other bytes and the
+account length, and emits `VaultStateMigrated`. It cannot transfer tokens or resize an
+account. A second call fails with `VaultStateAlreadyMigrated`.
+
+The SDK derives the only account automatically:
+
+```ts
+const client = new VaultClient(connection, mint);
+const migrateIx = client.buildMigrateV0ToV1Ix();
+```
+
+Do not send migration transactions solely because inventory found a vault. First
+confirm that the deployed binary is the reviewed M21 artifact and that the account is
+an exact 145-byte version-0 candidate. The current devnet inventory found no such
+candidate.
+
+### Inventory and retire legacy accounts (M21)
+
+Inventory is deliberately read-only and requires no wallet:
+
+```bash
+corepack yarn inventory:legacy --url https://api.devnet.solana.com
+corepack yarn inventory:legacy --url https://api.devnet.solana.com --fail-on-blockers
+```
+
+The second form exits with code 2 while any incompatible, unsupported, orphaned, or
+accounting/custody blocker exists. It does not create a transaction, request a signer,
+move tokens, or write an inventory file. Preserve the console output as review evidence.
+
+For an exact 145-byte v0 vault: independently verify its mint, PDA, bumps, authorities,
+totals, custody, and linked positions; deploy the reviewed compatible binary under the
+separately approved deployment plan; send the deterministic migration; then refetch it
+with the strict SDK decoder and rerun inventory.
+
+For a 113-byte vault: do **not** attempt M21 migration. Before upgrading away from a
+binary that can decode that layout, coordinate each recorded position owner, redeem or
+otherwise execute a separately reviewed compatible drain path, verify custody and
+share/accounting totals are zero, preserve transaction signatures and final account
+evidence, and mark the vault retired. Never substitute an ad hoc recovery transfer or
+private-key custody action. The two current devnet blockers and their public evidence
+are documented in
+[docs/LEGACY_ACCOUNT_INVENTORY.md](docs/LEGACY_ACCOUNT_INVENTORY.md).
 
 ---
 
@@ -578,17 +620,36 @@ Run this checklist in order:
 # 1. Format check (must exit 0)
 cargo fmt --all -- --check
 
-# 2. Build (must exit 0, zero warnings)
-cargo build-sbf
+# 2. Build program and generated IDL (must exit 0, zero warnings)
+anchor build --ignore-keys
 
-# 3. Full test suite (all 29 must pass)
+# 3. Rust checks (all 66 tests must pass)
+cargo clippy --all-targets --all-features -- -D warnings
 cargo test
 
-# 4. No trailing whitespace or conflict markers
+# 4. SDK checks
+corepack yarn typecheck
+corepack yarn test:sdk
+corepack yarn sdk:build
+npx ts-node scripts/verify_idl_discriminators.ts
+
+# 5. dApp checks
+npm --prefix app run typecheck
+npm --prefix app run build
+npm --prefix app run test
+
+# 6. Security audits
+cargo audit
+corepack yarn audit
+npm --prefix app audit --audit-level=high
+
+# 7. No trailing whitespace or conflict markers
 git diff --check
 ```
 
-Only open the PR when all four pass.
+Only open the PR when every locally available check passes. If a documented host
+limitation prevents a check, record the exact error and require the equivalent PR CI
+job to pass before handoff; never represent an unexecuted check as successful.
 
 ### Adding a new test
 
@@ -610,11 +671,13 @@ failed, but the SDK could not fetch/decode a valid current `VaultState`. Check t
 displayed error first, then verify the RPC endpoint and inspect the derived vault-state
 account with `solana account <VAULT_STATE_PDA> --url devnet`.
 
-A common devnet cause after M18 is an account initialized under the old 113-byte
-layout. The current decoder requires the 145-byte layout with
-`pending_pause_authority`. This prototype has no account-migration instruction, so an
-old vault cannot be upgraded in place: deploy the current program and initialize a new
-vault for a fresh mint. Do not treat a decode/RPC failure as an uninitialized vault.
+A common devnet cause is an account initialized under the old 113-byte layout. The M21
+strict decoder requires the exact 145-byte version-1 layout. Run the read-only
+`inventory:legacy` command above before taking action. An exact 145-byte v0 account may
+use `migrate_v0_to_v1` after the reviewed binary is deployed; a 113-byte account cannot
+be upgraded in place and must follow the documented drain/reconcile/retire procedure.
+Do not treat a decode/RPC failure as an uninitialized vault, initialize a replacement
+without reconciling ownership, or assume migration can resize an account.
 
 ### `anchor test` fails with "Failed to spawn surfpool"
 
@@ -753,9 +816,11 @@ hand-calculated account size) were all **fixed in M12**. M18 also closed the pri
 "no pause-authority rotation" gap with two-step propose/accept rotation. See
 `SECURITY_CHECKLIST.md` for the constraint-by-constraint citations and current scope.
 
-The M18 account-layout change has no migration path: a pre-M18 113-byte vault account
-cannot be decoded as the current 145-byte `VaultState`. This is accepted for the
-devnet prototype and must be solved before any persistent deployment.
+M21 closes the migration gap for exact 145-byte version-0 accounts. Pre-M18 113-byte
+vault accounts still cannot be decoded or resized as the current `VaultState`. The
+initial devnet inventory found two such accounts with live accounting and linked
+positions. Their coordinated drain, reconciliation evidence, and retirement remain
+launch blockers before persistent deployment.
 
 ### Holding pause authority with a multisig (M16)
 
@@ -804,9 +869,13 @@ are unaffected — the authority gates only `pause`/`unpause`.
 | [LEARNING_LOG.md](LEARNING_LOG.md) | Per-milestone reflection: what was built, what was learned, what confused me, how I verified it |
 | [docs/INTERVIEW_WALKTHROUGH.md](docs/INTERVIEW_WALKTHROUGH.md) | Guided narrative for technical interviews: account model, instruction contracts, test architecture, production gaps, Q&A |
 | [docs/decisions/0002-vault-architecture.md](docs/decisions/0002-vault-architecture.md) | Architecture Decision Record with rationale for every structural choice |
+| [docs/decisions/0005-account-versioning-and-migration.md](docs/decisions/0005-account-versioning-and-migration.md) | Accepted versioning, same-size migration, and 113-byte retirement policy |
+| [docs/LEGACY_ACCOUNT_INVENTORY.md](docs/LEGACY_ACCOUNT_INVENTORY.md) | Initial devnet legacy inventory, public evidence, blockers, and retirement requirements |
 | [programs/solana-vault-prototype/src/lib.rs](programs/solana-vault-prototype/src/lib.rs) | Program entry point, `declare_id!`, instruction dispatch |
 | [programs/solana-vault-prototype/src/state.rs](programs/solana-vault-prototype/src/state.rs) | `VaultState` and `UserPosition` struct definitions |
 | [programs/solana-vault-prototype/src/error.rs](programs/solana-vault-prototype/src/error.rs) | `VaultError` enum — every assertable on-chain error |
 | [programs/solana-vault-prototype/src/constants.rs](programs/solana-vault-prototype/src/constants.rs) | PDA seed byte constants — must match in program and tests |
 | [scripts/devnet_demo.ts](scripts/devnet_demo.ts) | End-to-end devnet lifecycle: mint → initialize → deposit → withdraw → pause |
 | [scripts/sdk_devnet_smoke.ts](scripts/sdk_devnet_smoke.ts) | SDK devnet lifecycle including two-step authority rotation and unpause by the new authority |
+| [scripts/inventory_legacy_accounts.ts](scripts/inventory_legacy_accounts.ts) | Read-only account-generation, PDA, position, custody, and accounting inventory |
+| [scripts/verify_idl_discriminators.ts](scripts/verify_idl_discriminators.ts) | Generated-IDL discriminator, field-order/type/size, and enum verifier |

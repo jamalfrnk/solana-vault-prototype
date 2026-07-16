@@ -68,7 +68,7 @@ jobs:
       - name: Whitespace / conflict marker check
         run: git diff --check
 
-      - name: Upload generated IDL (M19 idl-verify job consumes this)
+      - name: Upload generated IDL (discriminator and layout verification consumes this)
         uses: actions/upload-artifact@v4
         with:
           name: vault-idl
@@ -163,7 +163,7 @@ jobs:
         run: npm --prefix app audit --audit-level=high
 
   idl-verify:
-    name: IDL discriminator verification (M19)
+    name: IDL discriminator + account layout verification (M21)
     runs-on: ubuntu-latest
     needs: build-and-test
     steps:
@@ -185,10 +185,8 @@ jobs:
           name: vault-idl
           path: target/idl
 
-      # sdk/src/discriminator.ts computes every Anchor discriminator by hand
-      # (no runtime IDL dependency, by design — see M13). This diffs those
-      # hand-derived values against the real IDL anchor build just emitted,
-      # so a discriminator mismatch is a CI failure, not just a one-time
-      # research claim.
-      - name: Verify SDK discriminators match the generated IDL
+      # The SDK has no runtime IDL dependency (by design — see M13). This checks
+      # its hand-derived discriminators plus the exact account field order/types,
+      # fixed sizes, and enum variants against the real IDL emitted above.
+      - name: Verify discriminators and account layouts match the generated IDL
         run: npx ts-node scripts/verify_idl_discriminators.ts

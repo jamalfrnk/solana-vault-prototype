@@ -28,7 +28,8 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 | 18 | Authority rotation (`set_pause_authority`) | `[x]` complete |
 | 19 | SDK v2 — publishable package + IDL discriminator verification | `[x]` complete |
 | — | M18/M19 follow-up — dApp load errors + rotation devnet smoke | `[x]` complete |
-| 20 | Pre-audit production design ADRs | `[~]` awaiting review |
+| 20 | Pre-audit production design ADRs | `[x]` complete |
+| 21 | VaultState v1, deterministic migration, legacy inventory, full IDL layout | `[~]` awaiting review |
 
 ## Milestone 0 — Repository bootstrap (complete)
 
@@ -478,7 +479,7 @@ deferred to CI, same pattern as M13–M17. SDK-side verification (53/53
 observed passing.
 
 Observed (2026-07-13, CI run 29224127072 on PR #28): all four jobs green —
-`fmt, clippy, build-sbf, test` (2m1s; includes all 55 Rust tests, the 9 new
+`fmt, clippy, build-sbf, test` (2m1s; includes all 56 Rust tests, the 10 new
 in `tests/test_rotation.rs`), `cargo audit`, SDK tests, dApp tests. Merged
 into `main` as `6d329e3` (PR #28, 2026-07-13).
 
@@ -591,7 +592,7 @@ whole script is covered by the root TypeScript typecheck.
 
 Merged through PR #32 on 2026-07-15 as `3d68bbf` after all five CI jobs passed.
 
-## Milestone 20 — Pre-audit production design ADRs (awaiting review)
+## Milestone 20 — Pre-audit production design ADRs (complete)
 
 Approved by Malcolm 2026-07-15 as a documentation-only design gate before further
 program feature work, on `codex/pre-audit-design-adrs`. M20 does not change Rust,
@@ -614,20 +615,52 @@ ADRs 0003–0009 make the production-critical decisions explicit:
   sequential implementation/audit/canary plan.
 
 The design deliberately reuses the current pause byte and one reserved byte so the
-current 145-byte account need not grow again. Acceptance does not mean implementation:
-all corresponding checklist and test items remain open, the non-production disclaimer
-remains in force, and each later slice requires its own approved branch and PR.
+current 145-byte account need not grow again. Acceptance did not itself implement those
+decisions; each implementation slice still requires its own approved branch and PR.
 
 Observed locally (2026-07-15): ADR-structure validation — 7/7 files valid; local-link
 validation — 15/15 files resolve; placeholder/conflict-marker search — none found;
 source-scope check — no program, SDK, dApp, or CI diff; `git diff --cached --check` —
 exit 0.
 
-Observed in initial pull-request CI (2026-07-15, run 29454078682): `fmt, clippy,
-build-sbf, test` — passed in 2m53s; `cargo audit` — passed in 20s; SDK tests —
-passed in 12s; dApp tests — passed in 55s; IDL discriminator verification — passed
-in 15s. All five jobs were green on commit `43fcaeb`. See `TEST_PLAN.md` for the full
-M20 documentation gate.
+Merged through PR #33 on 2026-07-15. Final main CI run 29459544952 passed all five
+Rust, audit, SDK, dApp, and IDL jobs. See `TEST_PLAN.md` for the full M20 gate.
+
+## Milestone 21 — VaultState versioning and deterministic migration (awaiting review)
+
+Implements ADR 0005's same-size account slice on `codex/vault-state-versioning`:
+
+- changes the exact 145-byte VaultState interpretation to version 1, with
+  `OperationalState` at byte 90, `version = 1` at byte 123, and 21 zero reserved bytes;
+- adds a permissionless, value-deterministic `migrate_v0_to_v1` instruction that
+  validates canonical PDA/bump data and legacy bytes, preserves all other state and
+  account length, and emits an event;
+- rejects unsupported versions from every ordinary instruction and from strict SDK
+  decoding;
+- inventories 113-byte and 145-byte program accounts read-only, including linked
+  positions, canonical derivations, custody identity/balance, and launch blockers;
+- upgrades CI from discriminator-only checks to complete account field order/type/size
+  and enum verification against Anchor's generated IDL.
+
+The initial read-only devnet inventory found two canonical, accounting-balanced
+113-byte vaults with two linked positions. They cannot migrate in place and remain
+explicit launch blockers until a separately approved drain/reconcile/retire procedure
+is executed. No signer was used and no asset moved; see
+`docs/LEGACY_ACCOUNT_INVENTORY.md`.
+
+M21 assigns the accepted `Active`, `ExitOnly`, and `FullyPaused` wire values but does
+not implement the complete ADR 0004 behavior: deposits and withdrawals both continue
+to require `Active`. Exit-first withdrawals and the stronger full-pause authority
+matrix remain the next separate milestone.
+
+Observed locally: formatting passed; 68/68 SDK tests, root typecheck, and SDK build
+passed; the inventory completed successfully. Local Rust compile/test remains blocked
+because this Windows host has no `link.exe`.
+
+Observed in initial PR CI run 29461693429 on commit `539ddf1`: Anchor/SBF build, fmt,
+clippy, all 66 Rust tests, cargo audit, 68 SDK tests/audit, dApp typecheck/build/90 tests/
+audit, and real generated-IDL verification all passed. The IDL gate confirmed all 8
+instruction discriminators, both account discriminators, and exact 145/81-byte layouts.
 
 ## Post-MVP Roadmap (candidate pool — implementation requires separate approval)
 
