@@ -398,15 +398,23 @@ Windows `cargo test --no-run` stopped before project compilation because this ho
 no MSVC `link.exe`. An isolated WSL build then compiled the program and every integration
 test source with `cargo test --no-run`; full
 `clippy --all-targets --all-features -- -D warnings` also exited 0.
-Runtime execution, SBF generation, and all 70 tests still require CI because the local
+Runtime execution, SBF generation, and all 70 tests were left to CI because the local
 checkout has no current M22 `.so`; a temporary ignored placeholder was used only to
 satisfy `include_bytes!` during typechecking and was deleted immediately afterward.
 Yarn Classic's audit endpoint returned HTTP 410 locally, so the existing CI
-severity-bitmask gate remains authoritative. The live devnet smoke was not executed: it
+severity-bitmask gate is authoritative. The live devnet smoke was not executed: it
 requires a funded keypair and would mutate the deployed demonstration state.
 The first local-link helper repeated M20's empty-parent bug for repository-root files;
 the fail-fast corrected validator was rerun and resolved all 44 local links across the
 12 changed milestone documents.
+
+Observed in initial PR #35 CI (2026-07-15/16, run 29466979114, commit `c446c1f`):
+Anchor/SBF build, formatting, full clippy, all 70 Rust tests, whitespace, and IDL
+artifact upload passed; cargo audit passed; root typecheck, 73 SDK tests/build, and the
+high/critical Yarn audit gate passed; dApp typecheck/build, 94 tests, and high/critical
+npm audit passed; the generated-IDL gate confirmed all eight instruction interfaces,
+both account discriminators, exact 145/81-byte layouts, and both operational-state
+enums. All five jobs were green and GitHub reported the draft PR cleanly mergeable.
 
 ## Anchor scaffold baseline (complete — M2)
 

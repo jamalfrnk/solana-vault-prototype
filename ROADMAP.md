@@ -692,8 +692,14 @@ Observed locally: Rust formatting and whitespace checks passed; 73 SDK tests, ro
 typecheck, SDK build, dApp typecheck/build/audit, and 94 dApp tests passed. Windows Rust
 compilation is blocked because this host has no MSVC `link.exe`; isolated WSL compilation
 and full all-target clippy passed, including typechecking every integration test source.
-Runtime execution of all 70 tests, SBF, audit, and real generated-IDL verification must
-still be observed in pull-request CI.
+Runtime execution of all 70 tests, SBF, audit, and real generated-IDL verification were
+therefore left to pull-request CI.
+
+Observed in initial PR #35 CI run 29466979114 on commit `c446c1f`: Anchor/SBF build,
+formatting, full clippy, all 70 Rust tests, cargo audit, 73 SDK tests/build/audit, dApp
+typecheck/build/94 tests/audit, and generated-IDL instruction/account-layout verification
+all passed. The IDL gate confirmed all eight instruction interfaces, both account
+discriminators, exact 145/81-byte layouts, and both operational-state enums.
 
 ## Post-MVP Roadmap (candidate pool — implementation requires separate approval)
 
