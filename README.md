@@ -21,12 +21,12 @@ vault product without building custody logic from zero.
 
 ## Status
 
-**All 14 MVP milestones and post-MVP M15–M23 are merged.** M23's separate
+**All 14 MVP milestones and post-MVP M15–M24 are merged.** M23's separate
 ProtocolConfig and emergency-control milestone merged through PR #36, its isolated
 devnet/UI follow-up through PR #37, and the persistent wallet-header follow-up through
-PR #38. The connected-wallet balance UX merged through PR #39. M24 MintConfig,
-governed initialization, and exposure caps are in review; see `ROADMAP.md` for the full
-history.
+PR #38. The connected-wallet balance UX merged through PR #39, and M24 MintConfig/
+exposure controls through PR #40. M25 constrained exact-excess recovery is in review
+through draft PR #41; see `ROADMAP.md` for the full history.
 
 The original lifecycle was confirmed live on Solana devnet in June 2026. The reviewed
 M23 binary is now deployed separately at the current-layout devnet address; its
@@ -35,12 +35,13 @@ the legacy program. A CI pipeline (fmt, build, clippy, test, audit) gates every
 PR. A production-hardening pass closed four MVP-accepted risks and added instruction
 events. A TypeScript SDK (`sdk/`) and a minimal Next.js dApp (`app/`) sit on top of
 the program, both IDL-free and independently testable offline. The current recorded
-suite contains 89 Rust tests, 112 SDK tests, and 122 dApp tests. Current architecture is
+suite contains 97 Rust tests, 117 SDK tests, and 122 dApp tests. Current architecture is
 accepted in ADR 0002; ADRs 0003–0009 define the narrower pre-audit production target.
 M21 implements its account-versioning slice, M22 its exit-first availability slice,
-M23 the ProtocolConfig/emergency-control slice, and M24 the governed mint/exposure
-slice. Production role/timelock configuration, deployment of M24, upgrade governance,
-recovery, audit, and launch requirements remain incomplete.
+M23 the ProtocolConfig/emergency-control slice, M24 the governed mint/exposure slice,
+and M25 the deterministic exact-excess recovery slice. Production role/timelock
+configuration, deployment of M24/M25, upgrade governance, audit, and launch
+requirements remain incomplete.
 
 This is an interview-grade educational prototype. It is **not** audited, **not**
 production-safe, **not** mainnet-ready, and **not** formally verified. See
@@ -103,6 +104,9 @@ A single vault custodies one SPL token mint:
   exact risk-increasing target behind a 48-hour delay.
 - [x] `disable_mint` / `lower_mint_caps` — immediate risk reduction that cancels any
   pending increase and never affects withdrawals.
+- [x] `sweep_excess` — while not active, configured governance transfers exactly the
+  full custody excess to the configured treasury's canonical same-mint ATA without
+  changing accounting.
 
 ## Security goals
 
@@ -124,9 +128,9 @@ SBF hash, ProtocolConfig is initialized, and a clean v1 UI fixture is live. Full
 addresses, transaction evidence, hashes, and the legacy non-mutation proof are in
 [`docs/DEVNET_V1_DEPLOYMENT.md`](docs/DEVNET_V1_DEPLOYMENT.md).
 
-M24 is not deployed. The source's governed initialize/deposit account contracts and
-MintConfig instructions are incompatible with the M23 address until a separate
-reviewed deployment creates a verified binary and compatible fixture.
+M24/M25 are not deployed. The source's governed initialize/deposit account contracts,
+MintConfig instructions, and `sweep_excess` are incompatible with the M23 address
+until a separate reviewed deployment creates a verified binary and compatible fixture.
 
 The earlier M10 program at `FYqCCoAnM9tUYRcSRbeLbUE9LBPv8bN2uyuhcz46pSgq`
 remains unchanged because it owns the two inventoried 113-byte vaults. Never upgrade
@@ -143,10 +147,11 @@ account decoders, and Anchor error parsing — with **no runtime dependency on
 `target/idl/*.json`**. Every Anchor discriminator is computed directly via
 `sha256("global:<name>")` / `sha256("account:<Name>")`, matching Anchor's own
 codegen, which makes the SDK fully testable without the Anchor CLI installed. Since
-M19, discriminator matches are verified on every CI run. M21–M24 expand the same gate:
+M19, discriminator matches are verified on every CI run. M21–M25 expand the same gate:
 CI runs `anchor build` and verifies all instruction discriminators and argument schemas,
 all account discriminators, exact account field order and types, fixed serialized
-sizes, bounded enums, and MintConfig events against the real generated IDL.
+sizes, bounded enums, MintConfig events, and the exact excess-recovery event against
+the real generated IDL.
 
 `sdk/` is now a versioned, buildable package (`solana-vault-prototype-sdk`, see
 `sdk/README.md`) — **not yet published to npm**. Until then, import it directly from
@@ -154,7 +159,7 @@ the repo as shown below.
 
 ```bash
 corepack yarn install
-corepack yarn test:sdk    # 112 tests, offline, no RPC, no compiled program
+corepack yarn test:sdk    # 117 tests, offline, no RPC, no compiled program
 corepack yarn typecheck
 corepack yarn sdk:build   # emits sdk/dist/*.js + *.d.ts
 ```
@@ -172,7 +177,7 @@ const state = await client.fetchVaultState();
 ```
 
 `scripts/sdk_devnet_smoke.ts` documents the pre-M24 lifecycle and is retained for the
-deployed M23 generation. Do not run the current source's M24 builders against that
+deployed M23 generation. Do not run the current source's M24/M25 builders against that
 address: the governed account contracts differ. A later deployment milestone must
 update and verify a new live lifecycle without exposing signer material.
 
@@ -250,8 +255,8 @@ GitHub, **Code → Codespaces → Create codespace on main**, and wait for
 
 ## Testing strategy
 
-> See `TEST_PLAN.md`. The current suites contain 89 Rust tests, 112 SDK tests, and
-> 122 dApp tests; M24's local Rust/SBF/generated-IDL results are recorded there and PR
+> See `TEST_PLAN.md`. The current suites contain 97 Rust tests, 117 SDK tests, and
+> 122 dApp tests; M25's local Rust/SBF/generated-IDL results are recorded there and PR
 > CI remains the publication gate.
 
 ```bash
@@ -260,7 +265,7 @@ corepack yarn test:sdk  # SDK tests, no Rust/Solana/Anchor toolchain, no live cl
 cd app && npm run test  # dApp tests, no Rust/Solana/Anchor toolchain, no live cluster
 ```
 
-Program coverage spans unit (arithmetic), integration (all 16 instructions),
+Program coverage spans unit (arithmetic), integration (all 17 instructions),
 happy-path, negative, account-substitution, arithmetic-boundary, adversarial (12
 targeted attack scenarios), and event emission.
 
@@ -269,10 +274,12 @@ targeted attack scenarios), and event emission.
 See `ROADMAP.md` for the full milestone-by-milestone history. M20 accepted the
 production-target decisions; M21 implemented account versioning/migration/inventory,
 M22 implemented exit-first behavior, M23 implemented the singleton ProtocolConfig and
-emergency state transitions, and M24 implements governed MintConfig and exposure caps.
+emergency state transitions, M24 implements governed MintConfig and exposure caps,
+and M25 implements constrained exact-excess recovery.
 The devnet/UI follow-up deploys only the reviewed M23 slice; it does not retire legacy
-accounts or make production claims. After M24 merges, ADR 0009's next numbered slice
-is constrained exact-excess recovery and reconciliation tests.
+accounts or make production claims. After M25 merges, ADR 0009's next numbered slice
+is verifiable release automation, secret scanning, authority manifests, RPC/monitoring,
+and incident-runbook rehearsal.
 
 ## Interview walkthrough
 

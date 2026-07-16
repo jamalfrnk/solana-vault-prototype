@@ -1,5 +1,5 @@
 /**
- * M19/M21/M22/M23 generated-IDL verification.
+ * M19/M21/M22/M23/M24/M25 generated-IDL verification.
  *
  * M19 pinned every SDK-computed discriminator to Anchor's generated IDL.
  * M21 additionally verifies the complete fixed persistent-account schema:
@@ -11,6 +11,8 @@
  * 200-byte ProtocolConfig layout alongside VaultState and UserPosition.
  * M24 adds five MintConfig/configuration instruction schemas, the exact
  * 160-byte MintConfig layout, RolloutStage, and the three configuration events.
+ * M25 adds the no-argument exact-excess recovery instruction and freezes its
+ * bounded asset-movement event without changing a persistent-account layout.
  */
 
 import * as fs from "fs";
@@ -101,6 +103,7 @@ const INSTRUCTION_LAYOUTS: Record<string, IdlField[]> = {
     { name: "max_total_assets", type: "u64" },
     { name: "max_deposit_assets_per_transaction", type: "u64" },
   ],
+  sweep_excess: [],
 };
 
 const ACCOUNT_LAYOUTS: Record<
@@ -235,6 +238,20 @@ const EVENT_LAYOUTS: Record<string, { eventSize: number; fields: IdlField[] }> =
         { name: "slot", type: "u64" },
         { name: "unix_timestamp", type: "i64" },
         { name: "change_kind", type: "u8" },
+      ],
+    },
+    ExcessSwept: {
+      eventSize: 176,
+      fields: [
+        { name: "vault", type: "pubkey" },
+        { name: "mint", type: "pubkey" },
+        { name: "treasury", type: "pubkey" },
+        { name: "authority", type: "pubkey" },
+        { name: "amount", type: "u64" },
+        { name: "custody_balance", type: "u64" },
+        { name: "total_assets", type: "u64" },
+        { name: "slot", type: "u64" },
+        { name: "unix_timestamp", type: "i64" },
       ],
     },
   };
@@ -630,7 +647,7 @@ function main(): void {
   console.log(
     `All ${
       Object.keys(INSTRUCTION_LAYOUTS).length
-    } instruction interfaces, 4 account discriminators, exact 145/81/200/160-byte account layouts, MintConfig events, and bounded enums match the generated IDL.`
+    } instruction interfaces, 4 account discriminators, exact 145/81/200/160-byte account layouts, M24/M25 events, and bounded enums match the generated IDL.`
   );
 }
 

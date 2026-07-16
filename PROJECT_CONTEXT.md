@@ -107,9 +107,12 @@ separate emergency-authority path into `FullyPaused` and recovery first to `Exit
 M24 implements the next accepted slice: an exact versioned `MintConfig`, fixed-supply
 legacy-SPL mint approval, governance-gated vault initialization, a 48-hour
 risk-increase delay, and on-chain per-transaction/total-assets deposit caps. Mint
-disablement and cap controls never enter the withdrawal account contract. Role
-rotation, production multisig/timelock configuration, exact-excess recovery, and the
-remaining operational launch gates are still incomplete. These milestones do not
+disablement and cap controls never enter the withdrawal account contract. M25
+implements ADR 0008's constrained exact-excess recovery: only configured governance,
+only while not active, only the full computed excess, and only to the configured
+treasury's canonical same-mint ATA, without changing accounting. Role rotation,
+production multisig/timelock configuration, and the remaining operational launch
+gates are still incomplete. These milestones do not
 approve deployment, legacy asset movement, an audit engagement, mainnet deployment,
 or production custody.
 After M23 merged, a separately scoped devnet/UI follow-up deployed the reviewed binary
@@ -117,8 +120,9 @@ under a new devnet-only program ID and created a fresh v1 UI fixture. The origin
 program and both 113-byte vaults remain unchanged for later retirement. This live test
 fixture does not relax any production launch blocker. The separately merged wallet
 balance UX makes assets and shares explicit, but remains an untrusted projection of
-on-chain state. M24 is source-only until a later reviewed deployment milestone; the
-current devnet binary has no `MintConfig` instructions or cap enforcement.
+on-chain state. M24 and M25 are source-only until a later reviewed deployment
+milestone; the current devnet binary has no `MintConfig`, cap-enforcement, or
+`sweep_excess` instruction.
 The project law and work-in-progress limit below still govern every later milestone.
 
 ## Project law

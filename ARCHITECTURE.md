@@ -18,9 +18,11 @@ timestamped transition evidence. Milestone 23 implements the frozen version-1
 `FullyPaused` and back first to `ExitOnly`. Milestone 24 implements the exact
 version-1 `MintConfig`, fixed-supply legacy-SPL mint approval, governed vault
 initialization, timelocked risk increases, immediate risk reduction, and constant-time
-deposit exposure caps. Role rotation/timelocks, excess recovery, production multisig
-configuration, deployment of this M24 binary, and 113-byte account retirement remain
-unimplemented.
+deposit exposure caps. Milestone 25 implements ADR 0008's governance-constrained,
+exact-full-excess recovery to the configured canonical treasury ATA while not active,
+without changing accounting. Role rotation/timelocks, production multisig
+configuration, deployment of the M24/M25 binary, and 113-byte account retirement
+remain unimplemented.
 
 ## Devnet deployment generations
 
@@ -33,10 +35,10 @@ This generation split preserves the old withdrawal-compatible binary while allow
 fresh 145-byte v1 demonstration; it is not account migration or legacy retirement.
 Public deployment and non-mutation evidence is recorded in
 [`docs/DEVNET_V1_DEPLOYMENT.md`](docs/DEVNET_V1_DEPLOYMENT.md).
-The repository source now contains M24 interfaces that this M23 devnet binary does
-not. Do not send M24 instructions or use the governed M24 initialize/deposit account
-contracts against that address until a separate deployment review records a new
-verified binary and compatible fixture.
+The repository source now contains M24/M25 interfaces that this M23 devnet binary does
+not. Do not send M24/M25 instructions, use the governed M24 initialize/deposit account
+contracts, or attempt `sweep_excess` against that address until a separate deployment
+review records a new verified binary and compatible fixture.
 
 ## Accepted pre-audit target and implementation status
 
@@ -47,7 +49,7 @@ verified binary and compatible fixture.
 | Versioning | Same-size 145-byte VaultState v1 and deterministic v0 migration implemented in M21; 113-byte devnet retirement pending | [0005](docs/decisions/0005-account-versioning-and-migration.md) |
 | Upgrades | Established 3-of-5 multisig, 48-hour ordinary timelock, 4-of-5 emergency path, and later immutability review | [0006](docs/decisions/0006-upgrade-governance-and-immutability.md) |
 | Mint and exposure | M24 implements a governed fixed-supply legacy-SPL allowlist, 48-hour risk-increase delay, immediate risk reduction, on-chain TVL/deposit caps, and staged rollout; production values/deployment remain pending | [0007](docs/decisions/0007-mint-policy-and-exposure-limits.md) |
-| Donations | Internal accounting remains authoritative; only exact excess may be swept to the configured treasury while not active | [0008](docs/decisions/0008-donations-and-excess-recovery.md) |
+| Donations | M25 preserves internal accounting and permits governance to sweep only the exact full excess to the configured canonical treasury ATA while not active | [0008](docs/decisions/0008-donations-and-excess-recovery.md) |
 | Operations | Separated incident roles, explicit invariants, launch blockers, and sequential implementation/audit gates | [0009](docs/decisions/0009-incident-response-and-launch-gates.md) |
 
 M21 reuses the former pause byte as `operational_state` and the first former
@@ -137,7 +139,7 @@ one-time bootstrap:
 | 9 | `bump` | `u8` | Canonical `["protocol_config"]` PDA bump |
 | 10–41 | `protocol_governance_authority` | `Pubkey` | Governs M24 mint approval, delayed risk increases, disablement, and vault creation |
 | 42–73 | `emergency_authority` | `Pubkey` | Sole M23 authority for exceptional full-pause transitions |
-| 74–105 | `treasury` | `Pubkey` | Reserved for later constrained excess recovery |
+| 74–105 | `treasury` | `Pubkey` | Deterministic owner of the M25 exact-excess destination ATA |
 | 106–137 | `token_program` | `Pubkey` | Canonical legacy SPL Token Program, assigned by program code |
 | 138–199 | `reserved` | `[u8; 62]` | Must remain all zero in v1 |
 
@@ -312,6 +314,29 @@ Postconditions: `assets_out > 0`.
 `withdraw` deliberately has no MintConfig account. Disablement, zero/reduced caps,
 pending updates, and rollout stage therefore cannot make a valid exit unavailable.
 
+### `sweep_excess` (M25)
+
+| Account | Type | Signer | Mut | Constraint |
+|---------|------|--------|-----|------------|
+| `protocol_governance_authority` | `Signer` | yes | no | Must match ProtocolConfig governance |
+| `protocol_config` | `Account<ProtocolConfig>` | no | no | Canonical version 1, legacy token program, zero reserved bytes |
+| `vault_state` | `Account<VaultState>` | no | no | Canonical version 1 and `ExitOnly` or `FullyPaused` |
+| `vault_authority` | `UncheckedAccount` | no | no | Canonical System-owned PDA; signs only the recovery CPI |
+| `custody` | `Account<TokenAccount>` | no | yes | Canonical ATA for vault authority and mint |
+| `treasury` | `UncheckedAccount` | no | no | Exactly ProtocolConfig.treasury |
+| `treasury_token_account` | `Account<TokenAccount>` | no | yes | Existing canonical ATA for treasury and the same mint |
+| `mint` | `Account<Mint>` | no | no | Exactly VaultState.mint under legacy SPL Token |
+| `token_program` | `Program<Token>` | no | no | Canonical legacy SPL Token Program |
+
+The instruction takes no arguments. It computes
+`custody.amount.checked_sub(vault_state.total_assets)` and fails specifically on a
+shortfall or zero result. Success transfers exactly the complete excess with the
+existing vault-authority signer seeds, reloads custody, and emits the observed
+post-transfer balance. The treasury ATA must already exist; recovery has no payer,
+System Program, or Associated Token Program account. Every VaultState byte,
+ProtocolConfig, MintConfig, position, `total_assets`, and `total_shares` remains
+unchanged.
+
 ### `pause` / `unpause`
 
 | Account | Type | Signer | Mut | Constraint |
@@ -460,8 +485,8 @@ Rounding direction: floor (favors vault; dust accumulates in custody).
    direct SPL transfer into custody outside the `deposit` instruction (a "donation") is
    not reflected in `total_assets` and is treated as inert dust — see
    `SECURITY_CHECKLIST.md`'s "Direct-transfer / donation accounting" section. ADR 0008
-   preserves this rule and accepts a future governance-constrained exact-excess sweep;
-   no recovery instruction exists today.
+   preserves this rule. M25 recovery may transfer only the full difference between
+   custody and `total_assets`; it never synchronizes that difference into accounting.
 6. `total_shares == sum(user_position.shares)` — maintained by deposit/withdraw.
 7. No deposit credits zero shares; no withdrawal pays zero assets.
 8. All arithmetic is checked; no silent overflow.
@@ -485,6 +510,9 @@ Rounding direction: floor (favors vault; dust accumulates in custody).
     `deposit` enforces both configured caps before CPI or state mutation.
 17. Withdrawals never load MintConfig and remain governed only by ownership,
     accounting, token, PDA, version, and `Active`/`ExitOnly` availability checks.
+18. `sweep_excess` is governance-only and available only while not active. Its amount
+    and destination are fully derived on-chain; success leaves custody exactly at
+    `total_assets` and changes no accounting or position state.
 
 ---
 
@@ -509,6 +537,8 @@ MintConfig absent ── initialize_mint_config ──► Disabled / zero caps /
 Disabled or enabled ── propose target ── 48 hours ── permissionless execute
 Any MintConfig ── governance disable ──► Disabled
 Existing vault caps ── pause-authority reduction ──► Lower or zero caps
+
+ExitOnly/FullyPaused with custody excess ── governance sweep ──► treasury ATA
 ```
 
 Deposit is available only in `Active`. Withdraw is available in `Active` and
@@ -517,10 +547,12 @@ blocks both paths and the ordinary pause authority cannot alter it. The M23 emer
 authority may enter it and may recover only to `ExitOnly`, never directly to `Active`.
 Initialize is available only once, with protocol governance and an enabled matching
 MintConfig. Configuration state affects initialization and deposits only, never exits.
+Excess recovery is maintenance in `ExitOnly` or `FullyPaused`; it is unavailable in
+`Active` and cannot change operational state.
 
 ---
 
-## Events (M12–M24)
+## Events (M12–M25)
 
 Each instruction emits an Anchor event (`#[event]` + `emit!()`) at the end of its
 handler, after all state mutation, so every event reflects final post-instruction state.
@@ -541,6 +573,7 @@ one.
 | `MintConfigInitialized` | config/mint/authority, disabled zero-cap stage, slot, Unix timestamp, version | `initialize_mint_config` (M24) |
 | `MintConfigUpdateProposed` | config/mint/authority, complete previous/proposed target, effective time, slot, Unix timestamp | `propose_mint_config_update` (M24) |
 | `MintConfigChanged` | config/mint/authority, complete previous/new state, slot, Unix timestamp, bounded change kind | execute, disable, and lower-cap paths (M24) |
+| `ExcessSwept` | vault, mint, treasury, governance signer, exact amount, post-transfer custody, accounting total, slot, Unix timestamp | `sweep_excess` (M25) |
 
 ## Governance-ready pause authority (M16)
 

@@ -24,6 +24,7 @@ const GOLDEN_INSTRUCTION_DISCRIMINATORS: Record<string, string> = {
   execute_mint_config_update: "638da8ec769fee8e",
   disable_mint: "7973d207b88ec3ef",
   lower_mint_caps: "287b50086679cd45",
+  sweep_excess: "ff4adbb6017ee906",
 };
 
 const GOLDEN_ACCOUNT_DISCRIMINATORS: Record<string, string> = {
@@ -37,6 +38,7 @@ const GOLDEN_EVENT_DISCRIMINATORS: Record<string, string> = {
   MintConfigInitialized: "d915caaa65497502",
   MintConfigUpdateProposed: "ec41f34bcd6e96a7",
   MintConfigChanged: "943937dd5e431f88",
+  ExcessSwept: "e7b0af419202d19d",
 };
 
 describe("discriminator", () => {

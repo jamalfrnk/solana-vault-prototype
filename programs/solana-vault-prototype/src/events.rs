@@ -123,3 +123,16 @@ pub struct MintConfigChanged {
     /// 0 = immediate cap reduction, 1 = immediate disable, 2 = timelocked update.
     pub change_kind: u8,
 }
+
+#[event]
+pub struct ExcessSwept {
+    pub vault: Pubkey,
+    pub mint: Pubkey,
+    pub treasury: Pubkey,
+    pub authority: Pubkey,
+    pub amount: u64,
+    pub custody_balance: u64,
+    pub total_assets: u64,
+    pub slot: u64,
+    pub unix_timestamp: i64,
+}

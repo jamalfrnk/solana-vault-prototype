@@ -122,4 +122,8 @@ pub mod solana_vault_prototype {
     ) -> Result<()> {
         mint_config::lower_caps_handler(ctx, max_total_assets, max_deposit_assets_per_transaction)
     }
+
+    pub fn sweep_excess(ctx: Context<SweepExcess>) -> Result<()> {
+        excess::handler(ctx)
+    }
 }

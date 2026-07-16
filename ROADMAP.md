@@ -35,7 +35,8 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 | — | M23 follow-up — isolated devnet v1 deployment + clean UI fixture | `[x]` complete |
 | — | UI follow-up — persistent header wallet control | `[x]` complete |
 | — | UI follow-up — authoritative wallet assets and vault shares | `[x]` complete |
-| 24 | MintConfig, governed initialization, and exposure caps | `[~]` in review |
+| 24 | MintConfig, governed initialization, and exposure caps | `[x]` complete |
+| 25 | Constrained exact-excess recovery | `[~]` in review — PR #41 |
 
 ## Milestone 0 — Repository bootstrap (complete)
 
@@ -616,7 +617,7 @@ ADRs 0003–0009 make the production-critical decisions explicit:
   emergency policy, and no immediate immutability;
 - governed per-mint configuration, one mint- and freeze-authority-free legacy SPL mint initially,
   on-chain TVL/per-transaction caps, and staged exposure;
-- donation-excluded accounting plus a future exact-excess-only treasury recovery path;
+- donation-excluded accounting plus an exact-excess-only treasury recovery path;
 - explicit production invariants, incident responsibilities, launch blockers, and a
   sequential implementation/audit/canary plan.
 
@@ -836,7 +837,7 @@ warning/error logs were empty.
 Observed in PR #39 CI run `29497391680`: all five jobs passed. GitHub merged PR #39
 as `332807c` on 2026-07-16.
 
-## Milestone 24 — MintConfig, governed initialization, and exposure caps (in review)
+## Milestone 24 — MintConfig, governed initialization, and exposure caps (complete)
 
 Implements ADR 0007's next independently safe program/SDK/dApp slice on
 `codex/mint-config-exposure-caps`:
@@ -871,9 +872,45 @@ IDL gate confirmed all 16 instructions and exact 145/81/200/160-byte account lay
 Yarn Classic's retired local audit endpoint returned HTTP 410, leaving the existing CI
 severity-bitmask audit as the authoritative root-package gate.
 
-Observed in initial PR #40 CI run `29506354190` on commit `cbc832c`: all five jobs
-passed, including the dependent M24 generated-IDL verifier, and GitHub reported the
-draft pull request mergeable.
+Observed in final PR #40 CI run `29506690101`: all five jobs passed, including the
+dependent M24 generated-IDL verifier. Merged through PR #40 as `efa00c6` on
+2026-07-16.
+
+## Milestone 25 — Constrained exact-excess recovery (in review — PR #41)
+
+Implements ADR 0008's next independently safe program/SDK slice on
+`codex/exact-excess-recovery`:
+
+- adds a no-argument `sweep_excess` instruction available only to configured
+  ProtocolConfig governance while the canonical version-1 vault is `ExitOnly` or
+  `FullyPaused`;
+- computes the complete checked `custody.amount - total_assets` difference on-chain,
+  rejects shortfall/zero excess specifically, and accepts no caller-selected amount;
+- transfers only to the configured treasury's existing canonical same-mint ATA with
+  the existing vault-authority PDA signer seeds;
+- reloads custody and emits a fixed 176-byte event with deterministic movement and
+  timestamp evidence while preserving every accounting/config/position byte;
+- adds an IDL-free SDK builder/client/error contract and expands generated-IDL
+  verification to 17 instructions plus the exact recovery event;
+- covers both paused states, active/zero/shortfall failures, malformed config/version,
+  foreign authority ownership, every account substitution, near-`u64::MAX`, CPI
+  overflow rollback, repeat donation/recovery, full user withdrawal, and event bytes.
+
+M25 adds no persistent account, migration, dApp governance control, deployment,
+upgrade, live treasury provisioning, devnet mutation, or asset movement. The public
+devnet remains an M23 binary and cannot receive M24/M25 builders.
+
+Observed locally: Anchor/SBF build, Rust formatting, warning-denying all-target clippy,
+all 97 Rust tests, root typecheck, SDK build, 117 SDK tests, generated-IDL verification,
+dApp typecheck/build, 122 dApp tests, high-severity dApp audit, Rust audit, changed
+documentation links, focused source formatting, secret/attribution scanning, and
+whitespace checks passed. The verifier confirmed all 17 instructions, four unchanged
+account layouts, bounded enums, M24 events, and the 176-byte M25 event. Yarn Classic's
+retired local audit endpoint returned HTTP 410, so pull-request CI's existing
+severity-bitmask gate remains authoritative.
+
+Observed in initial PR #41 CI run `29514911025` on commit `94828b8`: all five
+Rust/Anchor, cargo-audit, SDK/root-audit, dApp, and generated-M25-IDL jobs passed.
 
 ## Post-MVP Roadmap (candidate pool — implementation requires separate approval)
 

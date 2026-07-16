@@ -53,7 +53,7 @@ describe("errors", () => {
       expect(result.message).to.include("System Program");
     });
 
-    it("recognizes every M21-M24 migration, config, version, cap, and transition error number", () => {
+    it("recognizes every M21-M25 migration, config, cap, transition, and recovery error number", () => {
       const expected = [
         VaultErrorCode.UnsupportedVaultVersion,
         VaultErrorCode.VaultStateAlreadyMigrated,
@@ -86,6 +86,10 @@ describe("errors", () => {
         VaultErrorCode.MintConfigUpdateNotReady,
         VaultErrorCode.TimestampOverflow,
         VaultErrorCode.ArithmeticOverflow,
+        VaultErrorCode.CustodyShortfall,
+        VaultErrorCode.NoExcessToSweep,
+        VaultErrorCode.ExcessRecoveryRequiresPausedVault,
+        VaultErrorCode.InvalidTreasury,
       ];
       for (const number of expected) {
         const result = parseVaultErrorFromLogs(

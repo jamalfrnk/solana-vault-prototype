@@ -122,6 +122,7 @@ solana-vault-prototype/
 │       ├── pause.rs              ← exit-first pause / unpause controls (M7/M21/M22)
 │       ├── protocol.rs           ← config bootstrap + emergency controls (M23)
 │       ├── mint_config.rs        ← mint approval, timelock, and exposure controls (M24)
+│       ├── excess.rs             ← exact-full-excess treasury recovery (M25)
 │       ├── rotate.rs             ← two-step authority rotation (M18)
 │       └── migrate.rs            ← exact-size VaultState v0 → v1 migration (M21)
 │
@@ -133,7 +134,8 @@ solana-vault-prototype/
 │   ├── test_adversarial.rs       ← substitution, ownership, arithmetic, and donation cases
 │   ├── test_migration.rs         ← 10 independent raw-wire migration/version cases
 │   ├── test_protocol.rs          ← 8 config/bootstrap/emergency-control cases
-│   └── test_mint_config.rs       ← 11 governance/timelock/cap/exit cases
+│   ├── test_mint_config.rs       ← 11 governance/timelock/cap/exit cases
+│   └── test_excess_recovery.rs   ← 8 recovery/substitution/accounting/event cases
 │
 ├── scripts/
 │   ├── devnet_demo.ts            ← end-to-end devnet lifecycle demo
@@ -179,16 +181,16 @@ file is what gets deployed to devnet or loaded by the LiteSVM test harness.
 
 ## 5. Run the full test suite
 
-### Step 1 — Run all 89 Rust tests
+### Step 1 — Run all 97 Rust tests
 
 ```bash
 cargo test
 ```
 
-All 89 tests must pass. Expected output (abbreviated):
+All 97 tests must pass. Expected output (abbreviated):
 
 ```
-running 89 tests across the program test targets
+running 97 tests across the program test targets
 test test_id ... ok
 test test_vault_initialize_creates_correct_state ... ok
 test test_pause_sets_exit_only ... ok
@@ -423,6 +425,40 @@ Before any future production proposal, record the exact mint base-unit values an
 their ADR 0007 stage evidence in a signed, independently reviewed manifest. This
 repository does not choose those values or provide the required production multisig.
 
+### Exact-excess recovery (M25)
+
+**File:** [programs/solana-vault-prototype/src/instructions/excess.rs](programs/solana-vault-prototype/src/instructions/excess.rs)
+
+`sweep_excess` is a governance maintenance instruction, not a user or dApp action. It
+is valid only after the vault is in `ExitOnly` or `FullyPaused`, and only when the
+canonical custody ATA contains a positive amount above `VaultState.total_assets`.
+
+Before preparing a future governed transaction:
+
+1. Independently fetch and verify ProtocolConfig version/PDA, governance identity,
+   treasury identity, and legacy Token Program.
+2. Verify the vault PDA/version, state, authority PDA/bump/owner, mint, custody ATA,
+   `total_assets`, live custody amount, and the exact checked difference.
+3. Provision and independently verify the existing canonical ATA for
+   `(ProtocolConfig.treasury, VaultState.mint)`. The recovery instruction does not
+   create it.
+4. Prepare the no-argument instruction with the SDK's `buildSweepExcessIx`. There is
+   no amount or token-account destination to approve; reject any transaction that
+   contains a different account order or extra program accounts.
+5. After governed execution, verify the `ExcessSwept` event, transaction signature,
+   custody balance equals `total_assets`, treasury ATA increased by exactly the prior
+   excess, and all vault/position/config bytes remain unchanged.
+
+If custody is below `total_assets`, stop: `CustodyShortfall` is an incident, not a
+negative recovery amount. Do not change accounting, retry with a caller-selected
+amount, redirect to another account, or use an ad hoc token transfer. If custody is
+equal to accounting, `NoExcessToSweep` is the expected fail-closed result.
+
+M25 is source-only. Do not execute this workflow against the documented M23 devnet
+program; that binary has no `sweep_excess` instruction. A later deployment/rehearsal
+milestone must supply compatible verified program and role evidence before any live
+recovery test.
+
 ### `initialize`
 
 **File:** [programs/solana-vault-prototype/src/instructions/initialize.rs](programs/solana-vault-prototype/src/instructions/initialize.rs)
@@ -625,12 +661,12 @@ The old `FYqC…pSgq` program remains live only because it owns the two inventor
 [the devnet deployment manifest](docs/DEVNET_V1_DEPLOYMENT.md) for program-data,
 binary-hash, ProtocolConfig, fixture, and legacy non-mutation evidence.
 
-This is an M23 binary. The repository's M24 source adds MintConfig instructions and
-changes initialize/deposit account contracts, so do not send current builders to this
-address. A separate deployment milestone must verify a new program, initialize a
-compatible config through governance, and create a new fixture. Until then, a current
-M24 dApp build correctly reports the missing MintConfig and disables deposits while
-leaving the existing withdrawal state visible.
+This is an M23 binary. The repository's M24/M25 source adds MintConfig instructions,
+changes initialize/deposit account contracts, and adds `sweep_excess`, so do not send
+current builders to this address. A separate deployment milestone must verify a new
+program, initialize a compatible config through governance, and create a new fixture.
+Until then, a current M24/M25 dApp build correctly reports the missing MintConfig and
+disables deposits while leaving the existing withdrawal state visible.
 
 Verify the current program with a local devnet-only signer path:
 
@@ -681,12 +717,12 @@ npm --prefix app run dev -- --port 3000
 
 With the merged M23 UI checkout, the route historically showed `Active`, deposits and
 withdrawals enabled, a 10,000-token wallet balance, and the ordinary admin panel. With
-the M24 source checkout, expect `Active` plus a clear missing-MintConfig warning:
+the M24/M25 source checkout, expect `Active` plus a clear missing-MintConfig warning:
 deposits are disabled and withdrawals/balances remain visible. That is the correct
 fail-closed result against an older binary. Never use the screenshot's old
 `HqeV…XjD5` mint; it intentionally remains a visible 113-byte compatibility error.
 
-The following setup commands are historical M23 tooling; do not run them from the M24
+The following setup commands are historical M23 tooling; do not run them from the M24/M25
 checkout until a later deployment milestone updates the governed account contract:
 
 ```bash
@@ -704,7 +740,7 @@ withdraw → pause against the current program. It requires a funded keypair at
 `~/.config/solana/id.json`. `scripts/sdk_devnet_smoke.ts` extends that flow through
 two-step authority rotation and final unpause.
 
-These scripts describe the pre-M24 deployed interface. Do not run them from an M24
+These scripts describe the pre-M24 deployed interface. Do not run them from an M24/M25
 checkout against the M23 address; the new governed account contracts require a later
 deployment-specific lifecycle update.
 
