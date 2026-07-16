@@ -15,6 +15,9 @@ const instructionNames = [
   "propose_pause_authority",
   "accept_pause_authority",
   "migrate_v0_to_v1",
+  "initialize_protocol_config",
+  "emergency_pause",
+  "emergency_resume",
 ];
 
 const instructionArgs: Record<string, { name: string; type: unknown }[]> = {
@@ -36,6 +39,23 @@ const instructionArgs: Record<string, { name: string; type: unknown }[]> = {
   propose_pause_authority: [{ name: "new_authority", type: "pubkey" }],
   accept_pause_authority: [],
   migrate_v0_to_v1: [],
+  initialize_protocol_config: [
+    { name: "protocol_governance_authority", type: "pubkey" },
+    { name: "emergency_authority", type: "pubkey" },
+    { name: "treasury", type: "pubkey" },
+  ],
+  emergency_pause: [
+    {
+      name: "reason",
+      type: { defined: { name: "OperationalStateReason" } },
+    },
+  ],
+  emergency_resume: [
+    {
+      name: "reason",
+      type: { defined: { name: "OperationalStateReason" } },
+    },
+  ],
 };
 
 function validIdl(): Record<string, unknown> {
@@ -45,7 +65,7 @@ function validIdl(): Record<string, unknown> {
       discriminator: Array.from(instructionDiscriminator(name)),
       args: instructionArgs[name],
     })),
-    accounts: ["VaultState", "UserPosition"].map((name) => ({
+    accounts: ["VaultState", "UserPosition", "ProtocolConfig"].map((name) => ({
       name,
       discriminator: Array.from(accountDiscriminator(name)),
     })),
@@ -103,6 +123,21 @@ function validIdl(): Record<string, unknown> {
             { name: "vault", type: "pubkey" },
             { name: "shares", type: "u64" },
             { name: "bump", type: "u8" },
+          ],
+        },
+      },
+      {
+        name: "ProtocolConfig",
+        type: {
+          kind: "struct",
+          fields: [
+            { name: "version", type: "u8" },
+            { name: "bump", type: "u8" },
+            { name: "protocol_governance_authority", type: "pubkey" },
+            { name: "emergency_authority", type: "pubkey" },
+            { name: "treasury", type: "pubkey" },
+            { name: "token_program", type: "pubkey" },
+            { name: "reserved", type: { array: ["u8", 62] } },
           ],
         },
       },
@@ -168,5 +203,16 @@ describe("full IDL account-layout verification", () => {
     expect(verifyIdlDocument(idl).join("\n")).to.match(
       /OperationalStateReason.*variant.*2/i
     );
+  });
+
+  it("rejects a resized ProtocolConfig reserved region", () => {
+    const idl = validIdl() as any;
+    const fields = idl.types.find(
+      (entry: any) => entry.name === "ProtocolConfig"
+    ).type.fields;
+    fields[6].type.array[1] = 61;
+    const errors = verifyIdlDocument(idl).join("\n");
+    expect(errors).to.match(/ProtocolConfig.*reserved|field.*6/i);
+    expect(errors).to.match(/200|size/i);
   });
 });

@@ -44,6 +44,13 @@ const state = await client.fetchVaultState();
 require a bounded `OperationalStateReason` and reject out-of-range numeric values
 before wallet interaction.
 
+M23 adds `deriveProtocolConfigPda()`, strict `decodeProtocolConfig()` /
+`fetchProtocolConfig()`, upgrade-authority-gated bootstrap construction, and
+`buildEmergencyPauseIx()` / `buildEmergencyResumeIx()`. Emergency recovery always
+lands in `ExitOnly`; no SDK builder can use that authority to reopen deposits. These
+builders prepare transactions only—production role addresses and signing remain an
+external governance responsibility.
+
 `fetchVaultState()` decodes only the exact 145-byte version-1 layout and fails closed
 on legacy 113-byte, compatible-but-unmigrated v0, unknown-version, invalid-state,
 nonzero-reserved, or incorrectly sized accounts. `inspectVaultStateAccount()` is the
@@ -65,5 +72,5 @@ migration transaction.
 ```bash
 corepack yarn install   # from the repo root
 corepack yarn sdk:build # emits dist/*.js + dist/*.d.ts
-corepack yarn test:sdk  # 73 offline tests
+corepack yarn test:sdk  # 87 offline tests
 ```

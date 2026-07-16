@@ -13,9 +13,10 @@ approved the target production decisions before code. Milestone 21 implemented t
 SDK/IDL layout verification, and legacy-account inventory. Milestone 22 implements the
 exit-first slice: deposits require `Active`, withdrawals are permitted in `Active` and
 `ExitOnly`, `FullyPaused` blocks both, and ordinary pause/unpause calls carry bounded,
-timestamped transition evidence. The future `ProtocolConfig` and its stronger
-emergency authority are still required before any instruction may enter or leave
-`FullyPaused`. Mint allowlisting, caps, excess recovery, production multisig/timelock
+timestamped transition evidence. Milestone 23 implements the frozen version-1
+`ProtocolConfig` singleton and its separate emergency-authority path into
+`FullyPaused` and back first to `ExitOnly`. Mint allowlisting, governed vault
+initialization, caps, role rotation/timelocks, excess recovery, production multisig
 configuration, and 113-byte account retirement remain unimplemented.
 
 ## Accepted pre-audit target and implementation status
@@ -23,7 +24,7 @@ configuration, and 113-byte account retirement remain unimplemented.
 | Area | Accepted target | ADR |
 |---|---|---|
 | Threat boundaries | Users, clients, RPC, issuer, and operational roles remain outside the on-chain trust boundary; canonical legacy SPL Token only | [0003](docs/decisions/0003-production-threat-model.md) |
-| Pause | `Active`, `ExitOnly`, and exceptional `FullyPaused`; M22 implements exit-first gates/evidence and ordinary `Active`/`ExitOnly` authority, while the `ProtocolConfig` full-pause path remains pending | [0004](docs/decisions/0004-exit-first-pause-semantics.md) |
+| Pause | `Active`, `ExitOnly`, and exceptional `FullyPaused`; M22 implements exit-first gates/evidence and ordinary controls, and M23 implements the separate ProtocolConfig emergency path | [0004](docs/decisions/0004-exit-first-pause-semantics.md) |
 | Versioning | Same-size 145-byte VaultState v1 and deterministic v0 migration implemented in M21; 113-byte devnet retirement pending | [0005](docs/decisions/0005-account-versioning-and-migration.md) |
 | Upgrades | Established 3-of-5 multisig, 48-hour ordinary timelock, 4-of-5 emergency path, and later immutability review | [0006](docs/decisions/0006-upgrade-governance-and-immutability.md) |
 | Mint and exposure | Governance allowlist, one mint- and freeze-authority-free legacy SPL mint initially, on-chain TVL/deposit caps, and staged rollout | [0007](docs/decisions/0007-mint-policy-and-exposure-limits.md) |
@@ -33,9 +34,9 @@ configuration, and 113-byte account retirement remain unimplemented.
 M21 reuses the former pause byte as `operational_state` and the first former
 reserved byte as `version`, so the 145-byte VaultState does not grow. Migration maps
 legacy `false`/`0` to `Active` and `true`/`1` to `ExitOnly` deterministically.
-Configuration and mint approval use separate versioned PDAs in the target design.
-M22 consumes no reserved bytes and does not invent a temporary emergency authority.
-Later milestones must implement one accepted slice at a time before this document can
+M23 adds the separate versioned ProtocolConfig PDA without consuming any VaultState
+reserved bytes. Mint approval still requires the future MintConfig PDA. Later
+milestones must implement one accepted slice at a time before this document can
 describe that slice as current behavior.
 
 ## High-level design
@@ -44,8 +45,9 @@ A single-asset vault that custodies one SPL token mint. Users deposit that token
 receive share credits (tracked in `UserPosition` PDAs). Users redeem shares to withdraw
 the underlying token. Custody is held by an ATA owned by a program-derived address
 (`vault_authority`); all outbound transfers use CPI with PDA signer seeds. Privileged
-controls (pause/unpause) are gated by an explicit `pause_authority` keypair stored in
-`VaultState`.
+controls (pause/unpause) are gated by an explicit `pause_authority` key stored in
+`VaultState`. Exceptional withdrawal blocking is gated independently by the emergency
+authority stored in the singleton `ProtocolConfig`.
 
 ---
 
@@ -56,6 +58,7 @@ controls (pause/unpause) are gated by an explicit `pause_authority` keypair stor
 | `vault_state` | `["vault", mint]` | `VaultState.vault_bump` | Deterministic vault identity per mint |
 | `vault_authority` | `["vault_authority", vault_state]` | `VaultState.authority_bump` | PDA signer that owns custody ATA and signs withdrawals |
 | `user_position` | `["user_position", vault_state, user]` | `UserPosition.bump` | Per-user share ledger |
+| `protocol_config` | `["protocol_config"]` | `ProtocolConfig.bump` | Singleton protocol roles and canonical token-program identity |
 
 ---
 
@@ -84,6 +87,26 @@ only byte 90's semantic type and byte 123's version marker. A pre-M18 113-byte a
 cannot be grown in place or passed to the migration instruction. Such accounts must be
 inventoried, drained under a compatible binary, reconciled, and retired; the initial
 devnet inventory is recorded in `docs/LEGACY_ACCOUNT_INVENTORY.md`.
+
+### ProtocolConfig
+
+The M23 singleton is exactly 200 bytes and has no mutation instruction after its
+one-time bootstrap:
+
+| Offset | Field | Type | Notes |
+|--------|-------|------|-------|
+| 0–7 | account discriminator | `[u8; 8]` | Anchor `ProtocolConfig` discriminator |
+| 8 | `version` | `u8` | Exactly `1` |
+| 9 | `bump` | `u8` | Canonical `["protocol_config"]` PDA bump |
+| 10–41 | `protocol_governance_authority` | `Pubkey` | Reserved for later governed configuration work |
+| 42–73 | `emergency_authority` | `Pubkey` | Sole M23 authority for exceptional full-pause transitions |
+| 74–105 | `treasury` | `Pubkey` | Reserved for later constrained excess recovery |
+| 106–137 | `token_program` | `Pubkey` | Canonical legacy SPL Token Program, assigned by program code |
+| 138–199 | `reserved` | `[u8; 62]` | Must remain all zero in v1 |
+
+All three role addresses are non-default and pairwise distinct. This separation is
+structural but is not yet a production multisig/timelock deployment: M23 chooses no
+live addresses and performs no bootstrap transaction.
 
 ### UserPosition
 
@@ -115,6 +138,24 @@ regardless of init mode.
 ---
 
 ## Instruction contracts
+
+### `initialize_protocol_config` (M23)
+
+| Account | Type | Signer | Mut | Constraint |
+|---------|------|--------|-----|------------|
+| `payer` | `Signer` | yes | yes | Pays rent for the singleton |
+| `upgrade_authority` | `Signer` | yes | no | Must equal the live ProgramData upgrade authority |
+| `protocol_config` | `Account<ProtocolConfig>` | no | yes | One-time init at `["protocol_config"]` |
+| `program` | `Program` | no | no | Must be this executable program and point to canonical ProgramData |
+| `program_data` | `Account<ProgramData>` | no | no | Upgradeable-loader metadata for this program |
+| `system_program` | `Program<System>` | no | no | Creates the singleton |
+
+Arguments are the protocol-governance, emergency, and treasury public keys. Requiring
+the current program upgrade authority prevents an arbitrary first caller from claiming
+the singleton. Roles must be non-default and pairwise distinct; the caller cannot
+choose the token program. Immutable programs and substituted ProgramData fail closed.
+Success emits `ProtocolConfigInitialized` with every configured identity, slot, Unix
+timestamp, and version.
 
 ### `initialize`
 
@@ -188,8 +229,21 @@ Both instructions require `version == 1`. `pause` idempotently writes `ExitOnly`
 `unpause` idempotently writes `Active`. Each successful call emits
 `OperationalStateChanged` with the old/new states, signer, Clock slot, Unix timestamp,
 and reason code. The ordinary pause authority cannot change a `FullyPaused` vault.
-Entering `FullyPaused`, or recovering it first to `ExitOnly`, remains unavailable until
-the separately reviewed `ProtocolConfig` emergency-governance milestone.
+The ordinary authority remains unable to enter or alter `FullyPaused`.
+
+### `emergency_pause` / `emergency_resume` (M23)
+
+| Account | Type | Signer | Mut | Constraint |
+|---------|------|--------|-----|------------|
+| `emergency_authority` | `Signer` | yes | no | Must match ProtocolConfig.emergency_authority |
+| `protocol_config` | `Account<ProtocolConfig>` | no | no | Canonical PDA, version 1, canonical token program, zero reserved bytes |
+| `vault_state` | `Account<VaultState>` | no | yes | Canonical mint-derived PDA and version 1 |
+
+Both take one bounded `OperationalStateReason`. `emergency_pause` accepts every valid
+state and ends in `FullyPaused`, including an observable idempotent repeat.
+`emergency_resume` accepts `FullyPaused` or `ExitOnly` and ends in `ExitOnly`; it
+rejects `Active` and can never reopen deposits. Both reuse the exact
+`OperationalStateChanged` evidence contract.
 
 ### `migrate_v0_to_v1` (M21)
 
@@ -299,8 +353,10 @@ Rounding direction: floor (favors vault; dust accumulates in custody).
 1. `vault_state.mint` is immutable after initialization.
 2. `custody.owner == vault_authority.key()` — enforced by Anchor ATA constraint.
 3. `custody.mint == vault_state.mint` — enforced by Anchor ATA constraint.
-4. Only the `pause_authority` signer can invoke the current pause/unpause controls;
-   migration can only preserve and deterministically reinterpret legacy state.
+4. Only the `pause_authority` signer can invoke ordinary pause/unpause controls; only
+   the canonical ProtocolConfig emergency signer can invoke exceptional full-pause
+   controls. Migration can only preserve and deterministically reinterpret legacy
+   state.
 5. `total_assets` reflects only vault-mediated deposit/withdraw flows, maintained by
    deposit/withdraw CPI. Custody's live token balance may be `>=` `total_assets`: a
    direct SPL transfer into custody outside the `deposit` instruction (a "donation") is
@@ -318,6 +374,10 @@ Rounding direction: floor (favors vault; dust accumulates in custody).
    program causes the transaction to fail with a specific, assertable error.
 11. Deposits are available only in `Active`; withdrawals remain available in
     `Active` and `ExitOnly` and are blocked only by `FullyPaused`.
+12. Emergency recovery stops at `ExitOnly`; reopening deposits requires the separate
+    ordinary pause authority after incident reconciliation.
+13. ProtocolConfig v1 has one canonical PDA, the canonical legacy token program,
+    non-default separated roles, and zero reserved bytes.
 
 ---
 
@@ -335,13 +395,14 @@ Uninitialized
 
 Legacy v0 Active/Paused ── migrate_v0_to_v1 ──► v1 Active/ExitOnly
 
- FullyPaused  (encoded fail-closed; accepted transitions deferred to ProtocolConfig)
+ Any valid state ── emergency_pause ──► FullyPaused
+ FullyPaused ── emergency_resume ──► ExitOnly
 ```
 
 Deposit is available only in `Active`. Withdraw is available in `Active` and
 `ExitOnly`, preserving user exits during the default incident response. `FullyPaused`
-blocks both paths and the ordinary pause authority cannot alter it. Its stronger
-governance transition path is intentionally absent until `ProtocolConfig` exists.
+blocks both paths and the ordinary pause authority cannot alter it. The M23 emergency
+authority may enter it and may recover only to `ExitOnly`, never directly to `Active`.
 Initialize is available regardless of pause state (vault is initialized exactly once).
 
 ---
@@ -359,10 +420,11 @@ one.
 | `VaultInitialized` | `vault`, `mint`, `pause_authority` | `initialize` |
 | `Deposited` | `vault`, `user`, `amount`, `shares_out`, `total_assets`, `total_shares` | `deposit` |
 | `Withdrawn` | `vault`, `user`, `assets_out`, `shares_in`, `total_assets`, `total_shares` | `withdraw` |
-| `OperationalStateChanged` | `vault`, `previous_state`, `new_state`, `authority`, `slot`, `unix_timestamp`, `reason_code` | `pause`, `unpause` (M22) |
+| `OperationalStateChanged` | `vault`, `previous_state`, `new_state`, `authority`, `slot`, `unix_timestamp`, `reason_code` | `pause`, `unpause` (M22); `emergency_pause`, `emergency_resume` (M23) |
 | `PauseAuthorityProposed` | `vault`, `current_authority`, `proposed_authority` | `propose_pause_authority` (M18) |
 | `PauseAuthorityRotated` | `vault`, `old_authority`, `new_authority` | `accept_pause_authority` (M18) |
 | `VaultStateMigrated` | `vault`, `old_version`, `new_version`, `operational_state` | `migrate_v0_to_v1` (M21) |
+| `ProtocolConfigInitialized` | `protocol_config`, `initializer`, three role addresses, `token_program`, `slot`, `unix_timestamp`, `version` | `initialize_protocol_config` (M23) |
 
 ## Governance-ready pause authority (M16)
 

@@ -21,6 +21,13 @@ export enum VaultErrorCode {
   InvalidVaultBump = 6016,
   InvalidAuthorityBump = 6017,
   InvalidOperationalStateTransition = 6018,
+  InvalidProgramData = 6019,
+  InvalidProtocolRole = 6020,
+  DuplicateProtocolRole = 6021,
+  UnsupportedProtocolConfigVersion = 6022,
+  InvalidProtocolConfigReservedBytes = 6023,
+  InvalidProtocolTokenProgram = 6024,
+  InvalidEmergencyStateTransition = 6025,
 }
 
 export interface ParsedVaultError {

@@ -21,20 +21,24 @@ vault product without building custody logic from zero.
 
 ## Status
 
-**All 14 MVP milestones and post-MVP M15–M20 are merged.** M20's pre-audit design
-gate merged through PR #33 on 2026-07-15. M21, the separate VaultState versioning and
-migration milestone, is in review; see `ROADMAP.md` for the full history.
+**All 14 MVP milestones and post-MVP M15–M22 are merged.** M21's VaultState
+versioning/migration milestone merged through PR #34 and M22's exit-first pause
+semantics through PR #35. M23, the separate ProtocolConfig and emergency-control
+milestone, is in review; see `ROADMAP.md` for the full history.
 
 The original lifecycle was confirmed live on Solana devnet: `initialize`, `deposit`,
-`withdraw`, `pause`, and `unpause` (2026-06-26). The M21 binary and migration are not
-deployed. A CI pipeline (fmt, build, clippy, test, audit) gates every
+`withdraw`, `pause`, and `unpause` (2026-06-26). The M21–M23 binaries, migration,
+ProtocolConfig, and emergency controls are not deployed. A CI pipeline (fmt, build,
+clippy, test, audit) gates every
 PR. A production-hardening pass closed four MVP-accepted risks and added instruction
 events. A TypeScript SDK (`sdk/`) and a minimal Next.js dApp (`app/`) sit on top of
 the program, both IDL-free and independently testable offline. The current recorded
-suite contains 66 Rust tests, 68 SDK tests, and 90 dApp tests. Current architecture is
+suite contains 78 Rust tests, 87 SDK tests, and 94 dApp tests. Current architecture is
 accepted in ADR 0002; ADRs 0003–0009 define the narrower pre-audit production target.
-M21 implements its account-versioning slice, while pause availability, mint/cap,
-upgrade, recovery, audit, and launch requirements remain incomplete.
+M21 implements its account-versioning slice, M22 its exit-first availability slice,
+and M23 the ProtocolConfig/emergency-control slice. Mint/cap governance, role
+rotation/timelocks, upgrade governance, recovery, audit, and launch requirements
+remain incomplete.
 
 This is an interview-grade educational prototype. It is **not** audited, **not**
 production-safe, **not** mainnet-ready, and **not** formally verified. See
@@ -83,6 +87,12 @@ A single vault custodies one SPL token mint:
 - [x] `propose_pause_authority` / `accept_pause_authority` — two-step authority rotation.
 - [x] `migrate_v0_to_v1` — permissionless, deterministic migration of compatible
   145-byte version-0 VaultState accounts; it never resizes 113-byte accounts.
+- [x] `initialize_protocol_config` — one-time singleton bootstrap by the live
+  program's current upgrade authority, with separate governance, emergency, and
+  treasury roles.
+- [x] `emergency_pause` / `emergency_resume` — only the configured emergency
+  authority may enter `FullyPaused` or recover first to `ExitOnly`; it cannot reopen
+  deposits.
 
 ## Security goals
 
@@ -119,7 +129,7 @@ account decoders, and Anchor error parsing — with **no runtime dependency on
 `target/idl/*.json`**. Every Anchor discriminator is computed directly via
 `sha256("global:<name>")` / `sha256("account:<Name>")`, matching Anchor's own
 codegen, which makes the SDK fully testable without the Anchor CLI installed. Since
-M19, discriminator matches are verified on every CI run. M21/M22 expand the same gate:
+M19, discriminator matches are verified on every CI run. M21–M23 expand the same gate:
 CI runs `anchor build` and verifies all instruction discriminators and argument schemas,
 all account discriminators, exact account field order and types, fixed serialized
 sizes, and both operational-state enums against the real generated IDL.
@@ -130,7 +140,7 @@ the repo as shown below.
 
 ```bash
 corepack yarn install
-corepack yarn test:sdk    # 73 tests, offline, no RPC, no compiled program
+corepack yarn test:sdk    # 87 tests, offline, no RPC, no compiled program
 corepack yarn typecheck
 corepack yarn sdk:build   # emits sdk/dist/*.js + *.d.ts
 ```
@@ -149,8 +159,9 @@ const state = await client.fetchVaultState();
 
 `scripts/sdk_devnet_smoke.ts` mirrors `devnet_demo.ts`'s flow but built entirely on
 `sdk/`. It has not been run against a live cluster in this environment — its
-correctness rests on the 68 offline unit tests plus manual review; run it yourself
-against a funded devnet keypair before trusting it live.
+correctness rests on the 87 offline unit tests plus manual review; run it yourself
+against a funded devnet keypair before trusting it live. It does not initialize or
+exercise M23 ProtocolConfig/emergency controls.
 
 ## dApp
 
@@ -164,7 +175,7 @@ version would add.
 cd app
 npm install
 npm run dev     # http://localhost:3000
-npm run test    # 32 tests, offline, mocked wallet + SDK, no live RPC
+npm run test    # 94 tests, offline, mocked wallet + SDK, no live RPC
 npm run build
 ```
 
@@ -214,8 +225,9 @@ GitHub, **Code → Codespaces → Create codespace on main**, and wait for
 
 ## Testing strategy
 
-> See `TEST_PLAN.md`. The current suites contain 66 Rust tests, 68 SDK tests, and
-> 90 dApp tests; M21's Rust and generated-IDL results are recorded from PR CI.
+> See `TEST_PLAN.md`. The current suites contain 78 Rust tests, 87 SDK tests, and
+> 94 dApp tests; M23's local Rust/SBF/generated-IDL results are recorded there and PR
+> CI remains the publication gate.
 
 ```bash
 cargo test              # program tests, LiteSVM, no network required
@@ -223,17 +235,19 @@ corepack yarn test:sdk  # SDK tests, no Rust/Solana/Anchor toolchain, no live cl
 cd app && npm run test  # dApp tests, no Rust/Solana/Anchor toolchain, no live cluster
 ```
 
-Program coverage spans unit (arithmetic), integration (all 8 instructions),
+Program coverage spans unit (arithmetic), integration (all 11 instructions),
 happy-path, negative, account-substitution, arithmetic-boundary, adversarial (12
 targeted attack scenarios), and event emission.
 
 ## Roadmap
 
 See `ROADMAP.md` for the full milestone-by-milestone history. M20 accepted the
-production-target decisions; M21 implements account versioning, same-size migration,
-inventory, and full IDL layout verification only. It does not deploy, retire legacy
-accounts, start an audit, or begin mainnet rollout. Each remaining slice starts only
-after Malcolm separately approves it and the preceding branch is reviewed and merged.
+production-target decisions; M21 implemented account versioning/migration/inventory,
+M22 implemented exit-first behavior, and M23 implements the singleton ProtocolConfig
+and emergency state transitions only. It does not govern vault initialization, add
+MintConfig/caps, deploy, retire legacy accounts, start an audit, or begin mainnet
+rollout. Each remaining slice starts only after Malcolm separately approves it and the
+preceding branch is reviewed and merged.
 
 ## Interview walkthrough
 

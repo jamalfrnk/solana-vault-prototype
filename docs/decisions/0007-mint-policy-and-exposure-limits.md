@@ -3,7 +3,10 @@
 - **Status:** Accepted
 - **Date:** 2026-07-15
 - **Milestone:** 20 — Pre-Audit Production Design
-- **Implementation status:** Not implemented; current initialization is not governed by a protocol allowlist or caps
+- **Implementation status:** Partially implemented through M23: the frozen version-1
+  ProtocolConfig singleton, canonical token-program identity, and separated role
+  addresses exist; MintConfig, governed vault initialization, mint policy, caps, and
+  configuration rotation/timelocks remain unimplemented
 
 ## Context
 
@@ -20,16 +23,18 @@ additional mints later.
 
 ### Versioned configuration accounts
 
-Introduce two program-owned account types in a later implementation milestone:
+Introduce two program-owned account types across later implementation milestones:
 
 | Account | PDA seeds | Purpose |
 |---|---|---|
 | `ProtocolConfig` | `[b"protocol_config"]` | Version, canonical legacy token-program ID, protocol-governance authority, emergency/full-pause authority, approved treasury, and reserved capacity. |
 | `MintConfig` | `[b"mint_config", mint]` | Version, mint, enabled flag, `max_total_assets`, `max_deposit_assets_per_transaction`, rollout stage, and reserved capacity. |
 
-Both types use explicit version bytes and compiler-derived allocation. Their exact
-field order and byte counts must be locked in the implementation milestone before
-code, but the seeds and responsibilities above are accepted here.
+Both types use explicit version bytes and compiler-derived allocation. M23 freezes
+ProtocolConfig v1 at exactly 200 bytes and bootstraps it only through the live
+program's current upgrade authority; its role addresses are non-default and pairwise
+distinct, and its legacy SPL Token Program identity is assigned by program code.
+MintConfig's exact layout remains to be locked by its own milestone.
 
 ### Initialization and mint approval
 

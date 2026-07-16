@@ -3,7 +3,10 @@
 - **Status:** Accepted
 - **Date:** 2026-07-15
 - **Milestone:** 20 — Pre-Audit Production Design
-- **Implementation status:** Not implemented; this ADR is the production acceptance policy
+- **Implementation status:** Partially implemented through M23; the repository now
+  enforces versioning, exit-first gates, and a separated emergency state-transition
+  path, while production roles, manifests, monitoring, rehearsal, audit, and most
+  launch gates remain unmet
 
 ## Context
 
@@ -134,12 +137,13 @@ milestones:
 1. VaultState versioning, deterministic v0-to-v1 migration, legacy inventory, and full
    IDL account-layout verification.
 2. Exit-first operational-state program/SDK/dApp behavior and tests.
-3. ProtocolConfig, MintConfig, governed initialization, mint policy, and caps.
-4. Constrained excess recovery and reconciliation tests.
-5. Verifiable release automation, secret scanning, authority manifests, RPC/monitoring,
+3. ProtocolConfig singleton and emergency state-transition controls (M23).
+4. MintConfig, governed vault initialization, mint policy, and caps.
+5. Constrained excess recovery and reconciliation tests.
+6. Verifiable release automation, secret scanning, authority manifests, RPC/monitoring,
    and incident runbook rehearsal.
-6. Audit preparation, external audit, remediation, and verification.
-7. Separately approved capped mainnet canary.
+7. Audit preparation, external audit, remediation, and verification.
+8. Separately approved capped mainnet canary.
 
 Each item requires Malcolm's approval, one feature branch, passing checks,
 documentation, review, and merge before the next starts. M20 does not start any item.

@@ -21,11 +21,16 @@ import {
   buildProposePauseAuthorityIx,
   buildUnpauseIx,
   buildWithdrawIx,
+  buildEmergencyPauseIx,
+  buildEmergencyResumeIx,
+  buildInitializeProtocolConfigIx,
 } from "./instructions";
 import {
+  fetchProtocolConfig,
   fetchUserPosition,
   fetchVaultState,
   OperationalStateReason,
+  ProtocolConfig,
   UserPosition,
   VaultState,
 } from "./accounts";
@@ -78,6 +83,44 @@ export class VaultClient {
     return buildUnpauseIx({ pauseAuthority, mint: this.mint, reason });
   }
 
+  buildInitializeProtocolConfigIx(
+    payer: PublicKey,
+    upgradeAuthority: PublicKey,
+    protocolGovernanceAuthority: PublicKey,
+    emergencyAuthority: PublicKey,
+    treasury: PublicKey
+  ): TransactionInstruction {
+    return buildInitializeProtocolConfigIx({
+      payer,
+      upgradeAuthority,
+      protocolGovernanceAuthority,
+      emergencyAuthority,
+      treasury,
+    });
+  }
+
+  buildEmergencyPauseIx(
+    emergencyAuthority: PublicKey,
+    reason: OperationalStateReason
+  ): TransactionInstruction {
+    return buildEmergencyPauseIx({
+      emergencyAuthority,
+      mint: this.mint,
+      reason,
+    });
+  }
+
+  buildEmergencyResumeIx(
+    emergencyAuthority: PublicKey,
+    reason: OperationalStateReason
+  ): TransactionInstruction {
+    return buildEmergencyResumeIx({
+      emergencyAuthority,
+      mint: this.mint,
+      reason,
+    });
+  }
+
   /** M18: current authority proposes the next one (two-step rotation, step 1). */
   buildProposePauseAuthorityIx(
     pauseAuthority: PublicKey,
@@ -104,6 +147,10 @@ export class VaultClient {
 
   fetchVaultState(): Promise<VaultState | null> {
     return fetchVaultState(this.connection, this.mint);
+  }
+
+  fetchProtocolConfig(): Promise<ProtocolConfig | null> {
+    return fetchProtocolConfig(this.connection);
   }
 
   fetchUserPosition(user: PublicKey): Promise<UserPosition | null> {

@@ -3,10 +3,10 @@
 - **Status:** Accepted
 - **Date:** 2026-07-15
 - **Milestone:** 20 — Pre-Audit Production Design
-- **Implementation status:** Partially implemented through M22: the wire enum,
-  exit-first deposit/withdraw gates, bounded transition evidence, and ordinary-authority
-  `Active`/`ExitOnly` controls are implemented; the `ProtocolConfig`-governed path into
-  and out of `FullyPaused` remains unimplemented
+- **Implementation status:** Implemented through M23: M22 delivered the wire enum,
+  exit-first gates/evidence, and ordinary `Active`/`ExitOnly` controls; M23 delivered
+  the separate ProtocolConfig emergency-authority path into `FullyPaused` and recovery
+  first to `ExitOnly`
 - **Supersedes:** ADR 0002 section 6 for the target production design
 
 ## Context
@@ -100,8 +100,7 @@ stronger, separately controlled authorization boundary.
 - Withdraw constraints permit both `Active` and `ExitOnly`, and reject only
   `FullyPaused` or invalid states.
 - Program, SDK, dApp, IDL verification, event, migration, and state-machine tests cover
-  the M22 exit-first slice. Emergency-authority transition tests remain required with
-  `ProtocolConfig`.
+  both the M22 exit-first slice and M23 emergency-authority transitions.
 - Existing paused 145-byte accounts become exit-only after deterministic migration;
   this intentionally restores safe withdrawals.
 - Monitoring and UI must show the three states explicitly and must never label
@@ -120,3 +119,9 @@ stronger, separately controlled authorization boundary.
 - existing `false` and `true` bytes migrate to `Active` and `ExitOnly` respectively;
 - events contain correct old/new state, authority, and reason code;
 - current authority-rotation behavior remains intact.
+
+M23 covers the emergency cases in `tests/test_protocol.rs`, including canonical config
+and vault substitution, wrong authority, every valid transition, idempotence,
+unsupported versions, malformed reserved bytes, non-state-byte preservation, and the
+exact transition-event wire contract. Production role deployment, signer thresholds,
+and incident rehearsal remain separate launch gates under ADRs 0006 and 0009.

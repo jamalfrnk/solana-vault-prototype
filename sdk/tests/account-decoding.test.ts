@@ -10,7 +10,11 @@ import {
   canWithdraw,
   operationalStateLabel,
   OperationalState,
+  decodeProtocolConfig,
+  PROTOCOL_CONFIG_LEN,
 } from "../src/accounts";
+import { TOKEN_PROGRAM_ID } from "../src/constants";
+import { deriveProtocolConfigPda } from "../src/pdas";
 
 function randomPubkey(): PublicKey {
   return Keypair.generate().publicKey;
@@ -77,7 +81,109 @@ function buildUserPositionBuffer(fields: {
   return buf;
 }
 
+function buildProtocolConfigBuffer(
+  overrides: {
+    version?: number;
+    bump?: number;
+    protocolGovernanceAuthority?: PublicKey;
+    emergencyAuthority?: PublicKey;
+    treasury?: PublicKey;
+    tokenProgram?: PublicKey;
+    reservedByte?: number;
+    discriminator?: Buffer;
+  } = {}
+): Buffer {
+  const buf = Buffer.alloc(PROTOCOL_CONFIG_LEN);
+  (overrides.discriminator ?? accountDiscriminator("ProtocolConfig")).copy(
+    buf,
+    0
+  );
+  buf[8] = overrides.version ?? 1;
+  buf[9] = overrides.bump ?? deriveProtocolConfigPda().bump;
+  (overrides.protocolGovernanceAuthority ?? randomPubkey())
+    .toBuffer()
+    .copy(buf, 10);
+  (overrides.emergencyAuthority ?? randomPubkey()).toBuffer().copy(buf, 42);
+  (overrides.treasury ?? randomPubkey()).toBuffer().copy(buf, 74);
+  (overrides.tokenProgram ?? TOKEN_PROGRAM_ID).toBuffer().copy(buf, 106);
+  if (overrides.reservedByte !== undefined) {
+    buf[138] = overrides.reservedByte;
+  }
+  return buf;
+}
+
 describe("accounts", () => {
+  describe("decodeProtocolConfig", () => {
+    it("round-trips the exact frozen v1 fields", () => {
+      const governance = randomPubkey();
+      const emergency = randomPubkey();
+      const treasury = randomPubkey();
+      const decoded = decodeProtocolConfig(
+        buildProtocolConfigBuffer({
+          protocolGovernanceAuthority: governance,
+          emergencyAuthority: emergency,
+          treasury,
+        })
+      );
+      expect(decoded.version).to.equal(1);
+      expect(decoded.bump).to.equal(deriveProtocolConfigPda().bump);
+      expect(decoded.protocolGovernanceAuthority.equals(governance)).to.equal(
+        true
+      );
+      expect(decoded.emergencyAuthority.equals(emergency)).to.equal(true);
+      expect(decoded.treasury.equals(treasury)).to.equal(true);
+      expect(decoded.tokenProgram.equals(TOKEN_PROGRAM_ID)).to.equal(true);
+    });
+
+    it("rejects wrong length, discriminator, version, bump, and reserved bytes", () => {
+      expect(() => decodeProtocolConfig(Buffer.alloc(199))).to.throw(/length/i);
+      expect(() =>
+        decodeProtocolConfig(
+          buildProtocolConfigBuffer({
+            discriminator: accountDiscriminator("VaultState"),
+          })
+        )
+      ).to.throw(/discriminator/i);
+      expect(() =>
+        decodeProtocolConfig(buildProtocolConfigBuffer({ version: 2 }))
+      ).to.throw(/version/i);
+      expect(() =>
+        decodeProtocolConfig(
+          buildProtocolConfigBuffer({
+            bump: (deriveProtocolConfigPda().bump + 1) & 0xff,
+          })
+        )
+      ).to.throw(/bump/i);
+      expect(() =>
+        decodeProtocolConfig(buildProtocolConfigBuffer({ reservedByte: 1 }))
+      ).to.throw(/reserved/i);
+    });
+
+    it("rejects default or duplicate roles and a substituted token program", () => {
+      const duplicate = randomPubkey();
+      expect(() =>
+        decodeProtocolConfig(
+          buildProtocolConfigBuffer({
+            protocolGovernanceAuthority: PublicKey.default,
+          })
+        )
+      ).to.throw(/default/i);
+      expect(() =>
+        decodeProtocolConfig(
+          buildProtocolConfigBuffer({
+            protocolGovernanceAuthority: duplicate,
+            emergencyAuthority: duplicate,
+          })
+        )
+      ).to.throw(/distinct/i);
+      expect(() =>
+        decodeProtocolConfig(
+          buildProtocolConfigBuffer({ tokenProgram: randomPubkey() })
+        )
+      ).to.throw(/token program/i);
+    });
+  });
+
   describe("operational-state availability", () => {
     it("implements the exact Active/ExitOnly/FullyPaused matrix", () => {
       expect(canDeposit(OperationalState.Active)).to.equal(true);

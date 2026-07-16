@@ -30,7 +30,8 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 | — | M18/M19 follow-up — dApp load errors + rotation devnet smoke | `[x]` complete |
 | 20 | Pre-audit production design ADRs | `[x]` complete |
 | 21 | VaultState v1, deterministic migration, legacy inventory, full IDL layout | `[x]` complete |
-| 22 | Exit-first pause semantics | `[~]` awaiting review |
+| 22 | Exit-first pause semantics | `[x]` complete |
+| 23 | ProtocolConfig and emergency pause controls | `[~]` awaiting review |
 
 ## Milestone 0 — Repository bootstrap (complete)
 
@@ -665,7 +666,7 @@ instruction discriminators, both account discriminators, and exact 145/81-byte l
 Merged through PR #34 as `30fa983` on 2026-07-15/16. Final pre-merge CI run
 29461990674 passed all five Rust, audit, SDK, dApp, and generated-IDL jobs.
 
-## Milestone 22 — Exit-first pause semantics (awaiting review)
+## Milestone 22 — Exit-first pause semantics (complete)
 
 Implements ADR 0004's independently safe availability slice on
 `codex/exit-first-pause-semantics`:
@@ -682,11 +683,10 @@ Implements ADR 0004's independently safe availability slice on
 - the dApp labels all three states and keeps withdrawals usable in `ExitOnly` while
   removing ordinary-authority controls in `FullyPaused`.
 
-M22 deliberately does not invent an emergency authority or consume reserved
+M22 deliberately did not invent an emergency authority or consume reserved
 `VaultState` bytes. ADR 0004's path into `FullyPaused` and recovery first to `ExitOnly`
-depends on the separately versioned `ProtocolConfig`, which remains the next planned
-implementation-sequence milestone. No program upgrade, deployment, or asset movement
-is part of M22.
+was left for the separately versioned ProtocolConfig slice now implemented in M23. No
+program upgrade, deployment, or asset movement was part of M22.
 
 Observed locally: Rust formatting and whitespace checks passed; 73 SDK tests, root
 typecheck, SDK build, dApp typecheck/build/audit, and 94 dApp tests passed. Windows Rust
@@ -700,6 +700,37 @@ formatting, full clippy, all 70 Rust tests, cargo audit, 73 SDK tests/build/audi
 typecheck/build/94 tests/audit, and generated-IDL instruction/account-layout verification
 all passed. The IDL gate confirmed all eight instruction interfaces, both account
 discriminators, exact 145/81-byte layouts, and both operational-state enums.
+
+Merged through PR #35 as `da15843` on 2026-07-15.
+
+## Milestone 23 — ProtocolConfig and emergency pause controls (awaiting review)
+
+Implements the next independently safe part of ADRs 0004, 0007, and 0009 on
+`codex/protocol-config-emergency-controls`:
+
+- adds the exact 200-byte version-1 singleton ProtocolConfig PDA with separated
+  protocol-governance, emergency, and treasury roles plus the canonical legacy SPL
+  Token Program identity;
+- gates the one-time bootstrap on this program's canonical ProgramData and current
+  upgrade-authority signer, preventing arbitrary first-caller role takeover;
+- permits only the configured emergency authority to enter `FullyPaused` or recover
+  first to `ExitOnly`, never directly reopen deposits;
+- preserves M22's exact bounded, timestamped transition evidence and adds complete
+  timestamped ProtocolConfig initialization evidence;
+- adds strict SDK derivation/decoding/builders and extends generated-IDL verification
+  to all 11 instruction interfaces and exact 145/81/200-byte account layouts.
+
+M23 does not add MintConfig, govern ordinary `initialize`, enforce mint/deposit/TVL
+caps, rotate roles, configure a production multisig/timelock, recover excess, deploy or
+upgrade the program, initialize a live config, or move assets. Those remain separate
+reviewed milestones and launch blockers.
+
+Observed locally: pinned Anchor 1.0.2 / Agave 3.1.10 SBF and IDL build passed; all 78
+Rust tests and full warning-denying clippy passed; root typecheck, SDK build, 87 SDK
+tests, dApp typecheck/build, and 94 dApp tests passed. The generated-IDL verifier
+confirmed all 11 instruction schemas, all three account discriminators, exact
+145/81/200-byte layouts, and both operational-state enums. Formatting and whitespace
+checks passed. Dependency audit and clean Ubuntu reproduction remain PR CI gates.
 
 ## Post-MVP Roadmap (candidate pool — implementation requires separate approval)
 

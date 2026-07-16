@@ -2,6 +2,7 @@ use anchor_lang::prelude::*;
 
 pub const VAULT_STATE_VERSION_V0: u8 = 0;
 pub const VAULT_STATE_VERSION_V1: u8 = 1;
+pub const PROTOCOL_CONFIG_VERSION_V1: u8 = 1;
 
 /// Borsh encodes these unit variants as their zero-based one-byte indexes,
 /// exactly matching the legacy bool byte for Active (0) and ExitOnly (1).
@@ -57,6 +58,27 @@ pub struct VaultState {
 impl VaultState {
     pub const ACCOUNT_LEN: usize = 8 + Self::INIT_SPACE;
 }
+
+/// Singleton protocol-level authority configuration. The exact 200-byte v1
+/// layout is frozen by M23; future assignments consume reserved bytes only
+/// through a reviewed versioned migration.
+#[account]
+#[derive(InitSpace)]
+pub struct ProtocolConfig {
+    pub version: u8,
+    pub bump: u8,
+    pub protocol_governance_authority: Pubkey,
+    pub emergency_authority: Pubkey,
+    pub treasury: Pubkey,
+    pub token_program: Pubkey,
+    pub reserved: [u8; 62],
+}
+
+impl ProtocolConfig {
+    pub const ACCOUNT_LEN: usize = 8 + Self::INIT_SPACE;
+}
+
+const _: () = assert!(ProtocolConfig::ACCOUNT_LEN == 200);
 
 #[account]
 #[derive(InitSpace)]

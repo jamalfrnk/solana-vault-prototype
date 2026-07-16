@@ -1,5 +1,5 @@
 /**
- * M19/M21/M22 generated-IDL verification.
+ * M19/M21/M22/M23 generated-IDL verification.
  *
  * M19 pinned every SDK-computed discriminator to Anchor's generated IDL.
  * M21 additionally verifies the complete fixed persistent-account schema:
@@ -7,6 +7,8 @@
  * the SDK's manual decoders auditable without adding a runtime IDL dependency.
  * M22 pins every instruction argument and the bounded operational-state reason
  * enum so pause/unpause wire changes cannot silently drift from the SDK.
+ * M23 adds the three emergency/config instruction schemas and freezes the exact
+ * 200-byte ProtocolConfig layout alongside VaultState and UserPosition.
  */
 
 import * as fs from "fs";
@@ -65,6 +67,23 @@ const INSTRUCTION_LAYOUTS: Record<string, IdlField[]> = {
   propose_pause_authority: [{ name: "new_authority", type: "pubkey" }],
   accept_pause_authority: [],
   migrate_v0_to_v1: [],
+  initialize_protocol_config: [
+    { name: "protocol_governance_authority", type: "pubkey" },
+    { name: "emergency_authority", type: "pubkey" },
+    { name: "treasury", type: "pubkey" },
+  ],
+  emergency_pause: [
+    {
+      name: "reason",
+      type: { defined: { name: "OperationalStateReason" } },
+    },
+  ],
+  emergency_resume: [
+    {
+      name: "reason",
+      type: { defined: { name: "OperationalStateReason" } },
+    },
+  ],
 };
 
 const ACCOUNT_LAYOUTS: Record<
@@ -96,6 +115,18 @@ const ACCOUNT_LAYOUTS: Record<
       { name: "vault", type: "pubkey" },
       { name: "shares", type: "u64" },
       { name: "bump", type: "u8" },
+    ],
+  },
+  ProtocolConfig: {
+    accountSize: 200,
+    fields: [
+      { name: "version", type: "u8" },
+      { name: "bump", type: "u8" },
+      { name: "protocol_governance_authority", type: "pubkey" },
+      { name: "emergency_authority", type: "pubkey" },
+      { name: "treasury", type: "pubkey" },
+      { name: "token_program", type: "pubkey" },
+      { name: "reserved", type: { array: ["u8", 62] } },
     ],
   },
 };
@@ -421,7 +452,7 @@ function main(): void {
   console.log(
     `All ${
       Object.keys(INSTRUCTION_LAYOUTS).length
-    } instruction interfaces, 2 account discriminators, exact 145/81-byte account layouts, and operational-state enums match the generated IDL.`
+    } instruction interfaces, 3 account discriminators, exact 145/81/200-byte account layouts, and operational-state enums match the generated IDL.`
   );
 }
 

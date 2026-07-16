@@ -42,4 +42,18 @@ pub enum VaultError {
     InvalidAuthorityBump,
     #[msg("The pause authority cannot perform this operational-state transition")]
     InvalidOperationalStateTransition,
+    #[msg("ProgramData is not the canonical upgradeable-loader account for this program")]
+    InvalidProgramData,
+    #[msg("ProtocolConfig role addresses must not be the default pubkey")]
+    InvalidProtocolRole,
+    #[msg("ProtocolConfig governance, emergency, and treasury addresses must be distinct")]
+    DuplicateProtocolRole,
+    #[msg("ProtocolConfig version is unsupported; only version 1 is current")]
+    UnsupportedProtocolConfigVersion,
+    #[msg("ProtocolConfig reserved bytes must all be zero")]
+    InvalidProtocolConfigReservedBytes,
+    #[msg("ProtocolConfig token program must be the canonical legacy SPL Token Program")]
+    InvalidProtocolTokenProgram,
+    #[msg("The emergency authority cannot perform this operational-state transition")]
+    InvalidEmergencyStateTransition,
 }

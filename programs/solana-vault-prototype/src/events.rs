@@ -59,3 +59,16 @@ pub struct VaultStateMigrated {
     pub new_version: u8,
     pub operational_state: u8,
 }
+
+#[event]
+pub struct ProtocolConfigInitialized {
+    pub protocol_config: Pubkey,
+    pub initializer: Pubkey,
+    pub protocol_governance_authority: Pubkey,
+    pub emergency_authority: Pubkey,
+    pub treasury: Pubkey,
+    pub token_program: Pubkey,
+    pub slot: u64,
+    pub unix_timestamp: i64,
+    pub version: u8,
+}

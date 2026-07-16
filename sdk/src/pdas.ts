@@ -7,6 +7,8 @@ import {
   VAULT_SEED,
   VAULT_AUTHORITY_SEED,
   USER_POSITION_SEED,
+  PROTOCOL_CONFIG_SEED,
+  BPF_UPGRADEABLE_LOADER_PROGRAM_ID,
 } from "./constants";
 
 export interface PdaResult {
@@ -14,7 +16,10 @@ export interface PdaResult {
   bump: number;
 }
 
-function derive(seeds: (Buffer | Uint8Array)[], programId: PublicKey): PdaResult {
+function derive(
+  seeds: (Buffer | Uint8Array)[],
+  programId: PublicKey
+): PdaResult {
   const [address, bump] = PublicKey.findProgramAddressSync(seeds, programId);
   return { address, bump };
 }
@@ -30,15 +35,34 @@ export function deriveVaultAuthorityPda(vaultState: PublicKey): PdaResult {
 }
 
 /** Per-user share ledger: seeds = ["user_position", vault_state, user]. */
-export function deriveUserPositionPda(vaultState: PublicKey, user: PublicKey): PdaResult {
-  return derive([USER_POSITION_SEED, vaultState.toBuffer(), user.toBuffer()], PROGRAM_ID);
+export function deriveUserPositionPda(
+  vaultState: PublicKey,
+  user: PublicKey
+): PdaResult {
+  return derive(
+    [USER_POSITION_SEED, vaultState.toBuffer(), user.toBuffer()],
+    PROGRAM_ID
+  );
+}
+
+/** Singleton protocol configuration: seeds = ["protocol_config"]. */
+export function deriveProtocolConfigPda(): PdaResult {
+  return derive([PROTOCOL_CONFIG_SEED], PROGRAM_ID);
+}
+
+/** Canonical upgradeable-loader ProgramData account for this program. */
+export function deriveProgramDataPda(): PdaResult {
+  return derive([PROGRAM_ID.toBuffer()], BPF_UPGRADEABLE_LOADER_PROGRAM_ID);
 }
 
 /** Standard Associated Token Account address for (owner, mint). */
-export function deriveAssociatedTokenAddress(owner: PublicKey, mint: PublicKey): PublicKey {
+export function deriveAssociatedTokenAddress(
+  owner: PublicKey,
+  mint: PublicKey
+): PublicKey {
   const [address] = PublicKey.findProgramAddressSync(
     [owner.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(), mint.toBuffer()],
-    ASSOCIATED_TOKEN_PROGRAM_ID,
+    ASSOCIATED_TOKEN_PROGRAM_ID
   );
   return address;
 }
