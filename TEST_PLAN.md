@@ -1,8 +1,8 @@
 # Test Plan
 
-**Status: M21–M25 and all UI/devnet follow-ups are complete through PR #41; M26
-release and operations evidence automation is in review through draft PR #42.
-Pull-request CI remains the publication gate.**
+**Status: M21–M26 and all earlier follow-ups are complete through PR #42. The M26
+Node-24 GitHub Action refresh follow-up is in progress; pull-request CI remains the
+publication gate.**
 
 ## Repository hygiene (complete)
 
@@ -683,7 +683,7 @@ Linux Rust job includes the complete 97-test regression.
 Observed in final PR #41 CI run `29515303554`: the same five jobs passed on the final
 head. GitHub merged PR #41 as `7c62346` on 2026-07-16.
 
-## M26 release and operations evidence automation (in review — PR #42)
+## M26 release and operations evidence automation (complete — PR #42)
 
 - [x] The four checked-in production templates validate only with the explicit
       `--allow-placeholders` mode; ordinary production mode rejects them.
@@ -716,8 +716,23 @@ and whitespace checks passed. Rust audit retained seven allowed upstream warning
 The checksum-verified Windows Gitleaks 8.30.1 binary scanned 123 commits /
 approximately 4.17 MB and reported no leaks. The first parallel WSL `cargo test` link
 hit Ubuntu BFD 2.38's internal `_bfd_merged_section_offset` error; `cargo test -j 1`
-linked the same suite serially and all 97 tests passed. Final-head pull-request CI
-results remain to be recorded.
+linked the same suite serially and all 97 tests passed.
+
+Observed in final PR #42 CI run `29520261971` on commit `7aba3b8`: all seven
+Rust/Anchor, cargo-audit, SDK/manifest/root-audit, dApp, full-history Gitleaks,
+generated-IDL, and deterministic-release-evidence jobs passed. GitHub merged PR #42
+as `03a25d1` on 2026-07-16.
+
+## M26 Node-24 GitHub Action refresh follow-up (in progress)
+
+- [x] Every checkout, cache, setup-node, upload-artifact, and download-artifact use is
+      updated to a current Node-24 major release and pinned to its full commit SHA.
+- [x] No mutable action tag remains in either workflow.
+- [x] Workflow permissions, commands, environment pins, artifact behavior, and job
+      dependencies are unchanged.
+- [x] Both workflow YAML files parse and pass focused Prettier/whitespace checks.
+- [ ] The follow-up PR's final-head CI passes all seven jobs without Node 20
+      runtime-deprecation annotations.
 
 ## Anchor scaffold baseline (complete — M2)
 
