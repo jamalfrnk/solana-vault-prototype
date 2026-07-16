@@ -108,6 +108,10 @@ It does not yet govern ordinary vault initialization or implement MintConfig, ca
 role rotation, or production multisig/timelock configuration. These milestones do not
 approve deployment, legacy asset movement, an audit engagement, mainnet deployment,
 or production custody.
+After M23 merged, a separately scoped devnet/UI follow-up deployed the reviewed binary
+under a new devnet-only program ID and created a fresh v1 UI fixture. The original
+program and both 113-byte vaults remain unchanged for later retirement. This live test
+fixture does not relax any production launch blocker or authorize MintConfig work.
 The project law and work-in-progress limit below still govern every later milestone.
 
 ## Project law

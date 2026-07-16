@@ -6,7 +6,7 @@ resolution = true
 skip-lint = false
 
 [programs.devnet]
-solana_vault_prototype = "FYqCCoAnM9tUYRcSRbeLbUE9LBPv8bN2uyuhcz46pSgq"
+solana_vault_prototype = "HaryVUcfDqxpzFS7JyNe1XuqscFWyYFVAJdYoUX6jEcS"
 
 [provider]
 cluster = "devnet"

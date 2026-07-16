@@ -1,7 +1,15 @@
 import { PublicKey, SystemProgram } from "@solana/web3.js";
 
-/** Deployed vault program (devnet, confirmed M10). */
+/** Current-layout vault program deployed to devnet by the M23 UI follow-up. */
 export const PROGRAM_ID = new PublicKey(
+  "HaryVUcfDqxpzFS7JyNe1XuqscFWyYFVAJdYoUX6jEcS"
+);
+
+/**
+ * Retained M10 deployment. It owns the inventoried 113-byte vaults and must
+ * remain available until their separately reviewed retirement is complete.
+ */
+export const LEGACY_DEVNET_PROGRAM_ID = new PublicKey(
   "FYqCCoAnM9tUYRcSRbeLbUE9LBPv8bN2uyuhcz46pSgq"
 );
 

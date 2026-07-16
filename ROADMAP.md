@@ -31,7 +31,8 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 | 20 | Pre-audit production design ADRs | `[x]` complete |
 | 21 | VaultState v1, deterministic migration, legacy inventory, full IDL layout | `[x]` complete |
 | 22 | Exit-first pause semantics | `[x]` complete |
-| 23 | ProtocolConfig and emergency pause controls | `[~]` awaiting review |
+| 23 | ProtocolConfig and emergency pause controls | `[x]` complete |
+| — | M23 follow-up — isolated devnet v1 deployment + clean UI fixture | `[~]` in review |
 
 ## Milestone 0 — Repository bootstrap (complete)
 
@@ -703,7 +704,7 @@ discriminators, exact 145/81-byte layouts, and both operational-state enums.
 
 Merged through PR #35 as `da15843` on 2026-07-15.
 
-## Milestone 23 — ProtocolConfig and emergency pause controls (awaiting review)
+## Milestone 23 — ProtocolConfig and emergency pause controls (complete)
 
 Implements the next independently safe part of ADRs 0004, 0007, and 0009 on
 `codex/protocol-config-emergency-controls`:
@@ -730,7 +731,39 @@ Rust tests and full warning-denying clippy passed; root typecheck, SDK build, 87
 tests, dApp typecheck/build, and 94 dApp tests passed. The generated-IDL verifier
 confirmed all 11 instruction schemas, all three account discriminators, exact
 145/81/200-byte layouts, and both operational-state enums. Formatting and whitespace
-checks passed. Dependency audit and clean Ubuntu reproduction remain PR CI gates.
+checks passed.
+
+Observed in PR #36 CI run `29471576382`: all five jobs passed, including the
+Rust/Anchor suite, cargo audit, SDK suite and audit, dApp suite and audit, and the full
+generated-IDL verifier. Merged through PR #36 as `7aa260b` on 2026-07-16.
+
+## M23 follow-up — isolated devnet v1 deployment + clean UI fixture (in review)
+
+The merged strict v1 decoder correctly rejects the two public 113-byte legacy vaults.
+This follow-up preserves that fail-closed behavior and makes clean UI testing safe:
+
+- retains the legacy devnet program at
+  `FYqCCoAnM9tUYRcSRbeLbUE9LBPv8bN2uyuhcz46pSgq` so its accounted test assets remain
+  withdrawable under the compatible binary;
+- deploys the reviewed v1 binary separately at
+  `HaryVUcfDqxpzFS7JyNe1XuqscFWyYFVAJdYoUX6jEcS` and records reproducible ProgramData,
+  ProtocolConfig, VaultState, transaction, slot, and SHA-256 evidence;
+- adds explicit program-ID overrides to PDA and inventory helpers, with tests that
+  prevent the legacy and current address spaces from being confused;
+- creates a gitignored, devnet-only Phantom burner with 0.05 SOL, 10,000 test tokens,
+  and an exact 145-byte Active v1 vault for the local UI route on port 3000;
+- verifies the route in a real browser with no load alert or console error and records
+  identical before/after hashes for the legacy program and both legacy vaults.
+
+This does not retire or migrate the legacy accounts, configure production governance,
+authorize mainnet, or make production-readiness claims. Complete public evidence and
+the safe operator workflow are in `docs/DEVNET_V1_DEPLOYMENT.md` and `RUNBOOK.md`.
+
+Observed locally: Anchor/SBF build, warning-denying clippy, all 78 Rust tests, Rust
+audit, root typecheck, 89 SDK tests/build, dApp typecheck/build/94 tests/audit, full
+IDL verification, local documentation-link validation, secret scanning, and
+whitespace checks passed. The root Yarn Classic audit endpoint returned HTTP 410, so
+the existing pull-request CI severity-bitmask audit remains authoritative.
 
 ## Post-MVP Roadmap (candidate pool — implementation requires separate approval)
 

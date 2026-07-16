@@ -3,7 +3,8 @@
 **Status: implemented controls checked through M23; M20 pre-audit target design
 accepted, with its VaultState versioning, exit-first availability, and ProtocolConfig
 emergency-control slices implemented in M21–M23. Remaining target items stay unchecked
-until built, tested, and reviewed.**
+until built, tested, and reviewed. The M23 devnet/UI follow-up deploys only a separate
+test identity and does not satisfy production launch gates.**
 
 Checked items reflect only what is true today. Implementation items remain unchecked
 until the corresponding milestone is implemented and tested. This is an interview-grade
@@ -467,6 +468,9 @@ below are implemented and tested; every unchecked item remains a launch blocker.
 
 - [x] `.gitignore` excludes wallets, keypairs, `.env` values, and build artifacts.
 - [x] No secrets, keypairs, or private RPC URLs are committed.
+- [x] The devnet UI fixture never prints its burner or role private keys; Phantom
+      import uses a local clipboard pipeline from a gitignored keypair file, and only
+      public addresses/transaction evidence are documented.
 - [ ] CI/secret scanning configured (future milestone, if adopted).
 
 ## Deployment claims
@@ -474,3 +478,10 @@ below are implemented and tested; every unchecked item remains a launch blocker.
 - [x] Repository never describes this prototype as audited, production-safe,
       mainnet-ready, formally verified, or secure by default.
 - [x] No mainnet accounts are created, funded, or used.
+- [x] The current-layout devnet binary was deployed under a new program ID instead of
+      upgrading the legacy program. Before/after hashes prove the old executable and
+      both 113-byte vaults remained unchanged; the local SBF hash matches the new
+      on-chain program payload exactly. See `docs/DEVNET_V1_DEPLOYMENT.md`.
+- [x] Devnet-only keypairs, roles, faucet SOL, and browser evidence are never accepted
+      as substitutes for production multisig/timelock, deployment, audit, or launch
+      evidence.

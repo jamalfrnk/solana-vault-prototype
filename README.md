@@ -21,19 +21,18 @@ vault product without building custody logic from zero.
 
 ## Status
 
-**All 14 MVP milestones and post-MVP M15–M22 are merged.** M21's VaultState
-versioning/migration milestone merged through PR #34 and M22's exit-first pause
-semantics through PR #35. M23, the separate ProtocolConfig and emergency-control
-milestone, is in review; see `ROADMAP.md` for the full history.
+**All 14 MVP milestones and post-MVP M15–M23 are merged.** M23's separate
+ProtocolConfig and emergency-control milestone merged through PR #36. A small M23
+devnet/UI follow-up is in review; see `ROADMAP.md` for the full history.
 
-The original lifecycle was confirmed live on Solana devnet: `initialize`, `deposit`,
-`withdraw`, `pause`, and `unpause` (2026-06-26). The M21–M23 binaries, migration,
-ProtocolConfig, and emergency controls are not deployed. A CI pipeline (fmt, build,
-clippy, test, audit) gates every
+The original lifecycle was confirmed live on Solana devnet in June 2026. The reviewed
+M23 binary is now deployed separately at the current-layout devnet address; its
+ProtocolConfig and a fresh 145-byte v1 UI fixture were verified live without upgrading
+the legacy program. A CI pipeline (fmt, build, clippy, test, audit) gates every
 PR. A production-hardening pass closed four MVP-accepted risks and added instruction
 events. A TypeScript SDK (`sdk/`) and a minimal Next.js dApp (`app/`) sit on top of
 the program, both IDL-free and independently testable offline. The current recorded
-suite contains 78 Rust tests, 87 SDK tests, and 94 dApp tests. Current architecture is
+suite contains 78 Rust tests, 89 SDK tests, and 94 dApp tests. Current architecture is
 accepted in ADR 0002; ADRs 0003–0009 define the narrower pre-audit production target.
 M21 implements its account-versioning slice, M22 its exit-first availability slice,
 and M23 the ProtocolConfig/emergency-control slice. Mint/cap governance, role
@@ -108,19 +107,19 @@ production custody.
 
 ## Devnet demonstration
 
-The earlier binary was deployed and executed on **Solana devnet** on 2026-06-26 — program ID
-`FYqCCoAnM9tUYRcSRbeLbUE9LBPv8bN2uyuhcz46pSgq`. `scripts/devnet_demo.ts` creates a
-fresh SPL mint, funds a user ATA, and calls all four instructions in sequence
-against the live cluster; the full transcript and every transaction link are in
-`LEARNING_LOG.md`'s Milestone 10 entry.
+The current 145/81/200-byte M23 binary is deployed on **Solana devnet** at
+`HaryVUcfDqxpzFS7JyNe1XuqscFWyYFVAJdYoUX6jEcS`. Its on-chain bytes match the local
+SBF hash, ProtocolConfig is initialized, and a clean v1 UI fixture is live. Full
+addresses, transaction evidence, hashes, and the legacy non-mutation proof are in
+[`docs/DEVNET_V1_DEPLOYMENT.md`](docs/DEVNET_V1_DEPLOYMENT.md).
 
-To run it yourself (requires a funded devnet keypair at `~/.config/solana/id.json`):
+The earlier M10 program at `FYqCCoAnM9tUYRcSRbeLbUE9LBPv8bN2uyuhcz46pSgq`
+remains unchanged because it owns the two inventoried 113-byte vaults. Never upgrade
+that address before their separately reviewed retirement.
 
-```bash
-anchor build
-anchor deploy --provider.cluster devnet
-npx ts-node scripts/devnet_demo.ts
-```
+For the exact Phantom wallet, mint, local URL, and safe clipboard workflow, follow
+`RUNBOOK.md` section 8. Do not paste or commit a devnet private key in an issue, PR,
+terminal transcript, or chat.
 
 ## SDK
 
@@ -140,7 +139,7 @@ the repo as shown below.
 
 ```bash
 corepack yarn install
-corepack yarn test:sdk    # 87 tests, offline, no RPC, no compiled program
+corepack yarn test:sdk    # 89 tests, offline, no RPC, no compiled program
 corepack yarn typecheck
 corepack yarn sdk:build   # emits sdk/dist/*.js + *.d.ts
 ```
@@ -190,10 +189,10 @@ Two known, deliberate limitations:
   client-side); real enforcement is the on-chain constraint already tested in the
   Rust program.
 
-Manual browser verification (real `next dev`, headless Chromium) confirmed the
-golden path works end to end except an actual wallet-extension-approved transaction,
-which this development environment has no wallet extension or funded keypair to
-exercise — connect a real wallet yourself to complete that check.
+Manual browser verification against the fresh devnet v1 fixture confirmed the vault
+route renders `Active`, deposits/withdrawals enabled, no visible alert, and no console
+error. The dedicated Phantom burner is funded; Malcolm still performs the final
+wallet-extension approval check locally.
 
 ## Development workflow
 
@@ -225,7 +224,7 @@ GitHub, **Code → Codespaces → Create codespace on main**, and wait for
 
 ## Testing strategy
 
-> See `TEST_PLAN.md`. The current suites contain 78 Rust tests, 87 SDK tests, and
+> See `TEST_PLAN.md`. The current suites contain 78 Rust tests, 89 SDK tests, and
 > 94 dApp tests; M23's local Rust/SBF/generated-IDL results are recorded there and PR
 > CI remains the publication gate.
 
@@ -243,11 +242,11 @@ targeted attack scenarios), and event emission.
 
 See `ROADMAP.md` for the full milestone-by-milestone history. M20 accepted the
 production-target decisions; M21 implemented account versioning/migration/inventory,
-M22 implemented exit-first behavior, and M23 implements the singleton ProtocolConfig
-and emergency state transitions only. It does not govern vault initialization, add
-MintConfig/caps, deploy, retire legacy accounts, start an audit, or begin mainnet
-rollout. Each remaining slice starts only after Malcolm separately approves it and the
-preceding branch is reviewed and merged.
+M22 implemented exit-first behavior, and M23 implemented the singleton ProtocolConfig
+and emergency state transitions. The devnet/UI follow-up deploys that reviewed slice
+for testing but does not retire legacy accounts or make production claims. After it
+merges, the next numbered implementation slice is MintConfig, governed initialization,
+and exposure caps; it remains unstarted here.
 
 ## Interview walkthrough
 
