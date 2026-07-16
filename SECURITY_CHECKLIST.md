@@ -1,9 +1,9 @@
 # Security Checklist
 
-**Status: implemented controls checked through M24; M20 pre-audit target design
+**Status: implemented controls checked through M25; M20 pre-audit target design
 accepted, with its VaultState versioning, exit-first availability, and ProtocolConfig
 emergency-control slices implemented in M21–M23 and its MintConfig/exposure slice in
-M24. Remaining target items stay unchecked
+M24 and its exact-excess recovery slice in M25. Remaining target items stay unchecked
 until built, tested, and reviewed. The M23 devnet/UI follow-up deploys only a separate
 test identity and does not satisfy production launch gates.**
 
@@ -179,7 +179,9 @@ instruction (a "donation"), or — combined with the `init_if_needed` fix above 
 custody before `initialize` ever runs. This is a deliberate design decision, not an
 oversight: donations are treated as inert dust. `total_assets` remains the sole
 accounting source of truth for all deposit/withdraw math; the excess sits in custody
-unclaimed until a future feature intentionally reconciles it.
+unclaimed unless M25's separately authorized `sweep_excess` transfers exactly the
+full difference to the configured treasury ATA while the vault is not active.
+Recovery never copies custody into accounting or creates shares.
 
 This deliberately diverges from an external architecture-planning brief that recommended
 a `sync_assets` reconciliation instruction. That was rejected for this pass: a new
@@ -199,7 +201,7 @@ can it be timed to shift share price around a pending deposit or withdrawal. Pro
       price.
       — M12: `test_direct_donation_does_not_skew_second_depositor_share_price`.
 
-## Events (M12/M18/M21/M22/M23/M24)
+## Events (M12/M18/M21/M22/M23/M24/M25)
 
 `VaultInitialized`, `Deposited`, and `Withdrawn` are emitted at the end of their handlers,
 after all state mutation. M18 adds proposal/rotation events; M21 adds
@@ -210,6 +212,9 @@ controls and adds `ProtocolConfigInitialized`, which records every frozen config
 identity plus its initializer, slot, Unix timestamp, and version. M24 adds exact
 MintConfig initialization, proposal, and change events with complete old/new targets,
 authority, slot, Unix timestamp, activation time, and bounded change kind.
+M25 adds `ExcessSwept`, which records the exact deterministic treasury movement,
+configured signer, post-transfer custody balance, unchanged accounting total, slot,
+and Unix timestamp.
 Events are informational only — intended for off-chain indexing and monitoring. They are
 **not** a security boundary: no instruction's correctness depends on an event being
 observed, and emitting an event grants no authority.
@@ -231,6 +236,9 @@ observed, and emitting an event grants no authority.
       — M24: `test_initialize_mint_config_is_exact_disabled_devnet_and_emits_evidence`,
         `test_timelock_rejects_early_and_executes_exact_target_permissionlessly_at_boundary`,
         `test_disable_is_immediate_idempotent_and_cancels_pending_update`.
+- [x] Exact-excess recovery emits a fixed 176-byte asset-movement event and does not
+      use event observation as authorization.
+      — M25: `test_sweep_exit_only_moves_exact_excess_preserves_state_and_emits_exact_event`.
 
 ## Adversarial tests
 
@@ -372,11 +380,11 @@ multisig PDA using the same M16 sigverify-off `invoke_signed` analog.
 - [x] Both instructions emit their events (`PauseAuthorityProposed`, `PauseAuthorityRotated`).
       — M18: `test_rotation_events_emitted`.
 
-## Pre-audit production target (M20 accepted; M21–M24 initial slices implemented)
+## Pre-audit production target (M20 accepted; M21–M25 initial slices implemented)
 
 ADRs 0003–0009 define the reviewed target before further program work. They adapt
 OWASP SCSVS architecture, governance, authorization, external-interaction, business-
-logic, and denial-of-service principles to this Solana program. Checked M21–M24 items
+logic, and denial-of-service principles to this Solana program. Checked M21–M25 items
 below are implemented and tested; every unchecked item remains a launch blocker.
 
 ### Threat boundaries and roles
@@ -466,6 +474,27 @@ below are implemented and tested; every unchecked item remains a launch blocker.
       values within ADR 0007, rollout evidence, and independently verified governance
       addresses. No M24 program/config is deployed by this milestone.
 
+### Exact-excess recovery security (M25)
+
+- [x] Only the canonical ProtocolConfig governance signer may recover excess; pause,
+      emergency, treasury, user, and unsigned callers have no recovery authority.
+- [x] Recovery requires canonical versioned config/vault accounts, the canonical
+      System-owned vault-authority PDA, canonical custody, matching legacy-SPL mint,
+      canonical token program, configured treasury identity, and its existing
+      canonical same-mint ATA.
+- [x] `Active` recovery, zero excess, and custody shortfall fail specifically before
+      CPI. `ExitOnly` and `FullyPaused` recover exactly the complete checked
+      `custody.amount - total_assets` value; callers supply no amount or destination.
+- [x] Success and failed CPI preserve every VaultState byte, ProtocolConfig,
+      MintConfig, positions, `total_assets`, and `total_shares`; only the two validated
+      token balances change on success.
+- [x] Near-`u64::MAX`, destination-overflow rollback, every account substitution,
+      repeat donation/recovery, full user exit, and exact event fields are covered in
+      `test_excess_recovery.rs`.
+- [ ] Deploy and rehearse recovery only after production treasury provisioning,
+      governance thresholds, monitoring, and response evidence are independently
+      approved. M25 source implementation does not satisfy this launch gate.
+
 ### Versioning and migration security (M21)
 
 - [x] Migration is permissionless but value-deterministic: the caller supplies no
@@ -488,7 +517,7 @@ below are implemented and tested; every unchecked item remains a launch blocker.
       freeze-authority-free legacy SPL mint initially plus on-chain deposit/TVL caps.
 - [x] Cap reductions may be immediate, increases are timelocked, and staged rollout
       never exceeds ADR 0007 without new risk approval.
-- [ ] Donations remain excluded from accounting; any `sweep_excess` transfers only the
+- [x] Donations remain excluded from accounting; `sweep_excess` transfers only the
       exact computed excess to the configured same-mint treasury ATA while not active.
 
 ### Upgrade, audit, and launch

@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-07-15
 - **Milestone:** 20 — Pre-Audit Production Design
-- **Implementation status:** Accounting policy is implemented; recovery is not implemented
+- **Implementation status:** Implemented in M25; production deployment and operations remain gated
 
 ## Context
 
@@ -34,7 +34,7 @@ excess = custody.amount.checked_sub(total_assets)
 
 ### Constrained recovery
 
-A later milestone may add `sweep_excess` with this complete authority surface:
+M25 adds `sweep_excess` with this complete authority surface:
 
 - require a supported VaultState and ProtocolConfig version;
 - require canonical vault, authority, custody, mint, legacy token program, protocol
@@ -46,6 +46,11 @@ A later milestone may add `sweep_excess` with this complete authority surface:
 - use the existing validated vault-authority PDA signer seeds;
 - leave `total_assets`, `total_shares`, and every position unchanged;
 - emit vault, mint, treasury, amount, custody balance, and `total_assets` after transfer.
+
+The M25 event additionally records the configured governance signer, slot, and Unix
+timestamp. The treasury ATA must already exist; recovery does not combine asset
+movement with account creation and therefore takes no payer, System Program, or
+Associated Token Program account.
 
 The calculation and transfer occur atomically in one instruction. A concurrently
 submitted donation is either included in the observed balance for that transaction or

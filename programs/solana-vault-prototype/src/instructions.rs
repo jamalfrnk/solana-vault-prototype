@@ -1,4 +1,5 @@
 pub mod deposit;
+pub mod excess;
 pub mod initialize;
 pub mod migrate;
 pub mod mint_config;
@@ -11,6 +12,8 @@ pub mod withdraw;
 // The `handler` name collision is harmless — callers use module-qualified paths.
 #[allow(ambiguous_glob_reexports)]
 pub use deposit::*;
+#[allow(ambiguous_glob_reexports)]
+pub use excess::*;
 #[allow(ambiguous_glob_reexports)]
 pub use initialize::*;
 #[allow(ambiguous_glob_reexports)]

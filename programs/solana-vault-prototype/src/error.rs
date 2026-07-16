@@ -90,4 +90,12 @@ pub enum VaultError {
     TimestampOverflow,
     #[msg("Checked arithmetic overflowed")]
     ArithmeticOverflow,
+    #[msg("Custody balance is below the vault's accounted total assets")]
+    CustodyShortfall,
+    #[msg("Custody contains no recoverable excess")]
+    NoExcessToSweep,
+    #[msg("Excess recovery requires the vault to be ExitOnly or FullyPaused")]
+    ExcessRecoveryRequiresPausedVault,
+    #[msg("Treasury account does not match ProtocolConfig")]
+    InvalidTreasury,
 }

@@ -43,6 +43,10 @@ export enum VaultErrorCode {
   MintConfigUpdateNotReady = 6038,
   TimestampOverflow = 6039,
   ArithmeticOverflow = 6040,
+  CustodyShortfall = 6041,
+  NoExcessToSweep = 6042,
+  ExcessRecoveryRequiresPausedVault = 6043,
+  InvalidTreasury = 6044,
 }
 
 export interface ParsedVaultError {

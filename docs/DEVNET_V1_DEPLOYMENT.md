@@ -4,10 +4,11 @@
 
 **Observed:** 2026-07-16 at confirmed commitment
 
-> **Generation warning (M24):** this manifest proves the deployed M23 binary only.
-> Repository source after M24 adds MintConfig instructions and governed
-> initialize/deposit account contracts that are not present at this address. Do not
-> send M24 builders here or treat the absence of MintConfig as an operator error; a
+> **Generation warning (M24/M25):** this manifest proves the deployed M23 binary only.
+> Repository source after M24/M25 adds MintConfig instructions, governed
+> initialize/deposit account contracts, cap enforcement, and `sweep_excess`; none are
+> present at this address. Do not send M24/M25 builders here or treat the absence of
+> MintConfig as an operator error; a
 > current M24 UI must disable deposits while preserving withdrawal visibility. A new
 > deployment requires its own reviewed manifest and compatible fixture.
 

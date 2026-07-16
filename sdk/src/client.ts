@@ -29,6 +29,7 @@ import {
   buildExecuteMintConfigUpdateIx,
   buildDisableMintIx,
   buildLowerMintCapsIx,
+  buildSweepExcessIx,
 } from "./instructions";
 import {
   fetchProtocolConfig,
@@ -210,6 +211,17 @@ export class VaultClient {
       mint: this.mint,
       maxTotalAssets,
       maxDepositAssetsPerTransaction,
+    });
+  }
+
+  buildSweepExcessIx(
+    protocolGovernanceAuthority: PublicKey,
+    treasury: PublicKey
+  ): TransactionInstruction {
+    return buildSweepExcessIx({
+      protocolGovernanceAuthority,
+      mint: this.mint,
+      treasury,
     });
   }
 

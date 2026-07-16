@@ -3,10 +3,10 @@
 - **Status:** Accepted
 - **Date:** 2026-07-15
 - **Milestone:** 20 — Pre-Audit Production Design
-- **Implementation status:** Partially implemented through M24; the repository now
+- **Implementation status:** Partially implemented through M25; the repository now
   enforces versioning, exit-first gates, separated emergency transitions, governed
   fixed-supply mint approval, delayed risk increases, and deposit exposure caps, while
-  production roles, deployment/manifests, excess recovery, monitoring, rehearsal,
+  production roles, deployment/manifests, monitoring, rehearsal,
   audit, and most launch gates remain unmet
 
 ## Context
@@ -141,7 +141,8 @@ milestones:
 3. ProtocolConfig singleton and emergency state-transition controls (M23).
 4. MintConfig, governed vault initialization, mint policy, and caps (implemented in
    M24; production deployment/values remain gated).
-5. Constrained excess recovery and reconciliation tests.
+5. Constrained excess recovery and reconciliation tests (implemented in M25; no live
+   recovery or deployment).
 6. Verifiable release automation, secret scanning, authority manifests, RPC/monitoring,
    and incident runbook rehearsal.
 7. Audit preparation, external audit, remediation, and verification.

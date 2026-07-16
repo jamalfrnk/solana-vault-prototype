@@ -217,6 +217,21 @@ Security boundary to emphasize: the emergency signer can change only the operati
 state. It cannot transfer custody, upgrade the program, rotate roles, alter mints or
 caps, recover donations, or reopen deposits through these instructions.
 
+### Exact-excess recovery
+
+M25's `sweep_excess` is a separate ProtocolConfig-governance instruction available
+only in `ExitOnly` or `FullyPaused`. It computes
+`custody.amount.checked_sub(total_assets)` and transfers exactly the full positive
+difference to the configured treasury's existing canonical same-mint ATA. The caller
+supplies neither amount nor token-account destination.
+
+The gotcha is that recovery must never become reconciliation. Copying custody into
+`total_assets` would change share price and could be timed around deposits or
+withdrawals. M25 instead leaves every accounting and position byte unchanged. A
+shortfall and zero excess fail specifically; an `Active` vault cannot sweep. The
+outbound CPI reuses the exact vault-authority signer seeds already proven by
+withdrawal, but its destination and amount are independently constrained.
+
 ### Version migration
 
 `migrate_v0_to_v1` has one writable account and no signer. Permissionless execution is
@@ -237,10 +252,10 @@ version 1. It never transfers tokens or reallocates an account.
 
 In-process Solana VM. Load the compiled `.so` via `include_bytes!`, airdrop SOL,
 inject SPL mint and token accounts via `svm.set_account()`, send transactions.
-No external validator. The current program suite contains 89 tests, including 10 raw-
+No external validator. The current program suite contains 97 tests, including 10 raw-
 wire migration/version cases, 8 ProtocolConfig/emergency cases, 11 MintConfig/
-governance/timelock/cap/exit cases, and explicit exit-first gate/transition/event
-coverage.
+governance/timelock/cap/exit cases, 8 exact-excess authority/substitution/arithmetic/
+event/lifecycle cases, and explicit exit-first gate/transition/event coverage.
 
 ### SPL account injection
 

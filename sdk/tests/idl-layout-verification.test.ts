@@ -24,6 +24,7 @@ const instructionNames = [
   "execute_mint_config_update",
   "disable_mint",
   "lower_mint_caps",
+  "sweep_excess",
 ];
 
 const instructionArgs: Record<string, { name: string; type: unknown }[]> = {
@@ -75,6 +76,7 @@ const instructionArgs: Record<string, { name: string; type: unknown }[]> = {
     { name: "max_total_assets", type: "u64" },
     { name: "max_deposit_assets_per_transaction", type: "u64" },
   ],
+  sweep_excess: [],
 };
 
 const eventFields: Record<string, { name: string; type: unknown }[]> = {
@@ -130,6 +132,17 @@ const eventFields: Record<string, { name: string; type: unknown }[]> = {
     { name: "slot", type: "u64" },
     { name: "unix_timestamp", type: "i64" },
     { name: "change_kind", type: "u8" },
+  ],
+  ExcessSwept: [
+    { name: "vault", type: "pubkey" },
+    { name: "mint", type: "pubkey" },
+    { name: "treasury", type: "pubkey" },
+    { name: "authority", type: "pubkey" },
+    { name: "amount", type: "u64" },
+    { name: "custody_balance", type: "u64" },
+    { name: "total_assets", type: "u64" },
+    { name: "slot", type: "u64" },
+    { name: "unix_timestamp", type: "i64" },
   ],
 };
 
@@ -362,5 +375,17 @@ describe("full IDL account-layout verification", () => {
     expect(errors).to.match(/MintConfig.*reserved|field.*13|160|size/i);
     expect(errors).to.match(/RolloutStage/i);
     expect(errors).to.match(/event MintConfigChanged/i);
+  });
+
+  it("rejects exact-excess instruction or event drift", () => {
+    const idl = validIdl() as any;
+    idl.instructions.find((entry: any) => entry.name === "sweep_excess").args =
+      [{ name: "amount", type: "u64" }];
+    idl.types.find(
+      (entry: any) => entry.name === "ExcessSwept"
+    ).type.fields[4].name = "requested_amount";
+    const errors = verifyIdlDocument(idl).join("\n");
+    expect(errors).to.match(/instruction sweep_excess.*expected 0 args/i);
+    expect(errors).to.match(/event ExcessSwept/i);
   });
 });

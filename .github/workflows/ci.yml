@@ -163,7 +163,7 @@ jobs:
         run: npm --prefix app audit --audit-level=high
 
   idl-verify:
-    name: IDL instruction + account layout verification (M24)
+    name: IDL instruction + account layout verification (M25)
     runs-on: ubuntu-latest
     needs: build-and-test
     steps:

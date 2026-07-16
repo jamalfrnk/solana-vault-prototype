@@ -34,6 +34,7 @@ import {
   buildExecuteMintConfigUpdateIx,
   buildDisableMintIx,
   buildLowerMintCapsIx,
+  buildSweepExcessIx,
 } from "../src/instructions";
 import { VaultClient } from "../src/client";
 import { Connection } from "@solana/web3.js";
@@ -487,6 +488,38 @@ describe("instructions", () => {
     });
   });
 
+  describe("buildSweepExcessIx", () => {
+    const governance = randomPubkey();
+    const mint = randomPubkey();
+    const treasury = randomPubkey();
+    const protocolConfig = deriveProtocolConfigPda();
+    const vault = deriveVaultStatePda(mint);
+    const vaultAuthority = deriveVaultAuthorityPda(vault.address);
+    const custody = deriveAssociatedTokenAddress(vaultAuthority.address, mint);
+    const treasuryTokenAccount = deriveAssociatedTokenAddress(treasury, mint);
+
+    it("has the exact no-argument nine-account recovery contract", () => {
+      const ix = buildSweepExcessIx({
+        protocolGovernanceAuthority: governance,
+        mint,
+        treasury,
+      });
+      assertKeys(ix.keys, [
+        { pubkey: governance, isSigner: true, isWritable: false },
+        { pubkey: protocolConfig.address, isSigner: false, isWritable: false },
+        { pubkey: vault.address, isSigner: false, isWritable: false },
+        { pubkey: vaultAuthority.address, isSigner: false, isWritable: false },
+        { pubkey: custody, isSigner: false, isWritable: true },
+        { pubkey: treasury, isSigner: false, isWritable: false },
+        { pubkey: treasuryTokenAccount, isSigner: false, isWritable: true },
+        { pubkey: mint, isSigner: false, isWritable: false },
+        { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+      ]);
+      expect(ix.data).to.have.lengthOf(8);
+      expect(ix.data).to.deep.equal(instructionDiscriminator("sweep_excess"));
+    });
+  });
+
   describe("VaultClient delegation", () => {
     const connection = new Connection("http://localhost:8899");
     const mint = randomPubkey();
@@ -598,6 +631,26 @@ describe("instructions", () => {
       ).to.have.lengthOf(3);
     });
 
+    it("delegates exact-excess recovery without an amount or token-account destination", () => {
+      const governance = randomPubkey();
+      const treasury = randomPubkey();
+      const viaClient = client.buildSweepExcessIx(governance, treasury);
+      const direct = buildSweepExcessIx({
+        protocolGovernanceAuthority: governance,
+        mint,
+        treasury,
+      });
+      expect(viaClient.data.equals(direct.data)).to.equal(true);
+      assertKeys(
+        viaClient.keys,
+        direct.keys.map((key) => ({
+          pubkey: key.pubkey,
+          isSigner: key.isSigner,
+          isWritable: key.isWritable,
+        }))
+      );
+    });
+
     it("delegates ProtocolConfig bootstrap and emergency controls", () => {
       const payer = randomPubkey();
       const upgradeAuthority = randomPubkey();
@@ -651,7 +704,7 @@ describe("instructions", () => {
     });
   });
 
-  it("all sixteen instructions have pairwise-distinct data discriminators", () => {
+  it("all seventeen instructions have pairwise-distinct data discriminators", () => {
     const mint = randomPubkey();
     const user = randomPubkey();
     const pauseAuthority = randomPubkey();
@@ -719,6 +772,11 @@ describe("instructions", () => {
         mint,
         maxTotalAssets: 5n,
         maxDepositAssetsPerTransaction: 1n,
+      }),
+      buildSweepExcessIx({
+        protocolGovernanceAuthority: user,
+        mint,
+        treasury: randomPubkey(),
       }),
     ];
     const prefixes = ixs.map((ix) => ix.data.subarray(0, 8).toString("hex"));

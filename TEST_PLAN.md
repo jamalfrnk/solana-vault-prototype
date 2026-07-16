@@ -1,9 +1,8 @@
 # Test Plan
 
-**Status: M21–M23 and all UI/devnet follow-ups are complete through PR #39; M24
-MintConfig, governed initialization, and exposure caps are in review — 89 Rust tests,
-112 SDK tests, and 122 dApp tests. Desktop and narrow-viewport browser behavior is
-observed; pull-request CI remains the publication gate.**
+**Status: M21–M24 and all UI/devnet follow-ups are complete through PR #40; M25
+constrained exact-excess recovery is in progress — 97 Rust tests, 117 SDK tests, and
+122 dApp tests. Pull-request CI remains the publication gate.**
 
 ## Repository hygiene (complete)
 
@@ -305,11 +304,11 @@ complete by this design milestone:
       (M23);
 - [x] MintConfig PDA, governed vault initialization, mint authority, cap
       decrease/increase authority, and cap-boundary cases;
-- [ ] exact-excess recovery, shortfall, treasury substitution, state, CPI, donation,
+- [x] exact-excess recovery, shortfall, treasury substitution, state, CPI, donation,
       and accounting-preservation cases;
 - [x] full IDL account field-order/type verification, instruction argument schemas,
       both operational enums, and SDK decoder compatibility against synthetic fixtures
-      (M21–M24; real generated IDL verified locally for M24 and in earlier CI);
+      (M21–M25; real generated IDL verified locally for M25 and in earlier CI);
 - [ ] deployment-manifest, verifiable-build, authority, monitoring, RPC-failover, load,
       reconciliation, and incident-drill evidence.
 
@@ -578,7 +577,7 @@ Observed in PR #39 CI run `29497391680`: all five Rust/Anchor, cargo-audit, SDK,
 dApp, and generated-IDL jobs passed. GitHub merged PR #39 as `332807c` on
 2026-07-16.
 
-## M24 MintConfig, governed initialization, and exposure caps (in review)
+## M24 MintConfig, governed initialization, and exposure caps (complete — PR #40)
 
 All new on-chain lifecycle and boundary cases are in `tests/test_mint_config.rs`;
 existing suites use exact synthetic version-1 config fixtures only to preserve their
@@ -628,6 +627,48 @@ retained the known non-fatal jsdom canvas warning.
 Observed in initial PR #40 CI run `29506354190` on commit `cbc832c`: all five
 Rust/Anchor, cargo-audit, SDK/root-audit, dApp, and generated-M24-IDL jobs passed, and
 GitHub reported the draft PR mergeable.
+
+Observed in final PR #40 CI run `29506690101`: all five jobs passed on the final head.
+GitHub merged PR #40 as `efa00c6` on 2026-07-16.
+
+## M25 constrained exact-excess recovery (in progress)
+
+All new on-chain authorization, arithmetic, atomicity, and lifecycle cases are in
+`tests/test_excess_recovery.rs`. The SDK and generated-IDL cases remain offline and
+exercise the exact no-argument wire contract.
+
+- [x] Only ProtocolConfig governance can invoke `sweep_excess`, and only while the
+      canonical version-1 vault is `ExitOnly` or `FullyPaused`.
+- [x] The handler computes the entire checked `custody.amount - total_assets`
+      difference on-chain and accepts no caller-selected amount.
+- [x] Zero excess and custody shortfall return distinct errors without token movement
+      or persistent-state mutation.
+- [x] The only destination is the configured treasury's existing canonical same-mint
+      legacy-SPL ATA; no payer, System Program, or Associated Token Program is accepted.
+- [x] Wrong governance, malformed ProtocolConfig fields, unsupported VaultState
+      version, foreign-owned vault authority, and every substituted account identity
+      fail before authorized movement.
+- [x] Near-`u64::MAX` excess transfers exactly, and a destination overflow in the token
+      CPI rolls the entire transaction back atomically.
+- [x] A later donation can be swept by a second call, after which the user's full
+      accounted withdrawal still succeeds and all accounting remains unchanged by
+      recovery.
+- [x] `ExcessSwept` serializes to exactly 176 bytes and records vault, mint, treasury,
+      governance authority, amount, post-sweep custody balance, accounted assets, slot,
+      and Unix timestamp.
+- [x] The SDK exposes a no-argument builder/client surface with the exact nine-account
+      order, all four M25 errors, and golden instruction/event discriminators.
+- [x] Generated-IDL verification covers all 17 instruction schemas, four unchanged
+      persistent-account layouts, bounded enums, and the exact M25 event layout.
+- [x] No persistent account, migration, dApp privileged control, deployment, upgrade,
+      treasury provisioning, devnet mutation, or live asset movement is included.
+
+Observed locally so far (2026-07-16): `anchor build --ignore-keys` completed without an
+SBF stack warning; all eight focused recovery tests passed; root typecheck, SDK build,
+all 117 SDK tests, and generated-IDL verification exited 0. The verifier confirmed all
+17 instruction schemas, four exact unchanged account layouts, bounded enums, M24
+events, and the fixed 176-byte M25 event. Full regression and audit evidence will be
+recorded before publication.
 
 ## Anchor scaffold baseline (complete — M2)
 

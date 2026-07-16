@@ -456,3 +456,40 @@ export function buildLowerMintCapsIx(
     ),
   });
 }
+
+export interface SweepExcessIxParams {
+  protocolGovernanceAuthority: PublicKey;
+  mint: PublicKey;
+  treasury: PublicKey;
+}
+
+/**
+ * M25: transfers the complete on-chain-computed custody excess to the
+ * configured treasury's canonical same-mint ATA. There is deliberately no
+ * amount or caller-selected token-account destination.
+ */
+export function buildSweepExcessIx(
+  p: SweepExcessIxParams
+): TransactionInstruction {
+  const protocolConfig = deriveProtocolConfigPda();
+  const vaultState = deriveVaultStatePda(p.mint);
+  const vaultAuthority = deriveVaultAuthorityPda(vaultState.address);
+  const custody = deriveAssociatedTokenAddress(vaultAuthority.address, p.mint);
+  const treasuryTokenAccount = deriveAssociatedTokenAddress(p.treasury, p.mint);
+
+  return new TransactionInstruction({
+    programId: PROGRAM_ID,
+    keys: [
+      meta(p.protocolGovernanceAuthority, true, false),
+      meta(protocolConfig.address, false, false),
+      meta(vaultState.address, false, false),
+      meta(vaultAuthority.address, false, false),
+      meta(custody, false, true),
+      meta(p.treasury, false, false),
+      meta(treasuryTokenAccount, false, true),
+      meta(p.mint, false, false),
+      meta(TOKEN_PROGRAM_ID, false, false),
+    ],
+    data: instructionDiscriminator("sweep_excess"),
+  });
+}
