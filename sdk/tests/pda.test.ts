@@ -8,12 +8,16 @@ import {
   VAULT_SEED,
   VAULT_AUTHORITY_SEED,
   USER_POSITION_SEED,
+  PROTOCOL_CONFIG_SEED,
+  BPF_UPGRADEABLE_LOADER_PROGRAM_ID,
 } from "../src/constants";
 import {
   deriveVaultStatePda,
   deriveVaultAuthorityPda,
   deriveUserPositionPda,
   deriveAssociatedTokenAddress,
+  deriveProtocolConfigPda,
+  deriveProgramDataPda,
 } from "../src/pdas";
 
 function randomPubkey(): PublicKey {
@@ -21,6 +25,28 @@ function randomPubkey(): PublicKey {
 }
 
 describe("pdas", () => {
+  describe("deriveProtocolConfigPda / deriveProgramDataPda", () => {
+    it("matches the singleton protocol-config derivation", () => {
+      const [expected, bump] = PublicKey.findProgramAddressSync(
+        [PROTOCOL_CONFIG_SEED],
+        PROGRAM_ID
+      );
+      const actual = deriveProtocolConfigPda();
+      expect(actual.address.equals(expected)).to.equal(true);
+      expect(actual.bump).to.equal(bump);
+    });
+
+    it("matches the canonical upgradeable-loader ProgramData derivation", () => {
+      const [expected, bump] = PublicKey.findProgramAddressSync(
+        [PROGRAM_ID.toBuffer()],
+        BPF_UPGRADEABLE_LOADER_PROGRAM_ID
+      );
+      const actual = deriveProgramDataPda();
+      expect(actual.address.equals(expected)).to.equal(true);
+      expect(actual.bump).to.equal(bump);
+    });
+  });
+
   describe("deriveVaultStatePda", () => {
     it("is deterministic", () => {
       const mint = randomPubkey();
@@ -40,7 +66,7 @@ describe("pdas", () => {
       const mint = randomPubkey();
       const [expected, expectedBump] = PublicKey.findProgramAddressSync(
         [VAULT_SEED, mint.toBuffer()],
-        PROGRAM_ID,
+        PROGRAM_ID
       );
       const result = deriveVaultStatePda(mint);
       expect(result.address.toBase58()).to.equal(expected.toBase58());
@@ -53,11 +79,13 @@ describe("pdas", () => {
       const mint = randomPubkey();
       const vaultState = deriveVaultStatePda(mint);
       const authority = deriveVaultAuthorityPda(vaultState.address);
-      expect(authority.address.toBase58()).to.not.equal(vaultState.address.toBase58());
+      expect(authority.address.toBase58()).to.not.equal(
+        vaultState.address.toBase58()
+      );
 
       const [expected, expectedBump] = PublicKey.findProgramAddressSync(
         [VAULT_AUTHORITY_SEED, vaultState.address.toBuffer()],
-        PROGRAM_ID,
+        PROGRAM_ID
       );
       expect(authority.address.toBase58()).to.equal(expected.toBase58());
       expect(authority.bump).to.equal(expectedBump);
@@ -68,7 +96,9 @@ describe("pdas", () => {
       const vaultStateB = deriveVaultStatePda(randomPubkey());
       const authorityA = deriveVaultAuthorityPda(vaultStateA.address);
       const authorityB = deriveVaultAuthorityPda(vaultStateB.address);
-      expect(authorityA.address.toBase58()).to.not.equal(authorityB.address.toBase58());
+      expect(authorityA.address.toBase58()).to.not.equal(
+        authorityB.address.toBase58()
+      );
     });
   });
 
@@ -84,7 +114,9 @@ describe("pdas", () => {
 
       const otherVaultState = deriveVaultStatePda(randomPubkey()).address;
       const posAOtherVault = deriveUserPositionPda(otherVaultState, userA);
-      expect(posA.address.toBase58()).to.not.equal(posAOtherVault.address.toBase58());
+      expect(posA.address.toBase58()).to.not.equal(
+        posAOtherVault.address.toBase58()
+      );
     });
 
     it("matches an independent findProgramAddressSync call", () => {
@@ -92,7 +124,7 @@ describe("pdas", () => {
       const user = randomPubkey();
       const [expected, expectedBump] = PublicKey.findProgramAddressSync(
         [USER_POSITION_SEED, vaultState.toBuffer(), user.toBuffer()],
-        PROGRAM_ID,
+        PROGRAM_ID
       );
       const result = deriveUserPositionPda(vaultState, user);
       expect(result.address.toBase58()).to.equal(expected.toBase58());
@@ -106,7 +138,7 @@ describe("pdas", () => {
       const mint = randomPubkey();
       const [expected] = PublicKey.findProgramAddressSync(
         [owner.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(), mint.toBuffer()],
-        ASSOCIATED_TOKEN_PROGRAM_ID,
+        ASSOCIATED_TOKEN_PROGRAM_ID
       );
       const result = deriveAssociatedTokenAddress(owner, mint);
       expect(result.toBase58()).to.equal(expected.toBase58());

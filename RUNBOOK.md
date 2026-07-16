@@ -111,7 +111,7 @@ solana-vault-prototype/
 │
 ├── programs/solana-vault-prototype/src/
 │   ├── lib.rs                    ← program entry point, declare_id!
-│   ├── state.rs                  ← VaultState + UserPosition structs
+│   ├── state.rs                  ← VaultState + UserPosition + ProtocolConfig structs
 │   ├── constants.rs              ← PDA seed byte constants
 │   ├── error.rs                  ← VaultError codes
 │   ├── instructions.rs           ← glob re-exports for Anchor macro
@@ -120,6 +120,7 @@ solana-vault-prototype/
 │       ├── deposit.rs            ← deposit instruction (M5)
 │       ├── withdraw.rs           ← withdraw instruction (M6)
 │       ├── pause.rs              ← exit-first pause / unpause controls (M7/M21/M22)
+│       ├── protocol.rs           ← config bootstrap + emergency controls (M23)
 │       ├── rotate.rs             ← two-step authority rotation (M18)
 │       └── migrate.rs            ← exact-size VaultState v0 → v1 migration (M21)
 │
@@ -129,7 +130,8 @@ solana-vault-prototype/
 │   ├── test_withdraw.rs          ← 7 tests (full, partial, principal, zero, excess, wrong user, paused)
 │   ├── test_pause.rs             ← 5 tests (set, clear, idempotent, wrong authority ×2)
 │   ├── test_adversarial.rs       ← substitution, ownership, arithmetic, and donation cases
-│   └── test_migration.rs         ← 10 independent raw-wire migration/version cases
+│   ├── test_migration.rs         ← 10 independent raw-wire migration/version cases
+│   └── test_protocol.rs          ← 8 config/bootstrap/emergency-control cases
 │
 ├── scripts/
 │   ├── devnet_demo.ts            ← end-to-end devnet lifecycle demo
@@ -181,10 +183,10 @@ file is what gets deployed to devnet or loaded by the LiteSVM test harness.
 cargo test
 ```
 
-All 70 tests must pass. Expected output (abbreviated):
+All 78 tests must pass. Expected output (abbreviated):
 
 ```
-running 70 tests across the program test targets
+running 78 tests across the program test targets
 test test_id ... ok
 test test_vault_initialize_creates_correct_state ... ok
 test test_pause_sets_exit_only ... ok
@@ -230,6 +232,7 @@ derived it can sign on its behalf.
 | `vault_state` | `["vault", mint]` | Vault configuration + share accounting |
 | `vault_authority` | `["vault_authority", vault_state]` | Owns the custody ATA; signs withdrawals |
 | `user_position` | `["user_position", vault_state, user]` | Per-user share ledger |
+| `protocol_config` | `["protocol_config"]` | Singleton protocol roles and canonical token program |
 
 **Why chain `vault_authority` off `vault_state`?** Two different mints produce two
 different `vault_state` addresses, which produce two different `vault_authority`
@@ -259,6 +262,25 @@ possible.
 > pre-M18 113-byte accounts cannot be resized in place. Account allocation is
 > compiler-derived with Anchor's `InitSpace`; do not substitute Rust's aligned
 > in-memory `sizeof` for the Borsh size.
+
+### ProtocolConfig account layout (200 bytes on the wire)
+
+```
+8  bytes  — Anchor discriminator
+1  byte   — version (exactly 1)
+1  byte   — canonical protocol_config PDA bump
+32 bytes  — protocol_governance_authority
+32 bytes  — emergency_authority
+32 bytes  — treasury
+32 bytes  — canonical legacy SPL token_program
+62 bytes  — reserved (must be all zero)
+= 200 bytes (Borsh wire size)
+```
+
+The three role addresses must be non-default and pairwise distinct. The account has no
+M23 mutation or rotation instruction. Do not initialize it with temporary production
+roles: bootstrap is a one-time transaction and M23 deliberately chooses no live
+addresses.
 
 ### Custody token account
 
@@ -307,18 +329,44 @@ Uninitialized
      ▼                │
  ExitOnly ────────────
 
- FullyPaused  (fail-closed; no accepted M22 transition)
+ Any valid state ── emergency_pause ──► FullyPaused
+ FullyPaused ── emergency_resume ──► ExitOnly
 ```
 
 `deposit` is available only in `Active`. `withdraw` is available in both `Active` and
 `ExitOnly`, so the default incident response stops new exposure without trapping users.
-`FullyPaused` blocks both paths and is encoded fail-closed, but no instruction may enter
-or leave it until the stronger `ProtocolConfig` emergency authority is implemented.
+`FullyPaused` blocks both paths. Only the ProtocolConfig emergency authority may enter
+it or recover first to `ExitOnly`; emergency recovery can never reopen deposits.
 `initialize` runs exactly once, regardless of pause state.
 
 ---
 
 ## 7. Vault instructions — what each one does
+
+### `initialize_protocol_config` (M23)
+
+**File:** [programs/solana-vault-prototype/src/instructions/protocol.rs](programs/solana-vault-prototype/src/instructions/protocol.rs)
+
+Creates the singleton once. The transaction must include this executable program, its
+canonical upgradeable-loader ProgramData account, and the current upgrade-authority
+signer. This prevents an arbitrary first caller from assigning protocol roles.
+
+Before any future live bootstrap, independently verify the program ID, ProgramData
+address, current upgrade authority, all three distinct governance addresses, and the
+canonical legacy SPL Token Program. M23 does not authorize or execute that transaction.
+
+### `emergency_pause` / `emergency_resume` (M23)
+
+Both require the canonical version-1 ProtocolConfig, its configured emergency signer,
+and the canonical version-1 vault. `emergency_pause` ends in `FullyPaused` from any
+valid state. `emergency_resume` ends in `ExitOnly` from `FullyPaused` or `ExitOnly` and
+rejects `Active`. Each call emits the same bounded, timestamped
+`OperationalStateChanged` evidence as ordinary controls.
+
+These are exceptional governance transactions, not frontend controls. Use
+`emergency_pause` only when the withdrawal/custody path itself is plausibly unsafe.
+After remediation, verify invariants before `emergency_resume`; then verify safe exits
+in `ExitOnly`. Reopening deposits remains a separate ordinary `unpause` decision.
 
 ### `initialize`
 
@@ -424,9 +472,10 @@ already set.
 
 For an ordinary deposit-path, cap, RPC, frontend, or monitoring incident, call `pause`
 with the narrowest applicable reason and verify both the event and a successful safe
-withdrawal probe. Do not represent `ExitOnly` as a complete halt. M22 provides no
-accepted full-pause transaction; if the withdrawal/custody path itself appears unsafe,
-follow the incident-escalation policy and do not invent or reuse a weaker authority.
+withdrawal probe. Do not represent `ExitOnly` as a complete halt. If the
+withdrawal/custody path itself appears unsafe, escalate to the separate ProtocolConfig
+emergency authority and preserve the reason/event evidence; never reuse the ordinary
+pause key as an emergency signer.
 
 ---
 
@@ -639,7 +688,7 @@ cargo fmt --all -- --check
 # 2. Build program and generated IDL (must exit 0, zero warnings)
 anchor build --ignore-keys
 
-# 3. Rust checks (all 70 tests must pass)
+# 3. Rust checks (all 78 tests must pass)
 cargo clippy --all-targets --all-features -- -D warnings
 cargo test
 

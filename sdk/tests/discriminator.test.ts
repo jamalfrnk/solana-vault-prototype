@@ -1,6 +1,9 @@
 import { expect } from "chai";
 
-import { instructionDiscriminator, accountDiscriminator } from "../src/discriminator";
+import {
+  instructionDiscriminator,
+  accountDiscriminator,
+} from "../src/discriminator";
 
 // Golden values: sha256(`global:${name}`).subarray(0, 8) / sha256(`account:${Name}`).subarray(0, 8),
 // per Anchor's actual codegen (single-colon "namespace:name" preimage). Regression pins —
@@ -12,16 +15,22 @@ const GOLDEN_INSTRUCTION_DISCRIMINATORS: Record<string, string> = {
   withdraw: "b712469c946da122",
   pause: "d316ddfb4a79c12f",
   unpause: "a99004260a8dbcff",
+  initialize_protocol_config: "1c322be9f4627b76",
+  emergency_pause: "158f1b8ec8b5d2ff",
+  emergency_resume: "00f330b90649be53",
 };
 
 const GOLDEN_ACCOUNT_DISCRIMINATORS: Record<string, string> = {
   VaultState: "e4c452a562d2eb98",
   UserPosition: "fbf8d1f553ea111b",
+  ProtocolConfig: "cf5bfa1c98b3d7d1",
 };
 
 describe("discriminator", () => {
   describe("instructionDiscriminator", () => {
-    for (const [name, hex] of Object.entries(GOLDEN_INSTRUCTION_DISCRIMINATORS)) {
+    for (const [name, hex] of Object.entries(
+      GOLDEN_INSTRUCTION_DISCRIMINATORS
+    )) {
       it(`matches the golden value for "${name}"`, () => {
         expect(instructionDiscriminator(name).toString("hex")).to.equal(hex);
       });
@@ -33,13 +42,13 @@ describe("discriminator", () => {
 
     it("is deterministic", () => {
       expect(instructionDiscriminator("deposit").toString("hex")).to.equal(
-        instructionDiscriminator("deposit").toString("hex"),
+        instructionDiscriminator("deposit").toString("hex")
       );
     });
 
-    it("is pairwise distinct across all five vault instructions", () => {
-      const values = Object.keys(GOLDEN_INSTRUCTION_DISCRIMINATORS).map((name) =>
-        instructionDiscriminator(name).toString("hex"),
+    it("is pairwise distinct across all pinned vault instructions", () => {
+      const values = Object.keys(GOLDEN_INSTRUCTION_DISCRIMINATORS).map(
+        (name) => instructionDiscriminator(name).toString("hex")
       );
       expect(new Set(values).size).to.equal(values.length);
     });

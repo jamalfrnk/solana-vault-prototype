@@ -34,6 +34,7 @@ solana-account = "3.4.0"
 solana-pubkey = { version = "4.0.0", features = ["curve25519"] }
 solana-clock = "3.0.0"
 base64 = "0.22.1"
+bincode = "1.3.3"
 
 
 [lints.rust]

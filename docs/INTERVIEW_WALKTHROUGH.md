@@ -23,13 +23,14 @@ Key points to hit:
 
 ## 2 — The account model
 
-### Three PDAs
+### Four PDAs
 
 | PDA | Seeds | Purpose |
 |-----|-------|---------|
 | `vault_state` | `["vault", mint]` | Vault configuration + accounting |
 | `vault_authority` | `["vault_authority", vault_state]` | Owns the custody ATA; signs withdrawals |
 | `user_position` | `["user_position", vault_state, user]` | Per-user share ledger |
+| `protocol_config` | `["protocol_config"]` | Singleton protocol roles and canonical token program |
 
 **Why chain `vault_authority` off `vault_state`?**
 Prevents seed collision: two different mints produce two different `vault_state`
@@ -57,6 +58,16 @@ at 145 bytes: byte 90 is the `OperationalState` enum, byte 123 is version 1, and
 last 21 bytes are zero reserved space. Exact 145-byte v0 accounts migrate in place;
 pre-M18 113-byte accounts cannot and must be drained/reconciled/retired.
 
+### ProtocolConfig layout (200 bytes Borsh)
+
+M23 freezes a separate singleton with version and bump bytes, three distinct 32-byte
+roles (protocol governance, emergency, treasury), the canonical legacy SPL Token
+Program, and 62 zero reserved bytes. Its one-time bootstrap requires the live
+program's current upgrade authority through the canonical upgradeable-loader
+ProgramData account. The gotcha is first-caller takeover: a permissionless singleton
+initializer would let an attacker assign themselves emergency authority before the
+intended operator.
+
 ---
 
 ## 3 — Initialize
@@ -73,8 +84,8 @@ ATA in one atomic transaction. Stores both bumps, the mint pubkey, and the
 ```rust
 constraint = pause_authority.key() != payer.key() @ VaultError::Unauthorized
 ```
-This on-chain constraint forces the deployer to specify a separate pause authority —
-a hot wallet cannot be both deployment payer and emergency pause control.
+This on-chain constraint forces the deployer to specify a separate ordinary pause
+authority — a hot wallet cannot be both deployment payer and pause control.
 
 **Security detail:** The custody ATA address is deterministic and public, so any party
 can pre-create it before `initialize` runs. M12 changed the account constraint to
@@ -163,13 +174,26 @@ the intended ordinary state is already set.
 
 M22 implements exit-first behavior: `pause` writes `ExitOnly`, which blocks deposits
 while preserving valid withdrawals; `unpause` returns to `Active`. `FullyPaused` blocks
-both paths, but the ordinary pause authority cannot alter it. The future versioned
-`ProtocolConfig` must supply the stronger authority for entering `FullyPaused` and
-recovering first to `ExitOnly`; M22 intentionally does not invent a temporary path.
+both paths, but the ordinary pause authority cannot alter it. M23's versioned
+`ProtocolConfig` supplies the stronger authority for entering `FullyPaused` and
+recovering first to `ExitOnly`. Emergency recovery deliberately cannot return directly
+to `Active`, so reopening deposits still requires the separate ordinary authority.
 
 Each accepted pause/unpause carries one of four bounded reason codes and emits
 `OperationalStateChanged` with previous/new state, signing authority, Clock slot, Unix
 timestamp, and reason. Arbitrary incident text stays off-chain.
+
+### Protocol bootstrap / emergency controls
+
+`initialize_protocol_config` validates this executable program, its canonical
+ProgramData, and the current upgrade-authority signer before creating the singleton.
+`emergency_pause` moves any valid state to `FullyPaused`; `emergency_resume` moves
+`FullyPaused` or `ExitOnly` to `ExitOnly` and rejects `Active`. Both validate the
+canonical version-1 config and vault and reuse the exact bounded, timestamped event.
+
+Security boundary to emphasize: the emergency signer can change only the operational
+state. It cannot transfer custody, upgrade the program, rotate roles, alter mints or
+caps, recover donations, or reopen deposits through these instructions.
 
 ### Version migration
 
@@ -191,8 +215,9 @@ version 1. It never transfers tokens or reallocates an account.
 
 In-process Solana VM. Load the compiled `.so` via `include_bytes!`, airdrop SOL,
 inject SPL mint and token accounts via `svm.set_account()`, send transactions.
-No external validator. The current program suite contains 70 tests, including 10 raw-
-wire migration/version cases and explicit exit-first gate/transition/event coverage.
+No external validator. The current program suite contains 78 tests, including 10 raw-
+wire migration/version cases, 8 ProtocolConfig/emergency cases, and explicit exit-first
+gate/transition/event coverage.
 
 ### SPL account injection
 

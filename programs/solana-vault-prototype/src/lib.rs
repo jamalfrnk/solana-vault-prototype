@@ -58,4 +58,32 @@ pub mod solana_vault_prototype {
     pub fn migrate_v0_to_v1(ctx: Context<MigrateV0ToV1>) -> Result<()> {
         migrate::handler(ctx)
     }
+
+    pub fn initialize_protocol_config(
+        ctx: Context<InitializeProtocolConfig>,
+        protocol_governance_authority: Pubkey,
+        emergency_authority: Pubkey,
+        treasury: Pubkey,
+    ) -> Result<()> {
+        protocol::initialize_handler(
+            ctx,
+            protocol_governance_authority,
+            emergency_authority,
+            treasury,
+        )
+    }
+
+    pub fn emergency_pause(
+        ctx: Context<EmergencyControl>,
+        reason: OperationalStateReason,
+    ) -> Result<()> {
+        protocol::emergency_pause_handler(ctx, reason)
+    }
+
+    pub fn emergency_resume(
+        ctx: Context<EmergencyControl>,
+        reason: OperationalStateReason,
+    ) -> Result<()> {
+        protocol::emergency_resume_handler(ctx, reason)
+    }
 }

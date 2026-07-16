@@ -1,11 +1,10 @@
 # Test Plan
 
-**Status: M20 complete (PR #33, merged 2026-07-15); M21 VaultState versioning
-in review — 66 Rust tests (56 through M18 + 10 migration/version-gate tests),
-68 SDK tests (53 through the M18/M19 follow-up + 15 strict decode, migration
-builder/client, inventory, and full synthetic IDL-layout cases), and 90 dApp tests. Rust
-execution and the real generated-IDL verifier passed in initial PR CI run 29461693429;
-the SDK and dApp suites are also observed green locally and in that run.**
+**Status: M21 and M22 are complete through PRs #34/#35; M23 ProtocolConfig and
+emergency controls are in review — 78 Rust tests, 87 SDK tests, and 94 dApp tests.
+The pinned local Anchor/SBF build, all Rust/SDK/dApp suites, clippy, SDK build,
+typechecks, and generated-IDL verifier are observed green for M23; pull-request CI
+remains the publication and dependency-audit gate.**
 
 ## Repository hygiene (complete)
 
@@ -299,15 +298,19 @@ complete by this design milestone:
       unsupported version, incompatible length, and idempotence (M21);
 - [x] ordinary-authority `Active`/`ExitOnly` transition matrix, fail-closed
       `FullyPaused`, and exit-first deposit/withdraw gates (M22);
-- [ ] `ProtocolConfig` emergency-authority transitions into and out of `FullyPaused`;
+- [x] `ProtocolConfig` emergency-authority transitions into `FullyPaused` and recovery
+      first to `ExitOnly`, never directly to `Active` (M23);
 - [x] deposits blocked while exits remain available in `ExitOnly` (M22);
-- [ ] ProtocolConfig/MintConfig PDA, governed initialization, mint authority, token
-      program, cap decrease/increase authority, and cap-boundary cases;
+- [x] ProtocolConfig PDA/layout, upgrade-authority bootstrap, separated roles,
+      canonical token program, emergency authority, and malformed/substitution cases
+      (M23);
+- [ ] MintConfig PDA, governed vault initialization, mint authority, cap
+      decrease/increase authority, and cap-boundary cases;
 - [ ] exact-excess recovery, shortfall, treasury substitution, state, CPI, donation,
       and accounting-preservation cases;
 - [x] full IDL account field-order/type verification, instruction argument schemas,
       both operational enums, and SDK decoder compatibility against synthetic fixtures
-      (M21/M22; real generated IDL pending M22 CI);
+      (M21–M23; real generated IDL verified locally for M23 and in M22 CI);
 - [ ] deployment-manifest, verifiable-build, authority, monitoring, RPC-failover, load,
       reconciliation, and incident-drill evidence.
 
@@ -373,7 +376,7 @@ passed in 14s. All five jobs were green.
 Merged through PR #34 as `30fa983` on 2026-07-15/16. Final pre-merge CI run
 29461990674 passed all five Rust, audit, SDK, dApp, and generated-IDL jobs.
 
-## M22 exit-first pause semantics (in review)
+## M22 exit-first pause semantics (complete — PR #35)
 
 - [x] Deposit succeeds only in `Active` and fails in `ExitOnly` and `FullyPaused`.
 - [x] Withdrawal succeeds in `Active` and `ExitOnly` and fails in `FullyPaused`.
@@ -415,6 +418,50 @@ high/critical Yarn audit gate passed; dApp typecheck/build, 94 tests, and high/c
 npm audit passed; the generated-IDL gate confirmed all eight instruction interfaces,
 both account discriminators, exact 145/81-byte layouts, and both operational-state
 enums. All five jobs were green and GitHub reported the draft PR cleanly mergeable.
+
+Merged through PR #35 as `da15843` on 2026-07-15.
+
+## M23 ProtocolConfig and emergency pause controls (in review)
+
+All new Rust integration cases are in `tests/test_protocol.rs`; SDK wire and strict
+decoder cases are in the existing SDK suites.
+
+- [x] The singleton derives only from `["protocol_config"]` and serializes to exactly
+      200 bytes with version 1, canonical bump/token program, separated roles, and 62
+      zero reserved bytes.
+- [x] Bootstrap succeeds only for this program's current upgrade authority and
+      canonical ProgramData; wrong authority/data, immutable program, default or
+      duplicate roles, and duplicate initialization fail.
+- [x] `ProtocolConfigInitialized` has an exact 217-byte payload and records the
+      initializer, every frozen config identity, slot, Unix timestamp, and version.
+- [x] `emergency_pause` accepts Active/ExitOnly/FullyPaused and always ends fully
+      paused; `emergency_resume` accepts FullyPaused/ExitOnly, always ends exit-only,
+      and rejects Active.
+- [x] Wrong emergency signer, config/vault substitution, unsupported config/vault
+      versions, malformed reserved bytes, and substituted token program fail closed.
+- [x] Emergency transitions preserve every non-state VaultState byte and reuse M22's
+      exact 91-byte bounded, timestamped event contract.
+- [x] SDK PDA derivations, strict decoder/fetcher, three instruction builders, client
+      delegation, error mapping, discriminator goldens, and synthetic IDL fixtures
+      match the frozen program contract.
+- [x] Generated-IDL verification covers all 11 instructions and all three persistent
+      accounts, including exact 145/81/200-byte layouts.
+- [x] No dApp emergency signing control, deployment, program upgrade, live config
+      initialization, key generation, or asset movement is part of this milestone.
+
+Observed locally (2026-07-15/16): pinned Anchor 1.0.2 / Agave 3.1.10
+`anchor build --ignore-keys` exited 0; `cargo fmt --all -- --check` and full
+`clippy --all-targets --all-features -- -D warnings` exited 0; all 78 Rust tests passed;
+root TypeScript typecheck and SDK build exited 0; 87 SDK tests passed; dApp typecheck
+and production build exited 0; all 94 dApp tests passed. The verifier reported all 11
+instruction interfaces, three account discriminators, exact 145/81/200-byte layouts,
+and both operational enums matching the generated IDL. Changed TypeScript sources
+passed Prettier, and `git diff --check` passed. Windows-native Rust compilation remains
+unavailable because MSVC `link.exe` is absent; WSL supplied the complete Rust/SBF path.
+`cargo audit` exited 0 with seven allowed upstream warnings and no blocking
+vulnerability; dApp `npm audit --audit-level=high` reported 0 vulnerabilities. Yarn
+Classic's retired quick-audit endpoint returned HTTP 410 locally, so the existing CI
+severity-bitmask audit remains authoritative for the root package.
 
 ## Anchor scaffold baseline (complete — M2)
 

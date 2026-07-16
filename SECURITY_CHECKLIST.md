@@ -1,8 +1,9 @@
 # Security Checklist
 
-**Status: implemented controls checked through M21; M20 pre-audit target design accepted
-and its VaultState versioning slice implemented in M21. Remaining target items stay
-unchecked until built, tested, and reviewed.**
+**Status: implemented controls checked through M23; M20 pre-audit target design
+accepted, with its VaultState versioning, exit-first availability, and ProtocolConfig
+emergency-control slices implemented in M21–M23. Remaining target items stay unchecked
+until built, tested, and reviewed.**
 
 Checked items reflect only what is true today. Implementation items remain unchecked
 until the corresponding milestone is implemented and tested. This is an interview-grade
@@ -196,13 +197,15 @@ can it be timed to shift share price around a pending deposit or withdrawal. Pro
       price.
       — M12: `test_direct_donation_does_not_skew_second_depositor_share_price`.
 
-## Events (M12/M18/M21/M22)
+## Events (M12/M18/M21/M22/M23)
 
 `VaultInitialized`, `Deposited`, and `Withdrawn` are emitted at the end of their handlers,
 after all state mutation. M18 adds proposal/rotation events; M21 adds
 `VaultStateMigrated`; M22 replaces the former `Paused`/`Unpaused` pair with one
 `OperationalStateChanged` event carrying old/new state, signer, slot, Unix timestamp,
-and bounded reason evidence.
+and bounded reason evidence. M23 reuses that exact transition event for emergency
+controls and adds `ProtocolConfigInitialized`, which records every frozen config
+identity plus its initializer, slot, Unix timestamp, and version.
 Events are informational only — intended for off-chain indexing and monitoring. They are
 **not** a security boundary: no instruction's correctness depends on an event being
 observed, and emitting an event grants no authority.
@@ -216,6 +219,9 @@ observed, and emitting an event grants no authority.
       authorization boundary.
       — M18: `test_rotation_events_emitted`; M21:
         `test_migrate_active_v0_to_v1_is_permissionless_same_size_and_preserves_fields`.
+- [x] Protocol bootstrap and emergency transitions emit exact, timestamped evidence.
+      — M23: `test_initialize_protocol_config_uses_exact_layout_and_emits_evidence`,
+        `test_emergency_transition_event_retains_exact_m22_wire_contract`.
 
 ## Adversarial tests
 
@@ -357,11 +363,11 @@ multisig PDA using the same M16 sigverify-off `invoke_signed` analog.
 - [x] Both instructions emit their events (`PauseAuthorityProposed`, `PauseAuthorityRotated`).
       — M18: `test_rotation_events_emitted`.
 
-## Pre-audit production target (M20 accepted; M21 versioning and M22 exit-first slices implemented)
+## Pre-audit production target (M20 accepted; M21–M23 initial slices implemented)
 
 ADRs 0003–0009 define the reviewed target before further program work. They adapt
 OWASP SCSVS architecture, governance, authorization, external-interaction, business-
-logic, and denial-of-service principles to this Solana program. Checked M21/M22 items
+logic, and denial-of-service principles to this Solana program. Checked M21–M23 items
 below are implemented and tested; every unchecked item remains a launch blocker.
 
 ### Threat boundaries and roles
@@ -375,16 +381,17 @@ below are implemented and tested; every unchecked item remains a launch blocker.
 
 ### Pause and availability
 
-- [ ] `operational_state` implements the complete exit-first behavior and authority
-      matrix from ADR 0004. M22 implements the deposit/withdraw gates, ordinary
-      `Active`/`ExitOnly` transitions, and fail-closed `FullyPaused` behavior; the
-      stronger `ProtocolConfig` emergency-authority transition path remains pending.
+- [x] `operational_state` implements ADR 0004's complete on-chain behavior and
+      authority matrix: M22 supplies exit-first gates and ordinary transitions; M23
+      supplies the separate emergency-authority path into `FullyPaused` and recovery
+      first to `ExitOnly`.
 - [x] Ordinary incident response blocks new deposits while preserving valid user exits.
 - [x] The ordinary pause authority cannot enter, clear, or downgrade `FullyPaused`.
 - [x] Successful ordinary transitions emit bounded old/new state, signer, slot,
       Unix timestamp, and reason evidence; invalid reason/state enum values fail closed.
-- [ ] Only the stronger emergency authority can block withdrawals, and cap/mint controls
-      never restrict exits.
+- [x] Only the stronger ProtocolConfig emergency authority can block withdrawals, and
+      it can recover only to `ExitOnly`, never directly reopen deposits.
+- [ ] Future cap/mint controls never restrict exits.
 
 ### Versioning and migration
 
@@ -404,6 +411,22 @@ below are implemented and tested; every unchecked item remains a launch blocker.
       discriminators, exact account field order/types/sizes, and both operational-state
       enums.
 
+### Protocol configuration security (M23)
+
+- [x] ProtocolConfig is one canonical `["protocol_config"]` PDA with an exact frozen
+      200-byte version-1 layout, canonical bump/token program, and zero reserved bytes.
+- [x] Bootstrap requires this program's canonical upgradeable-loader ProgramData and
+      its current upgrade-authority signer, preventing first-caller role takeover;
+      wrong authority, substituted ProgramData, immutable program, and duplicate init
+      fail closed.
+- [x] Governance, emergency, and treasury roles are non-default and pairwise distinct;
+      callers cannot choose the token program.
+- [x] Emergency instructions validate canonical config/vault PDAs, both supported
+      versions, config reserved bytes/token program, and the configured emergency
+      signer before changing only `operational_state`.
+- [ ] Production role rotation, multisig thresholds, timelocks, hardware-wallet
+      policy, addresses, backups, and independent manifest verification are configured.
+
 ### Versioning and migration security (M21)
 
 - [x] Migration is permissionless but value-deterministic: the caller supplies no
@@ -420,9 +443,10 @@ below are implemented and tested; every unchecked item remains a launch blocker.
 
 ### Mint, exposure, and donations
 
-- [ ] ProtocolConfig and MintConfig enforce governed initialization, one approved
-      mint- and freeze-authority-free legacy SPL mint initially, and on-chain
-      deposit/TVL caps.
+- [x] ProtocolConfig v1 records separated protocol-governance, emergency, and treasury
+      roles plus the canonical legacy SPL Token Program.
+- [ ] MintConfig and governed vault initialization enforce one approved mint- and
+      freeze-authority-free legacy SPL mint initially plus on-chain deposit/TVL caps.
 - [ ] Cap reductions may be immediate, increases are timelocked, and staged rollout
       never exceeds ADR 0007 without new risk approval.
 - [ ] Donations remain excluded from accounting; any `sweep_excess` transfers only the

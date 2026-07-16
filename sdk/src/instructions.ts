@@ -17,6 +17,8 @@ import {
   deriveVaultAuthorityPda,
   deriveUserPositionPda,
   deriveAssociatedTokenAddress,
+  deriveProtocolConfigPda,
+  deriveProgramDataPda,
 } from "./pdas";
 
 function meta(
@@ -138,7 +140,7 @@ export interface PauseIxParams {
 }
 
 function operationalStateChangeData(
-  name: "pause" | "unpause",
+  name: "pause" | "unpause" | "emergency_pause" | "emergency_resume",
   reason: OperationalStateReason
 ): Buffer {
   if (!Number.isInteger(reason) || reason < 0 || reason > 3) {
@@ -171,6 +173,74 @@ export function buildPauseIx(p: PauseIxParams): TransactionInstruction {
 
 export function buildUnpauseIx(p: PauseIxParams): TransactionInstruction {
   return buildPauseLikeIx("unpause", p);
+}
+
+export interface InitializeProtocolConfigIxParams {
+  payer: PublicKey;
+  upgradeAuthority: PublicKey;
+  protocolGovernanceAuthority: PublicKey;
+  emergencyAuthority: PublicKey;
+  treasury: PublicKey;
+}
+
+/** M23: one-time singleton bootstrap by the live program's upgrade authority. */
+export function buildInitializeProtocolConfigIx(
+  p: InitializeProtocolConfigIxParams
+): TransactionInstruction {
+  const protocolConfig = deriveProtocolConfigPda();
+  const programData = deriveProgramDataPda();
+  const data = Buffer.alloc(104);
+  instructionDiscriminator("initialize_protocol_config").copy(data, 0);
+  data.set(p.protocolGovernanceAuthority.toBytes(), 8);
+  data.set(p.emergencyAuthority.toBytes(), 40);
+  data.set(p.treasury.toBytes(), 72);
+  return new TransactionInstruction({
+    programId: PROGRAM_ID,
+    keys: [
+      meta(p.payer, true, true),
+      meta(p.upgradeAuthority, true, false),
+      meta(protocolConfig.address, false, true),
+      meta(PROGRAM_ID, false, false),
+      meta(programData.address, false, false),
+      meta(SYSTEM_PROGRAM_ID, false, false),
+    ],
+    data,
+  });
+}
+
+export interface EmergencyControlIxParams {
+  emergencyAuthority: PublicKey;
+  mint: PublicKey;
+  reason: OperationalStateReason;
+}
+
+function buildEmergencyControlIx(
+  name: "emergency_pause" | "emergency_resume",
+  p: EmergencyControlIxParams
+): TransactionInstruction {
+  const protocolConfig = deriveProtocolConfigPda();
+  const vaultState = deriveVaultStatePda(p.mint);
+  return new TransactionInstruction({
+    programId: PROGRAM_ID,
+    keys: [
+      meta(p.emergencyAuthority, true, false),
+      meta(protocolConfig.address, false, false),
+      meta(vaultState.address, false, true),
+    ],
+    data: operationalStateChangeData(name, p.reason),
+  });
+}
+
+export function buildEmergencyPauseIx(
+  p: EmergencyControlIxParams
+): TransactionInstruction {
+  return buildEmergencyControlIx("emergency_pause", p);
+}
+
+export function buildEmergencyResumeIx(
+  p: EmergencyControlIxParams
+): TransactionInstruction {
+  return buildEmergencyControlIx("emergency_resume", p);
 }
 
 export interface ProposePauseAuthorityIxParams {

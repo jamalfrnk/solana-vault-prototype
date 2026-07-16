@@ -100,12 +100,14 @@ product on Solana rather than a from-scratch custody design.
 Concrete next-phase candidates live in `ROADMAP.md`'s Post-MVP Roadmap section and
 revisit the anti-goals list above one at a time. M20 accepted the pre-audit target
 ADRs; M21 implemented VaultState versioning, same-size migration, inventory, and
-IDL-layout verification. M22 implements ADR 0004's independently safe exit-first
+IDL-layout verification. M22 implemented ADR 0004's independently safe exit-first
 slice: deposits stop in `ExitOnly` while valid withdrawals remain available, and
-`FullyPaused` fails closed. The separate emergency-governance transition path still
-depends on the future versioned `ProtocolConfig`. These milestones do not approve
-production governance, deployment, legacy asset movement, an audit engagement,
-mainnet deployment, or production custody.
+`FullyPaused` fails closed. M23 adds the versioned singleton `ProtocolConfig` plus the
+separate emergency-authority path into `FullyPaused` and recovery first to `ExitOnly`.
+It does not yet govern ordinary vault initialization or implement MintConfig, caps,
+role rotation, or production multisig/timelock configuration. These milestones do not
+approve deployment, legacy asset movement, an audit engagement, mainnet deployment,
+or production custody.
 The project law and work-in-progress limit below still govern every later milestone.
 
 ## Project law

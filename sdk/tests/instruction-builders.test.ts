@@ -13,6 +13,8 @@ import {
   deriveVaultAuthorityPda,
   deriveUserPositionPda,
   deriveAssociatedTokenAddress,
+  deriveProtocolConfigPda,
+  deriveProgramDataPda,
 } from "../src/pdas";
 import {
   buildInitializeIx,
@@ -23,6 +25,9 @@ import {
   buildProposePauseAuthorityIx,
   buildAcceptPauseAuthorityIx,
   buildMigrateV0ToV1Ix,
+  buildInitializeProtocolConfigIx,
+  buildEmergencyPauseIx,
+  buildEmergencyResumeIx,
 } from "../src/instructions";
 import { VaultClient } from "../src/client";
 import { Connection } from "@solana/web3.js";
@@ -214,6 +219,97 @@ describe("instructions", () => {
     });
   });
 
+  describe("ProtocolConfig and emergency controls", () => {
+    const payer = randomPubkey();
+    const upgradeAuthority = randomPubkey();
+    const protocolGovernanceAuthority = randomPubkey();
+    const emergencyAuthority = randomPubkey();
+    const treasury = randomPubkey();
+    const mint = randomPubkey();
+
+    it("builds the exact upgrade-authority-gated bootstrap interface", () => {
+      const protocolConfig = deriveProtocolConfigPda();
+      const programData = deriveProgramDataPda();
+      const ix = buildInitializeProtocolConfigIx({
+        payer,
+        upgradeAuthority,
+        protocolGovernanceAuthority,
+        emergencyAuthority,
+        treasury,
+      });
+      assertKeys(ix.keys, [
+        { pubkey: payer, isSigner: true, isWritable: true },
+        { pubkey: upgradeAuthority, isSigner: true, isWritable: false },
+        { pubkey: protocolConfig.address, isSigner: false, isWritable: true },
+        { pubkey: PROGRAM_ID, isSigner: false, isWritable: false },
+        { pubkey: programData.address, isSigner: false, isWritable: false },
+        { pubkey: SYSTEM_PROGRAM_ID, isSigner: false, isWritable: false },
+      ]);
+      expect(ix.data).to.have.lengthOf(104);
+      expect(ix.data.subarray(0, 8).toString("hex")).to.equal(
+        instructionDiscriminator("initialize_protocol_config").toString("hex")
+      );
+      expect(
+        new PublicKey(ix.data.subarray(8, 40)).equals(
+          protocolGovernanceAuthority
+        )
+      ).to.equal(true);
+      expect(
+        new PublicKey(ix.data.subarray(40, 72)).equals(emergencyAuthority)
+      ).to.equal(true);
+      expect(
+        new PublicKey(ix.data.subarray(72, 104)).equals(treasury)
+      ).to.equal(true);
+    });
+
+    it("builds emergency pause/resume with the canonical config and vault", () => {
+      const protocolConfig = deriveProtocolConfigPda();
+      const vaultState = deriveVaultStatePda(mint);
+      for (const [name, ix] of [
+        [
+          "emergency_pause",
+          buildEmergencyPauseIx({
+            emergencyAuthority,
+            mint,
+            reason: OperationalStateReason.IncidentResponse,
+          }),
+        ],
+        [
+          "emergency_resume",
+          buildEmergencyResumeIx({
+            emergencyAuthority,
+            mint,
+            reason: OperationalStateReason.IncidentResolved,
+          }),
+        ],
+      ] as const) {
+        assertKeys(ix.keys, [
+          { pubkey: emergencyAuthority, isSigner: true, isWritable: false },
+          {
+            pubkey: protocolConfig.address,
+            isSigner: false,
+            isWritable: false,
+          },
+          { pubkey: vaultState.address, isSigner: false, isWritable: true },
+        ]);
+        expect(ix.data).to.have.lengthOf(9);
+        expect(ix.data.subarray(0, 8).toString("hex")).to.equal(
+          instructionDiscriminator(name).toString("hex")
+        );
+      }
+    });
+
+    it("rejects an out-of-range emergency reason before wallet interaction", () => {
+      expect(() =>
+        buildEmergencyPauseIx({
+          emergencyAuthority,
+          mint,
+          reason: 4 as OperationalStateReason,
+        })
+      ).to.throw(/reason code 4/i);
+    });
+  });
+
   describe("buildProposePauseAuthorityIx / buildAcceptPauseAuthorityIx", () => {
     const pauseAuthority = randomPubkey();
     const newPauseAuthority = randomPubkey();
@@ -341,9 +437,61 @@ describe("instructions", () => {
         }))
       );
     });
+
+    it("delegates ProtocolConfig bootstrap and emergency controls", () => {
+      const payer = randomPubkey();
+      const upgradeAuthority = randomPubkey();
+      const governance = randomPubkey();
+      const emergency = randomPubkey();
+      const treasury = randomPubkey();
+      const configViaClient = client.buildInitializeProtocolConfigIx(
+        payer,
+        upgradeAuthority,
+        governance,
+        emergency,
+        treasury
+      );
+      const configDirect = buildInitializeProtocolConfigIx({
+        payer,
+        upgradeAuthority,
+        protocolGovernanceAuthority: governance,
+        emergencyAuthority: emergency,
+        treasury,
+      });
+      expect(configViaClient.data.equals(configDirect.data)).to.equal(true);
+
+      expect(
+        client
+          .buildEmergencyPauseIx(
+            emergency,
+            OperationalStateReason.IncidentResponse
+          )
+          .data.equals(
+            buildEmergencyPauseIx({
+              emergencyAuthority: emergency,
+              mint,
+              reason: OperationalStateReason.IncidentResponse,
+            }).data
+          )
+      ).to.equal(true);
+      expect(
+        client
+          .buildEmergencyResumeIx(
+            emergency,
+            OperationalStateReason.IncidentResolved
+          )
+          .data.equals(
+            buildEmergencyResumeIx({
+              emergencyAuthority: emergency,
+              mint,
+              reason: OperationalStateReason.IncidentResolved,
+            }).data
+          )
+      ).to.equal(true);
+    });
   });
 
-  it("all eight instructions have pairwise-distinct data discriminators", () => {
+  it("all eleven instructions have pairwise-distinct data discriminators", () => {
     const mint = randomPubkey();
     const user = randomPubkey();
     const pauseAuthority = randomPubkey();
@@ -369,6 +517,23 @@ describe("instructions", () => {
       }),
       buildAcceptPauseAuthorityIx({ newPauseAuthority: user, mint }),
       buildMigrateV0ToV1Ix({ mint }),
+      buildInitializeProtocolConfigIx({
+        payer,
+        upgradeAuthority: user,
+        protocolGovernanceAuthority: randomPubkey(),
+        emergencyAuthority: randomPubkey(),
+        treasury: randomPubkey(),
+      }),
+      buildEmergencyPauseIx({
+        emergencyAuthority: user,
+        mint,
+        reason: OperationalStateReason.IncidentResponse,
+      }),
+      buildEmergencyResumeIx({
+        emergencyAuthority: user,
+        mint,
+        reason: OperationalStateReason.IncidentResolved,
+      }),
     ];
     const prefixes = ixs.map((ix) => ix.data.subarray(0, 8).toString("hex"));
     expect(new Set(prefixes).size).to.equal(prefixes.length);

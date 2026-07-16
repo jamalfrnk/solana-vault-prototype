@@ -53,7 +53,7 @@ describe("errors", () => {
       expect(result.message).to.include("System Program");
     });
 
-    it("recognizes every M21/M22 migration, version, and transition error number", () => {
+    it("recognizes every M21-M23 migration, config, version, and transition error number", () => {
       const expected = [
         VaultErrorCode.UnsupportedVaultVersion,
         VaultErrorCode.VaultStateAlreadyMigrated,
@@ -64,6 +64,13 @@ describe("errors", () => {
         VaultErrorCode.InvalidVaultBump,
         VaultErrorCode.InvalidAuthorityBump,
         VaultErrorCode.InvalidOperationalStateTransition,
+        VaultErrorCode.InvalidProgramData,
+        VaultErrorCode.InvalidProtocolRole,
+        VaultErrorCode.DuplicateProtocolRole,
+        VaultErrorCode.UnsupportedProtocolConfigVersion,
+        VaultErrorCode.InvalidProtocolConfigReservedBytes,
+        VaultErrorCode.InvalidProtocolTokenProgram,
+        VaultErrorCode.InvalidEmergencyStateTransition,
       ];
       for (const number of expected) {
         const result = parseVaultErrorFromLogs(
