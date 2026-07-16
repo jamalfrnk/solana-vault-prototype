@@ -1,8 +1,8 @@
 # Test Plan
 
 **Status: M21–M26 and all earlier follow-ups are complete through PR #42. The M26
-Node-24 GitHub Action refresh follow-up is in progress; pull-request CI remains the
-publication gate.**
+Node-24 GitHub Action refresh follow-up is in review through draft PR #43;
+pull-request CI remains the publication gate.**
 
 ## Repository hygiene (complete)
 
@@ -723,7 +723,7 @@ Rust/Anchor, cargo-audit, SDK/manifest/root-audit, dApp, full-history Gitleaks,
 generated-IDL, and deterministic-release-evidence jobs passed. GitHub merged PR #42
 as `03a25d1` on 2026-07-16.
 
-## M26 Node-24 GitHub Action refresh follow-up (in progress)
+## M26 Node-24 GitHub Action refresh follow-up (in review — PR #43)
 
 - [x] Every checkout, cache, setup-node, upload-artifact, and download-artifact use is
       updated to a current Node-24 major release and pinned to its full commit SHA.

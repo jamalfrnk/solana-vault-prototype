@@ -38,7 +38,7 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 | 24 | MintConfig, governed initialization, and exposure caps | `[x]` complete |
 | 25 | Constrained exact-excess recovery | `[x]` complete — PR #41 |
 | 26 | Release and operations evidence automation | `[x]` complete — PR #42 |
-| — | M26 follow-up — Node 24 GitHub Action refresh | `[~]` in progress |
+| — | M26 follow-up — Node 24 GitHub Action refresh | `[~]` in review — PR #43 |
 
 ## Milestone 0 — Repository bootstrap (complete)
 
@@ -955,7 +955,7 @@ as `03a25d1` on 2026-07-16. The run retained non-failing Node 20 runtime-depreca
 annotations from the then-current v4 action pins; the separate Node 24 follow-up
 refreshes only those immutable pins.
 
-## M26 follow-up — Node 24 GitHub Action refresh (in progress)
+## M26 follow-up — Node 24 GitHub Action refresh (in review — PR #43)
 
 Refreshes checkout, cache, setup-node, upload-artifact, and download-artifact to their
 current Node-24 major releases at immutable full SHAs. It changes no workflow
