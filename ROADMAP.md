@@ -37,7 +37,7 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 | — | UI follow-up — authoritative wallet assets and vault shares | `[x]` complete |
 | 24 | MintConfig, governed initialization, and exposure caps | `[x]` complete |
 | 25 | Constrained exact-excess recovery | `[x]` complete — PR #41 |
-| 26 | Release and operations evidence automation | `[~]` in progress |
+| 26 | Release and operations evidence automation | `[~]` in review — PR #42 |
 
 ## Milestone 0 — Repository bootstrap (complete)
 
@@ -914,7 +914,7 @@ Observed in final PR #41 CI run `29515303554`: all five Rust/Anchor, cargo-audit
 SDK/root-audit, dApp, and generated-M25-IDL jobs passed. GitHub merged PR #41 as
 `7c62346` on 2026-07-16.
 
-## Milestone 26 — Release and operations evidence automation (in progress)
+## Milestone 26 — Release and operations evidence automation (in review — PR #42)
 
 Implements the repository-controlled portion of ADR 0009 step 6 on
 `codex/release-operations-evidence`:

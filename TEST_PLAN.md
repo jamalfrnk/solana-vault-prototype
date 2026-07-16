@@ -1,8 +1,8 @@
 # Test Plan
 
 **Status: M21–M25 and all UI/devnet follow-ups are complete through PR #41; M26
-release and operations evidence automation is in progress. Pull-request CI remains
-the publication gate.**
+release and operations evidence automation is in review through draft PR #42.
+Pull-request CI remains the publication gate.**
 
 ## Repository hygiene (complete)
 
@@ -683,7 +683,7 @@ Linux Rust job includes the complete 97-test regression.
 Observed in final PR #41 CI run `29515303554`: the same five jobs passed on the final
 head. GitHub merged PR #41 as `7c62346` on 2026-07-16.
 
-## M26 release and operations evidence automation (in progress)
+## M26 release and operations evidence automation (in review — PR #42)
 
 - [x] The four checked-in production templates validate only with the explicit
       `--allow-placeholders` mode; ordinary production mode rejects them.
