@@ -138,6 +138,89 @@ form button[type="submit"] {
   color: #9fe8c4;
 }
 
+/* --- Persistent app header --- */
+
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  border-bottom: 1px solid rgba(101, 131, 255, 0.24);
+  background: rgba(7, 10, 20, 0.88);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(12px);
+}
+
+.app-header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+  max-width: 1180px;
+  min-height: 68px;
+  margin: 0 auto;
+  padding: 0.65rem 1.5rem;
+}
+
+.app-brand {
+  color: #e6e8ee;
+  font-family: var(--font-display, system-ui), system-ui, sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-decoration: none;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.app-brand:hover {
+  color: #8fb3ff;
+}
+
+.app-brand:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid #7aa2ff;
+  outline-offset: 4px;
+}
+
+.app-header-wallet {
+  flex: 0 0 auto;
+}
+
+.app-header-wallet .wallet-adapter-button {
+  min-height: 44px;
+  max-width: min(17rem, 50vw);
+  border: 1px solid #3d5ba8;
+  background: linear-gradient(120deg, #1d2742, #24365f);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-header-wallet .wallet-adapter-button:hover:not([disabled]) {
+  background: linear-gradient(120deg, #24365f, #31508d);
+}
+
+@media (max-width: 520px) {
+  .app-header-inner {
+    min-height: 60px;
+    gap: 0.65rem;
+    padding: 0.5rem 0.75rem;
+  }
+
+  .app-brand {
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+  }
+
+  .app-header-wallet .wallet-adapter-button {
+    max-width: 10.5rem;
+    height: 42px;
+    padding: 0 0.85rem;
+    font-size: 0.72rem;
+  }
+}
+
 /* --- Panel ("dialogue box") system --- */
 
 .panel {

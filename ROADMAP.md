@@ -32,7 +32,8 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 | 21 | VaultState v1, deterministic migration, legacy inventory, full IDL layout | `[x]` complete |
 | 22 | Exit-first pause semantics | `[x]` complete |
 | 23 | ProtocolConfig and emergency pause controls | `[x]` complete |
-| — | M23 follow-up — isolated devnet v1 deployment + clean UI fixture | `[~]` in review |
+| — | M23 follow-up — isolated devnet v1 deployment + clean UI fixture | `[x]` complete |
+| — | UI follow-up — persistent header wallet control | `[~]` in review |
 
 ## Milestone 0 — Repository bootstrap (complete)
 
@@ -737,7 +738,7 @@ Observed in PR #36 CI run `29471576382`: all five jobs passed, including the
 Rust/Anchor suite, cargo audit, SDK suite and audit, dApp suite and audit, and the full
 generated-IDL verifier. Merged through PR #36 as `7aa260b` on 2026-07-16.
 
-## M23 follow-up — isolated devnet v1 deployment + clean UI fixture (in review)
+## M23 follow-up — isolated devnet v1 deployment + clean UI fixture (complete)
 
 The merged strict v1 decoder correctly rejects the two public 113-byte legacy vaults.
 This follow-up preserves that fail-closed behavior and makes clean UI testing safe:
@@ -764,6 +765,32 @@ audit, root typecheck, 89 SDK tests/build, dApp typecheck/build/94 tests/audit, 
 IDL verification, local documentation-link validation, secret scanning, and
 whitespace checks passed. The root Yarn Classic audit endpoint returned HTTP 410, so
 the existing pull-request CI severity-bitmask audit remains authoritative.
+
+Observed in PR #37 CI run `29479838988`: all five jobs passed, including the
+Rust/Anchor suite, cargo audit, SDK suite and audit, dApp suite and audit, and the full
+generated-IDL verifier. Merged through PR #37 as `9ec205e` on 2026-07-16.
+
+## UI follow-up — persistent header wallet control (in review)
+
+Approved by Malcolm on 2026-07-16 as a small dApp-only follow-up on
+`codex/ui-header-wallet-connect`. It moves the existing wallet-adapter control from
+the landing-page panel into a shared sticky header so the same control remains
+available on both `/` and `/vault/[mint]` without introducing another wallet state
+machine. The disconnected label is now the explicit `Connect Wallet`; connected
+address, copy, switch-wallet, and disconnect behavior remain delegated to
+wallet-adapter.
+
+Focused component tests cover the header's accessible home link, wallet affordance,
+and right-side container. Manual browser verification at 1440×900 and 390×844 found
+no horizontal overflow or overlap with the devnet warning on either route. The
+wallet modal listed exactly the configured Phantom and Solflare adapters, and the
+browser recorded no console errors. This follow-up does not change the program, SDK,
+account layouts, devnet state, keypairs, balances, or transaction authorization.
+
+Observed locally: root and dApp typechecks, the Next.js production build, all 96 dApp
+tests, high-severity npm audit, new component/test formatting, documentation-link
+validation, filename-only secret/artifact review, prohibited-attribution scanning,
+and whitespace checks passed. Pull-request CI remains the publication gate.
 
 ## Post-MVP Roadmap (candidate pool — implementation requires separate approval)
 

@@ -20,8 +20,6 @@ function renderWithWalletContext(ui: React.ReactElement) {
 describe("WalletConnectButton", () => {
   it("renders a wallet connect affordance when no wallet is connected", () => {
     renderWithWalletContext(<WalletConnectButton />);
-    // wallet-adapter-react-ui's WalletMultiButton renders "Select Wallet" when
-    // disconnected — this is the observable "wallet not connected" state.
-    expect(screen.getByRole("button")).to.exist;
+    expect(screen.getByRole("button", { name: "Connect Wallet" })).to.exist;
   });
 });

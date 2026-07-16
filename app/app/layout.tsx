@@ -3,6 +3,7 @@ import { Orbitron, Exo_2 } from "next/font/google";
 import "./globals.css";
 import "./vault.css";
 import { Providers } from "./providers";
+import { AppHeader } from "../components/AppHeader";
 import { ClusterWarningBanner } from "../components/ClusterWarningBanner";
 import { CryptoNetworkBackground } from "../components/CryptoNetworkBackground";
 
@@ -30,6 +31,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <CryptoNetworkBackground />
         <Providers>
           <ClusterWarningBanner />
+          <AppHeader />
           {children}
         </Providers>
       </body>
