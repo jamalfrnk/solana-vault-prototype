@@ -871,6 +871,10 @@ IDL gate confirmed all 16 instructions and exact 145/81/200/160-byte account lay
 Yarn Classic's retired local audit endpoint returned HTTP 410, leaving the existing CI
 severity-bitmask audit as the authoritative root-package gate.
 
+Observed in initial PR #40 CI run `29506354190` on commit `cbc832c`: all five jobs
+passed, including the dependent M24 generated-IDL verifier, and GitHub reported the
+draft pull request mergeable.
+
 ## Post-MVP Roadmap (candidate pool — implementation requires separate approval)
 
 Milestones 0–14 are the MVP `PROJECT_CONTEXT.md` scoped from day one: a hardened,

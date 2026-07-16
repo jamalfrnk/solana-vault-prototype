@@ -611,7 +611,7 @@ original focus. SDK wire/layout cases and dApp cap-signifier cases remain offlin
 - [x] No deployment, upgrade, live config transaction, devnet mutation, key creation,
       asset movement, production mint/cap selection, or privileged dApp control is in
       this milestone.
-- [ ] Observe every M24 pull-request CI job green before merge.
+- [x] Observe every M24 pull-request CI job green before merge.
 
 Observed locally (2026-07-16): `anchor build --ignore-keys`, Rust formatting, and
 warning-denying clippy exited 0; all 89 Rust tests passed. Root typecheck, SDK build,
@@ -624,6 +624,10 @@ Rust/SBF path. `cargo audit` exited 0 with seven allowed upstream warnings. Yarn
 Classic's retired audit endpoint returned HTTP 410 locally, so pull-request CI's
 severity-bitmask job remains the authoritative root-package dependency gate. Vitest
 retained the known non-fatal jsdom canvas warning.
+
+Observed in initial PR #40 CI run `29506354190` on commit `cbc832c`: all five
+Rust/Anchor, cargo-audit, SDK/root-audit, dApp, and generated-M24-IDL jobs passed, and
+GitHub reported the draft PR mergeable.
 
 ## Anchor scaffold baseline (complete — M2)
 

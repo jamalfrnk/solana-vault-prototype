@@ -1,6 +1,6 @@
 # Milestone 24 — MintConfig, Governed Initialization, and Exposure Caps
 
-- **Status:** Approved by Malcolm on 2026-07-16
+- **Status:** In review — draft PR #40; initial CI run `29506354190` passed
 - **Branch:** `codex/mint-config-exposure-caps`
 - **Milestone type:** Program accounts/behavior, SDK, tests, IDL verification, dApp compatibility, and documentation
 
