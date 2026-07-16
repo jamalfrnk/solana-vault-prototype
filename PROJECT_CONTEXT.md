@@ -104,14 +104,21 @@ IDL-layout verification. M22 implemented ADR 0004's independently safe exit-firs
 slice: deposits stop in `ExitOnly` while valid withdrawals remain available, and
 `FullyPaused` fails closed. M23 adds the versioned singleton `ProtocolConfig` plus the
 separate emergency-authority path into `FullyPaused` and recovery first to `ExitOnly`.
-It does not yet govern ordinary vault initialization or implement MintConfig, caps,
-role rotation, or production multisig/timelock configuration. These milestones do not
+M24 implements the next accepted slice: an exact versioned `MintConfig`, fixed-supply
+legacy-SPL mint approval, governance-gated vault initialization, a 48-hour
+risk-increase delay, and on-chain per-transaction/total-assets deposit caps. Mint
+disablement and cap controls never enter the withdrawal account contract. Role
+rotation, production multisig/timelock configuration, exact-excess recovery, and the
+remaining operational launch gates are still incomplete. These milestones do not
 approve deployment, legacy asset movement, an audit engagement, mainnet deployment,
 or production custody.
 After M23 merged, a separately scoped devnet/UI follow-up deployed the reviewed binary
 under a new devnet-only program ID and created a fresh v1 UI fixture. The original
 program and both 113-byte vaults remain unchanged for later retirement. This live test
-fixture does not relax any production launch blocker or authorize MintConfig work.
+fixture does not relax any production launch blocker. The separately merged wallet
+balance UX makes assets and shares explicit, but remains an untrusted projection of
+on-chain state. M24 is source-only until a later reviewed deployment milestone; the
+current devnet binary has no `MintConfig` instructions or cap enforcement.
 The project law and work-in-progress limit below still govern every later milestone.
 
 ## Project law

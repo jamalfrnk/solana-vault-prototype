@@ -3,6 +3,7 @@ use anchor_lang::prelude::*;
 pub const VAULT_STATE_VERSION_V0: u8 = 0;
 pub const VAULT_STATE_VERSION_V1: u8 = 1;
 pub const PROTOCOL_CONFIG_VERSION_V1: u8 = 1;
+pub const MINT_CONFIG_VERSION_V1: u8 = 1;
 
 /// Borsh encodes these unit variants as their zero-based one-byte indexes,
 /// exactly matching the legacy bool byte for Active (0) and ExitOnly (1).
@@ -79,6 +80,90 @@ impl ProtocolConfig {
 }
 
 const _: () = assert!(ProtocolConfig::ACCOUNT_LEN == 200);
+
+/// Ordered staged-exposure labels accepted by ADR 0007. The program enforces
+/// one-stage-at-a-time promotion; the deployment manifest remains responsible
+/// for mapping reviewed token base-unit caps to the ADR's USD-equivalent ceilings.
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug, Eq, InitSpace, PartialEq)]
+#[repr(u8)]
+pub enum RolloutStage {
+    Devnet,
+    Canary,
+    Limited,
+    Expanded,
+}
+
+impl RolloutStage {
+    pub const fn permits_target(self, target: Self) -> bool {
+        let current = self as u8;
+        let proposed = target as u8;
+        proposed >= current && proposed <= current.saturating_add(1)
+    }
+}
+
+/// Per-mint allowlist and exposure configuration. The exact 160-byte v1
+/// layout is frozen by M24. A pending update commits every future value so
+/// execution after the delay is permissionless but cannot choose new terms.
+#[account]
+#[derive(InitSpace)]
+pub struct MintConfig {
+    pub version: u8,
+    pub bump: u8,
+    pub mint: Pubkey,
+    pub enabled: bool,
+    pub max_total_assets: u64,
+    pub max_deposit_assets_per_transaction: u64,
+    pub rollout_stage: RolloutStage,
+    pub has_pending_update: bool,
+    pub pending_enabled: bool,
+    pub pending_max_total_assets: u64,
+    pub pending_max_deposit_assets_per_transaction: u64,
+    pub pending_rollout_stage: RolloutStage,
+    pub pending_effective_unix_timestamp: i64,
+    pub reserved: [u8; 73],
+}
+
+impl MintConfig {
+    pub const ACCOUNT_LEN: usize = 8 + Self::INIT_SPACE;
+
+    pub fn clear_pending_update(&mut self) {
+        self.has_pending_update = false;
+        self.pending_enabled = false;
+        self.pending_max_total_assets = 0;
+        self.pending_max_deposit_assets_per_transaction = 0;
+        self.pending_rollout_stage = RolloutStage::Devnet;
+        self.pending_effective_unix_timestamp = 0;
+    }
+
+    /// Fail closed on malformed pending state. This is checked by every
+    /// ordinary consumer, including deposits while a valid proposal waits.
+    pub fn pending_state_is_valid(&self) -> bool {
+        if !self.has_pending_update {
+            return !self.pending_enabled
+                && self.pending_max_total_assets == 0
+                && self.pending_max_deposit_assets_per_transaction == 0
+                && self.pending_rollout_stage == RolloutStage::Devnet
+                && self.pending_effective_unix_timestamp == 0;
+        }
+
+        self.pending_enabled
+            && self.pending_effective_unix_timestamp > 0
+            && self.pending_max_deposit_assets_per_transaction <= self.pending_max_total_assets
+            && self.pending_max_total_assets >= self.max_total_assets
+            && self.pending_max_deposit_assets_per_transaction
+                >= self.max_deposit_assets_per_transaction
+            && self
+                .rollout_stage
+                .permits_target(self.pending_rollout_stage)
+            && (!self.enabled
+                || self.pending_max_total_assets > self.max_total_assets
+                || self.pending_max_deposit_assets_per_transaction
+                    > self.max_deposit_assets_per_transaction
+                || self.pending_rollout_stage != self.rollout_stage)
+    }
+}
+
+const _: () = assert!(MintConfig::ACCOUNT_LEN == 160);
 
 #[account]
 #[derive(InitSpace)]

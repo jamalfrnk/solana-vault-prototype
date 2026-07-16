@@ -1,9 +1,9 @@
 # Test Plan
 
-**Status: M21–M23 and the devnet/UI and wallet-header follow-ups are complete through
-PRs #34–#38; the authoritative share-balance UX follow-up is in review — 78 Rust
-tests, 89 SDK tests, and 117 dApp tests. Desktop and narrow-viewport browser behavior
-is observed; pull-request CI remains the publication gate.**
+**Status: M21–M23 and all UI/devnet follow-ups are complete through PR #39; M24
+MintConfig, governed initialization, and exposure caps are in review — 89 Rust tests,
+112 SDK tests, and 122 dApp tests. Desktop and narrow-viewport browser behavior is
+observed; pull-request CI remains the publication gate.**
 
 ## Repository hygiene (complete)
 
@@ -303,13 +303,13 @@ complete by this design milestone:
 - [x] ProtocolConfig PDA/layout, upgrade-authority bootstrap, separated roles,
       canonical token program, emergency authority, and malformed/substitution cases
       (M23);
-- [ ] MintConfig PDA, governed vault initialization, mint authority, cap
+- [x] MintConfig PDA, governed vault initialization, mint authority, cap
       decrease/increase authority, and cap-boundary cases;
 - [ ] exact-excess recovery, shortfall, treasury substitution, state, CPI, donation,
       and accounting-preservation cases;
 - [x] full IDL account field-order/type verification, instruction argument schemas,
       both operational enums, and SDK decoder compatibility against synthetic fixtures
-      (M21–M23; real generated IDL verified locally for M23 and in M22 CI);
+      (M21–M24; real generated IDL verified locally for M24 and in earlier CI);
 - [ ] deployment-manifest, verifiable-build, authority, monitoring, RPC-failover, load,
       reconciliation, and incident-drill evidence.
 
@@ -535,7 +535,7 @@ real-browser canvas and console checks were clean.
 Observed in PR #38 CI run `29493805747`: all five jobs passed. GitHub merged PR #38
 as `821bf1e` on 2026-07-16.
 
-## Authoritative wallet-assets and vault-shares UX follow-up (in progress)
+## Authoritative wallet-assets and vault-shares UX follow-up (complete — PR #39)
 
 - [x] The connected-wallet summary distinguishes canonical wallet-ATA assets available
       to deposit, `UserPosition` shares available to withdraw, and the current
@@ -562,7 +562,7 @@ as `821bf1e` on 2026-07-16.
       browser warning/error logs are empty.
 - [x] The complete local typecheck/build/test/audit, documentation, secret/artifact,
       prohibited-attribution, and whitespace gates pass.
-- [ ] Observe every pull-request CI job green before merge.
+- [x] Observe every pull-request CI job green before merge.
 
 No program, SDK wire contract, account layout, program ID, devnet state, keypair,
 token balance, or transaction-authorization behavior changes in this follow-up.
@@ -573,6 +573,57 @@ audit reported 0 vulnerabilities; focused Prettier checks, 50 local Markdown lin
 milestone-only prohibited-attribution/secret scans, and `git diff --check` passed.
 Vitest retained the known non-fatal jsdom canvas warning; the real-browser canvas
 rendered at both tested widths and browser warning/error logs were empty.
+
+Observed in PR #39 CI run `29497391680`: all five Rust/Anchor, cargo-audit, SDK,
+dApp, and generated-IDL jobs passed. GitHub merged PR #39 as `332807c` on
+2026-07-16.
+
+## M24 MintConfig, governed initialization, and exposure caps (in review)
+
+All new on-chain lifecycle and boundary cases are in `tests/test_mint_config.rs`;
+existing suites use exact synthetic version-1 config fixtures only to preserve their
+original focus. SDK wire/layout cases and dApp cap-signifier cases remain offline.
+
+- [x] MintConfig derives from `["mint_config", mint]` and serializes to exactly 160
+      bytes with version 1, canonical bump/mint, bounded stage/pending state, and 73
+      zero reserved bytes.
+- [x] Initialization requires ProtocolConfig governance and a fixed-supply,
+      non-freezable legacy-SPL mint, then assigns disabled, zero-cap `Devnet` state.
+- [x] Risk-increase proposals commit every target, enforce nondecreasing caps and at
+      most one stage promotion, use a checked 172,800-second delay, and execute the
+      exact target permissionlessly only at/after the boundary.
+- [x] Governance disablement and pause-authority cap reductions are immediate,
+      reduction-only, clear pending proposals, and preserve accounting/custody.
+- [x] Governed `initialize` rejects disabled/substituted config and wrong governance;
+      deposits enforce enabled, per-transaction, checked total-assets, zero-cap,
+      overflow, malformed, and substituted-config cases before mutation.
+- [x] Withdrawals succeed in `Active` and `ExitOnly` after disablement and zero caps;
+      their instruction account contract contains no MintConfig.
+- [x] The SBF build has no 4 KiB stack violation; the read-only deposit config is boxed
+      without changing its account order or writable/signer privileges.
+- [x] SDK strict decoding/builders/client/error mapping and generated-IDL verification
+      cover all 16 instructions, four persistent accounts, exact 145/81/200/160-byte
+      layouts, bounded enums, and all three MintConfig events.
+- [x] The dApp reads MintConfig independently, disables only deposits when it is
+      absent/malformed/disabled, and shows confirmed wallet assets alongside the
+      minimum of per-transaction cap and remaining total capacity before submission.
+      Withdraw UI remains usable.
+- [x] No deployment, upgrade, live config transaction, devnet mutation, key creation,
+      asset movement, production mint/cap selection, or privileged dApp control is in
+      this milestone.
+- [ ] Observe every M24 pull-request CI job green before merge.
+
+Observed locally (2026-07-16): `anchor build --ignore-keys`, Rust formatting, and
+warning-denying clippy exited 0; all 89 Rust tests passed. Root typecheck, SDK build,
+112 SDK tests, and the generated-IDL verifier exited 0. DApp typecheck and production
+build passed, all 122 dApp tests passed, and high-severity npm audit reported zero
+vulnerabilities. The verifier confirmed 16 instruction schemas, four account
+discriminators, exact 145/81/200/160-byte layouts, bounded enums, and three MintConfig
+events. Windows-native Rust still lacks MSVC `link.exe`; WSL supplied the complete
+Rust/SBF path. `cargo audit` exited 0 with seven allowed upstream warnings. Yarn
+Classic's retired audit endpoint returned HTTP 410 locally, so pull-request CI's
+severity-bitmask job remains the authoritative root-package dependency gate. Vitest
+retained the known non-fatal jsdom canvas warning.
 
 ## Anchor scaffold baseline (complete — M2)
 

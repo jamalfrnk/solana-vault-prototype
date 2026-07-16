@@ -1,3 +1,5 @@
+mod support;
+
 use {
     anchor_lang::{
         solana_program::instruction::Instruction, AccountDeserialize, InstructionData,
@@ -52,10 +54,9 @@ fn system_program_id() -> Pubkey {
 
 /// Manually build an 82-byte SPL Token Mint account payload.
 /// COption layout: [tag u32 LE][optional 32-byte pubkey]
-fn make_mint_account(mint_authority: &Pubkey, decimals: u8) -> Account {
+fn make_mint_account(_mint_authority: &Pubkey, decimals: u8) -> Account {
     let mut data = vec![0u8; 82];
-    data[0] = 1; // COption::Some tag for mint_authority
-    data[4..36].copy_from_slice(mint_authority.as_ref());
+    // [0..36] COption::None mint_authority: fixed supply required by M24.
     // [36..44] supply = 0 (already zeroed)
     data[44] = decimals;
     data[45] = 1; // is_initialized = true
@@ -72,13 +73,12 @@ fn make_mint_account(mint_authority: &Pubkey, decimals: u8) -> Account {
 /// Same layout as `make_mint_account`, but with an active freeze authority set
 /// (COption::Some at [46..82]: 4-byte tag + 32-byte pubkey).
 fn make_mint_account_with_freeze(
-    mint_authority: &Pubkey,
+    _mint_authority: &Pubkey,
     freeze_authority: &Pubkey,
     decimals: u8,
 ) -> Account {
     let mut data = vec![0u8; 82];
-    data[0] = 1; // COption::Some tag for mint_authority
-    data[4..36].copy_from_slice(mint_authority.as_ref());
+    // [0..36] COption::None mint_authority.
     data[44] = decimals;
     data[45] = 1; // is_initialized = true
     data[46] = 1; // COption::Some tag for freeze_authority
@@ -158,6 +158,9 @@ fn make_init_ix(
             token_program: spl_token_id(),
             associated_token_program: ata_program_id(),
             system_program: system_program_id(),
+            protocol_governance_authority: payer,
+            protocol_config: support::find_protocol_config().0,
+            mint_config: support::find_mint_config(&mint).0,
         }
         .to_account_metas(None),
     )
@@ -202,6 +205,9 @@ fn test_initialize_rejects_bad_accounts() {
             token_program: spl_token_id(),
             associated_token_program: ata_program_id(),
             system_program: system_program_id(),
+            protocol_governance_authority: keypair_pubkey(&payer),
+            protocol_config: Pubkey::default(),
+            mint_config: Pubkey::default(),
         }
         .to_account_metas(None),
     );
@@ -234,6 +240,7 @@ fn test_vault_initialize_creates_correct_state() {
         make_mint_account(&keypair_pubkey(&mint_authority), 6),
     )
     .unwrap();
+    support::install_enabled_test_configs(&mut svm, keypair_pubkey(&payer), mint_pk);
 
     let (vault_state_pda, _) = find_vault_state(&mint_pk, &pid);
     let (vault_authority_pda, _) = find_vault_authority(&vault_state_pda, &pid);
@@ -302,6 +309,7 @@ fn test_vault_initialize_duplicate_fails() {
         make_mint_account(&keypair_pubkey(&mint_authority), 6),
     )
     .unwrap();
+    support::install_enabled_test_configs(&mut svm, keypair_pubkey(&payer), mint_pk);
 
     let (vault_state_pda, _) = find_vault_state(&mint_pk, &pid);
     let (vault_authority_pda, _) = find_vault_authority(&vault_state_pda, &pid);
@@ -357,6 +365,7 @@ fn test_initialize_succeeds_with_preexisting_empty_custody_ata() {
         make_mint_account(&keypair_pubkey(&mint_authority), 6),
     )
     .unwrap();
+    support::install_enabled_test_configs(&mut svm, keypair_pubkey(&payer), mint_pk);
 
     let (vault_state_pda, _) = find_vault_state(&mint_pk, &pid);
     let (vault_authority_pda, _) = find_vault_authority(&vault_state_pda, &pid);
@@ -414,6 +423,7 @@ fn test_initialize_rejects_mint_with_freeze_authority() {
         ),
     )
     .unwrap();
+    support::install_enabled_test_configs(&mut svm, keypair_pubkey(&payer), mint_pk);
 
     let (vault_state_pda, _) = find_vault_state(&mint_pk, &pid);
     let (vault_authority_pda, _) = find_vault_authority(&vault_state_pda, &pid);
@@ -460,6 +470,7 @@ fn test_initialize_rejects_foreign_owned_vault_authority() {
         make_mint_account(&keypair_pubkey(&mint_authority), 6),
     )
     .unwrap();
+    support::install_enabled_test_configs(&mut svm, keypair_pubkey(&payer), mint_pk);
 
     let (vault_state_pda, _) = find_vault_state(&mint_pk, &pid);
     let (vault_authority_pda, _) = find_vault_authority(&vault_state_pda, &pid);

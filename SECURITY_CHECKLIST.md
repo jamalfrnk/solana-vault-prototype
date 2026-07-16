@@ -1,8 +1,9 @@
 # Security Checklist
 
-**Status: implemented controls checked through M23; M20 pre-audit target design
+**Status: implemented controls checked through M24; M20 pre-audit target design
 accepted, with its VaultState versioning, exit-first availability, and ProtocolConfig
-emergency-control slices implemented in M21–M23. Remaining target items stay unchecked
+emergency-control slices implemented in M21–M23 and its MintConfig/exposure slice in
+M24. Remaining target items stay unchecked
 until built, tested, and reviewed. The M23 devnet/UI follow-up deploys only a separate
 test identity and does not satisfy production launch gates.**
 
@@ -198,7 +199,7 @@ can it be timed to shift share price around a pending deposit or withdrawal. Pro
       price.
       — M12: `test_direct_donation_does_not_skew_second_depositor_share_price`.
 
-## Events (M12/M18/M21/M22/M23)
+## Events (M12/M18/M21/M22/M23/M24)
 
 `VaultInitialized`, `Deposited`, and `Withdrawn` are emitted at the end of their handlers,
 after all state mutation. M18 adds proposal/rotation events; M21 adds
@@ -206,7 +207,9 @@ after all state mutation. M18 adds proposal/rotation events; M21 adds
 `OperationalStateChanged` event carrying old/new state, signer, slot, Unix timestamp,
 and bounded reason evidence. M23 reuses that exact transition event for emergency
 controls and adds `ProtocolConfigInitialized`, which records every frozen config
-identity plus its initializer, slot, Unix timestamp, and version.
+identity plus its initializer, slot, Unix timestamp, and version. M24 adds exact
+MintConfig initialization, proposal, and change events with complete old/new targets,
+authority, slot, Unix timestamp, activation time, and bounded change kind.
 Events are informational only — intended for off-chain indexing and monitoring. They are
 **not** a security boundary: no instruction's correctness depends on an event being
 observed, and emitting an event grants no authority.
@@ -223,6 +226,11 @@ observed, and emitting an event grants no authority.
 - [x] Protocol bootstrap and emergency transitions emit exact, timestamped evidence.
       — M23: `test_initialize_protocol_config_uses_exact_layout_and_emits_evidence`,
         `test_emergency_transition_event_retains_exact_m22_wire_contract`.
+- [x] MintConfig initialization, delayed proposal/execution, disablement, and cap
+      reduction emit exact bounded evidence verified against the generated IDL.
+      — M24: `test_initialize_mint_config_is_exact_disabled_devnet_and_emits_evidence`,
+        `test_timelock_rejects_early_and_executes_exact_target_permissionlessly_at_boundary`,
+        `test_disable_is_immediate_idempotent_and_cancels_pending_update`.
 
 ## Adversarial tests
 
@@ -364,16 +372,16 @@ multisig PDA using the same M16 sigverify-off `invoke_signed` analog.
 - [x] Both instructions emit their events (`PauseAuthorityProposed`, `PauseAuthorityRotated`).
       — M18: `test_rotation_events_emitted`.
 
-## Pre-audit production target (M20 accepted; M21–M23 initial slices implemented)
+## Pre-audit production target (M20 accepted; M21–M24 initial slices implemented)
 
 ADRs 0003–0009 define the reviewed target before further program work. They adapt
 OWASP SCSVS architecture, governance, authorization, external-interaction, business-
-logic, and denial-of-service principles to this Solana program. Checked M21–M23 items
+logic, and denial-of-service principles to this Solana program. Checked M21–M24 items
 below are implemented and tested; every unchecked item remains a launch blocker.
 
 ### Threat boundaries and roles
 
-- [ ] Frontend, SDK, RPC, token metadata, and events are treated only as untrusted
+- [x] Frontend, SDK, RPC, token metadata, and events are treated only as untrusted
       inputs or operational evidence; on-chain validation is authoritative.
 - [ ] Pause, protocol-governance, full-pause, upgrade, and treasury capabilities use
       the separate governed addresses and thresholds in ADRs 0003, 0006, and 0009.
@@ -392,7 +400,8 @@ below are implemented and tested; every unchecked item remains a launch blocker.
       Unix timestamp, and reason evidence; invalid reason/state enum values fail closed.
 - [x] Only the stronger ProtocolConfig emergency authority can block withdrawals, and
       it can recover only to `ExitOnly`, never directly reopen deposits.
-- [ ] Future cap/mint controls never restrict exits.
+- [x] Mint disablement, zero/reduced caps, pending updates, and rollout stage never
+      enter the withdrawal account contract or restrict valid `Active`/`ExitOnly` exits.
 
 ### Versioning and migration
 
@@ -428,6 +437,35 @@ below are implemented and tested; every unchecked item remains a launch blocker.
 - [ ] Production role rotation, multisig thresholds, timelocks, hardware-wallet
       policy, addresses, backups, and independent manifest verification are configured.
 
+### Mint configuration and exposure security (M24)
+
+- [x] MintConfig is one canonical `["mint_config", mint]` PDA per mint with an exact
+      160-byte version-1 layout, matching bump/mint, bounded rollout enum, canonical
+      pending state, and 73 zero reserved bytes.
+- [x] Only ProtocolConfig governance can create a config, propose a risk increase, or
+      disable a mint; creation accepts only the canonical legacy SPL Token Program and
+      rejects any remaining mint or freeze authority.
+- [x] New configs are program-assigned disabled, zero-cap `Devnet` records. No caller
+      can select initial exposure or bypass the 172,800-second approval delay.
+- [x] A risk-increase proposal commits every enabled/cap/stage target, permits at most
+      one rollout-stage promotion, uses checked timestamp arithmetic, and is executable
+      permissionlessly only at or after the exact boundary.
+- [x] Governance disablement and current pause-authority cap reductions are immediate,
+      cannot increase exposure, clear pending proposals, move no assets, and change no
+      vault accounting.
+- [x] Governed vault initialization requires canonical ProtocolConfig, governance
+      signer, enabled matching MintConfig, and a permanently fixed-supply mint before
+      allocating the canonical vault.
+- [x] Deposit checks enabled state, per-transaction cap, and checked post-deposit total
+      against the total-assets cap before CPI/state mutation. Zero means disabled, not
+      unlimited; overflow and substituted/malformed config fail without state change.
+- [x] SDK decoding and generated-IDL verification pin the exact config, instruction,
+      enum, event, and error contracts; dApp cap display is a signifier only and never
+      replaces on-chain enforcement.
+- [ ] A signed production manifest selects exactly one initial mint, base-unit cap
+      values within ADR 0007, rollout evidence, and independently verified governance
+      addresses. No M24 program/config is deployed by this milestone.
+
 ### Versioning and migration security (M21)
 
 - [x] Migration is permissionless but value-deterministic: the caller supplies no
@@ -446,9 +484,9 @@ below are implemented and tested; every unchecked item remains a launch blocker.
 
 - [x] ProtocolConfig v1 records separated protocol-governance, emergency, and treasury
       roles plus the canonical legacy SPL Token Program.
-- [ ] MintConfig and governed vault initialization enforce one approved mint- and
+- [x] MintConfig and governed vault initialization enforce one approved mint- and
       freeze-authority-free legacy SPL mint initially plus on-chain deposit/TVL caps.
-- [ ] Cap reductions may be immediate, increases are timelocked, and staged rollout
+- [x] Cap reductions may be immediate, increases are timelocked, and staged rollout
       never exceeds ADR 0007 without new risk approval.
 - [ ] Donations remain excluded from accounting; any `sweep_excess` transfers only the
       exact computed excess to the configured same-mint treasury ATA while not active.

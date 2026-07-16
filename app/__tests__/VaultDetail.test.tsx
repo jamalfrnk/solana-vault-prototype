@@ -7,9 +7,10 @@ import {
   within,
 } from "@testing-library/react";
 import { Keypair, PublicKey } from "@solana/web3.js";
-import { OperationalState } from "../../sdk/src";
+import { OperationalState, RolloutStage } from "../../sdk/src";
 
 const fetchVaultStateMock = vi.fn();
+const fetchMintConfigMock = vi.fn();
 const fetchUserPositionMock = vi.fn();
 const buildDepositIxMock = vi
   .fn()
@@ -37,6 +38,7 @@ vi.mock("@vault-sdk", async () => {
       .mockImplementation(function MockVaultClient(this: unknown) {
         return {
           fetchVaultState: fetchVaultStateMock,
+          fetchMintConfig: fetchMintConfigMock,
           fetchUserPosition: fetchUserPositionMock,
           buildDepositIx: buildDepositIxMock,
         };
@@ -58,11 +60,27 @@ const mint = Keypair.generate().publicKey.toBase58();
 describe("VaultDetail", () => {
   beforeEach(() => {
     fetchVaultStateMock.mockReset();
+    fetchMintConfigMock.mockReset();
     fetchUserPositionMock.mockReset();
     fetchWalletAssetBalanceMock.mockReset();
     buildDepositIxMock.mockClear();
     useWalletMock.mockReturnValue({ connected: false, publicKey: null });
     useConnectionMock.mockReturnValue({ connection: {} });
+    fetchMintConfigMock.mockResolvedValue({
+      version: 1,
+      bump: 255,
+      mint: new PublicKey(mint),
+      enabled: true,
+      maxTotalAssets: 1_000_000_000n,
+      maxDepositAssetsPerTransaction: 100_000_000n,
+      rolloutStage: RolloutStage.Devnet,
+      hasPendingUpdate: false,
+      pendingEnabled: false,
+      pendingMaxTotalAssets: 0n,
+      pendingMaxDepositAssetsPerTransaction: 0n,
+      pendingRolloutStage: RolloutStage.Devnet,
+      pendingEffectiveUnixTimestamp: 0n,
+    });
   });
 
   it("shows an invalid-mint state without calling the SDK", () => {
@@ -90,6 +108,64 @@ describe("VaultDetail", () => {
     expect(alert).toHaveTextContent(/account data is too small/i);
     expect(alert).toHaveTextContent(/older, incompatible program version/i);
     expect(screen.queryByText(/vault not found/i)).not.toBeInTheDocument();
+  });
+
+  it("keeps the vault and withdrawals visible while a missing MintConfig disables deposits", async () => {
+    useWalletMock.mockReturnValue({
+      connected: true,
+      publicKey: Keypair.generate().publicKey,
+      sendTransaction: vi.fn(),
+    });
+    fetchVaultStateMock.mockResolvedValue({
+      pauseAuthority: Keypair.generate().publicKey,
+      mint: new PublicKey(mint),
+      vaultBump: 255,
+      authorityBump: 254,
+      totalAssets: 10n,
+      totalShares: 10n,
+      operationalState: OperationalState.Active,
+    });
+    fetchMintConfigMock.mockResolvedValue(null);
+    fetchWalletAssetBalanceMock.mockResolvedValue(10n);
+    fetchUserPositionMock.mockResolvedValue({ shares: 5n });
+
+    render(<VaultDetail mintInput={mint} />);
+
+    expect(await screen.findByText(/no on-chain MintConfig/i)).to.exist;
+    expect(screen.getByRole("button", { name: /^deposit$/i })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: /^withdraw$/i })
+    ).not.toBeDisabled();
+    expect(screen.queryByText(/failed to load vault state/i)).to.equal(null);
+  });
+
+  it("fails only deposits closed when MintConfig decoding or RPC fails", async () => {
+    useWalletMock.mockReturnValue({
+      connected: true,
+      publicKey: Keypair.generate().publicKey,
+      sendTransaction: vi.fn(),
+    });
+    fetchVaultStateMock.mockResolvedValue({
+      pauseAuthority: Keypair.generate().publicKey,
+      mint: new PublicKey(mint),
+      vaultBump: 255,
+      authorityBump: 254,
+      totalAssets: 10n,
+      totalShares: 10n,
+      operationalState: OperationalState.Active,
+    });
+    fetchMintConfigMock.mockRejectedValue(new Error("private RPC detail"));
+    fetchWalletAssetBalanceMock.mockResolvedValue(10n);
+    fetchUserPositionMock.mockResolvedValue({ shares: 5n });
+
+    render(<VaultDetail mintInput={mint} />);
+
+    expect(await screen.findByText(/limits could not be verified/i)).to.exist;
+    expect(screen.queryByText(/private RPC detail/i)).to.equal(null);
+    expect(screen.getByRole("button", { name: /^deposit$/i })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: /^withdraw$/i })
+    ).not.toBeDisabled();
   });
 
   it("renders vault stats when fetchVaultState resolves a VaultState", async () => {

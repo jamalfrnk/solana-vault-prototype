@@ -24,11 +24,19 @@ import {
   buildEmergencyPauseIx,
   buildEmergencyResumeIx,
   buildInitializeProtocolConfigIx,
+  buildInitializeMintConfigIx,
+  buildProposeMintConfigUpdateIx,
+  buildExecuteMintConfigUpdateIx,
+  buildDisableMintIx,
+  buildLowerMintCapsIx,
 } from "./instructions";
 import {
   fetchProtocolConfig,
   fetchUserPosition,
   fetchVaultState,
+  fetchMintConfig,
+  MintConfig,
+  RolloutStage,
   OperationalStateReason,
   ProtocolConfig,
   UserPosition,
@@ -56,9 +64,15 @@ export class VaultClient {
 
   buildInitializeIx(
     payer: PublicKey,
-    pauseAuthority: PublicKey
+    pauseAuthority: PublicKey,
+    protocolGovernanceAuthority: PublicKey = pauseAuthority
   ): TransactionInstruction {
-    return buildInitializeIx({ payer, pauseAuthority, mint: this.mint });
+    return buildInitializeIx({
+      payer,
+      pauseAuthority,
+      protocolGovernanceAuthority,
+      mint: this.mint,
+    });
   }
 
   buildDepositIx(user: PublicKey, amount: bigint): TransactionInstruction {
@@ -145,12 +159,70 @@ export class VaultClient {
     return buildMigrateV0ToV1Ix({ mint: this.mint });
   }
 
+  buildInitializeMintConfigIx(
+    payer: PublicKey,
+    protocolGovernanceAuthority: PublicKey
+  ): TransactionInstruction {
+    return buildInitializeMintConfigIx({
+      payer,
+      protocolGovernanceAuthority,
+      mint: this.mint,
+    });
+  }
+
+  buildProposeMintConfigUpdateIx(
+    protocolGovernanceAuthority: PublicKey,
+    enabled: boolean,
+    maxTotalAssets: bigint,
+    maxDepositAssetsPerTransaction: bigint,
+    rolloutStage: RolloutStage
+  ): TransactionInstruction {
+    return buildProposeMintConfigUpdateIx({
+      protocolGovernanceAuthority,
+      mint: this.mint,
+      enabled,
+      maxTotalAssets,
+      maxDepositAssetsPerTransaction,
+      rolloutStage,
+    });
+  }
+
+  buildExecuteMintConfigUpdateIx(): TransactionInstruction {
+    return buildExecuteMintConfigUpdateIx(this.mint);
+  }
+
+  buildDisableMintIx(
+    protocolGovernanceAuthority: PublicKey
+  ): TransactionInstruction {
+    return buildDisableMintIx({
+      protocolGovernanceAuthority,
+      mint: this.mint,
+    });
+  }
+
+  buildLowerMintCapsIx(
+    pauseAuthority: PublicKey,
+    maxTotalAssets: bigint,
+    maxDepositAssetsPerTransaction: bigint
+  ): TransactionInstruction {
+    return buildLowerMintCapsIx({
+      pauseAuthority,
+      mint: this.mint,
+      maxTotalAssets,
+      maxDepositAssetsPerTransaction,
+    });
+  }
+
   fetchVaultState(): Promise<VaultState | null> {
     return fetchVaultState(this.connection, this.mint);
   }
 
   fetchProtocolConfig(): Promise<ProtocolConfig | null> {
     return fetchProtocolConfig(this.connection);
+  }
+
+  fetchMintConfig(): Promise<MintConfig | null> {
+    return fetchMintConfig(this.connection, this.mint);
   }
 
   fetchUserPosition(user: PublicKey): Promise<UserPosition | null> {

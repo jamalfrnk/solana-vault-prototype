@@ -53,7 +53,7 @@ describe("errors", () => {
       expect(result.message).to.include("System Program");
     });
 
-    it("recognizes every M21-M23 migration, config, version, and transition error number", () => {
+    it("recognizes every M21-M24 migration, config, version, cap, and transition error number", () => {
       const expected = [
         VaultErrorCode.UnsupportedVaultVersion,
         VaultErrorCode.VaultStateAlreadyMigrated,
@@ -71,6 +71,21 @@ describe("errors", () => {
         VaultErrorCode.InvalidProtocolConfigReservedBytes,
         VaultErrorCode.InvalidProtocolTokenProgram,
         VaultErrorCode.InvalidEmergencyStateTransition,
+        VaultErrorCode.MintAuthorityPresent,
+        VaultErrorCode.UnsupportedMintConfigVersion,
+        VaultErrorCode.InvalidMintConfigReservedBytes,
+        VaultErrorCode.InvalidMintConfigPendingState,
+        VaultErrorCode.InvalidMintConfigMint,
+        VaultErrorCode.MintDisabled,
+        VaultErrorCode.DepositCapExceeded,
+        VaultErrorCode.MaxTotalAssetsExceeded,
+        VaultErrorCode.InvalidMintCaps,
+        VaultErrorCode.CapReductionRequired,
+        VaultErrorCode.InvalidMintConfigUpdate,
+        VaultErrorCode.NoPendingMintConfigUpdate,
+        VaultErrorCode.MintConfigUpdateNotReady,
+        VaultErrorCode.TimestampOverflow,
+        VaultErrorCode.ArithmeticOverflow,
       ];
       for (const number of expected) {
         const result = parseVaultErrorFromLogs(

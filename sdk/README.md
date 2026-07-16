@@ -5,8 +5,9 @@ program — PDA derivation, instruction builders, account decoders, and Anchor
 error parsing, with no runtime dependency on a generated IDL. Every Anchor
 discriminator is computed directly (`sha256("global:<name>")` /
 `sha256("account:<Name>")`). CI verifies those values plus exact account field
-order/types/sizes, every instruction argument schema, and both operational-state enums
-against the program's real generated IDL (see `TEST_PLAN.md` in the repository root).
+order/types/sizes, every instruction argument schema, both operational-state enums,
+and MintConfig's rollout enum/events against the program's real generated IDL (see
+`TEST_PLAN.md` in the repository root).
 
 **Status**: versioned and buildable, not yet published to npm. Until then,
 import it directly from the repo (see `README.md`'s SDK section for the
@@ -51,6 +52,25 @@ lands in `ExitOnly`; no SDK builder can use that authority to reopen deposits. T
 builders prepare transactions only—production role addresses and signing remain an
 external governance responsibility.
 
+M24 adds `deriveMintConfigPda()`, strict `decodeMintConfig()` /
+`fetchMintConfig()`, five configuration builders, governed initialize/deposit account
+construction, cap errors, and event discriminator verification. A new config is always
+disabled with zero caps. Protocol governance must propose the complete enabled/cap/
+stage target, wait 172,800 seconds, and then anyone may execute that exact target.
+`buildDisableMintIx()` and `buildLowerMintCapsIx()` only reduce risk and clear pending
+updates. `buildWithdrawIx()` remains unchanged and never includes MintConfig.
+
+```ts
+const mintConfig = await client.fetchMintConfig();
+const maxNow = mintConfig?.enabled
+  ? mintConfig.maxDepositAssetsPerTransaction
+  : 0n;
+```
+
+Builders only prepare transactions. They do not choose production caps, provide
+multisig/timelock enforcement, or authorize signing. The public devnet address still
+runs the M23 binary and must not receive M24 instruction/account contracts.
+
 `fetchVaultState()` decodes only the exact 145-byte version-1 layout and fails closed
 on legacy 113-byte, compatible-but-unmigrated v0, unknown-version, invalid-state,
 nonzero-reserved, or incorrectly sized accounts. `inspectVaultStateAccount()` is the
@@ -72,5 +92,5 @@ migration transaction.
 ```bash
 corepack yarn install   # from the repo root
 corepack yarn sdk:build # emits dist/*.js + dist/*.d.ts
-corepack yarn test:sdk  # 87 offline tests
+corepack yarn test:sdk  # 112 offline tests
 ```

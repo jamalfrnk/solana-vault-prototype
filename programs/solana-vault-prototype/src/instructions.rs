@@ -1,6 +1,7 @@
 pub mod deposit;
 pub mod initialize;
 pub mod migrate;
+pub mod mint_config;
 pub mod pause;
 pub mod protocol;
 pub mod rotate;
@@ -14,6 +15,8 @@ pub use deposit::*;
 pub use initialize::*;
 #[allow(ambiguous_glob_reexports)]
 pub use migrate::*;
+#[allow(ambiguous_glob_reexports)]
+pub use mint_config::*;
 #[allow(ambiguous_glob_reexports)]
 pub use pause::*;
 #[allow(ambiguous_glob_reexports)]

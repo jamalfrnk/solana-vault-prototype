@@ -56,4 +56,38 @@ pub enum VaultError {
     InvalidProtocolTokenProgram,
     #[msg("The emergency authority cannot perform this operational-state transition")]
     InvalidEmergencyStateTransition,
+    #[msg("Mint has an active mint authority; the approved initial mint must have fixed supply")]
+    MintAuthorityPresent,
+    #[msg("MintConfig version is unsupported; only version 1 is current")]
+    UnsupportedMintConfigVersion,
+    #[msg("MintConfig reserved bytes must all be zero")]
+    InvalidMintConfigReservedBytes,
+    #[msg("MintConfig pending-update fields are malformed")]
+    InvalidMintConfigPendingState,
+    #[msg("MintConfig does not match the requested mint")]
+    InvalidMintConfigMint,
+    #[msg("Mint is disabled by its on-chain MintConfig")]
+    MintDisabled,
+    #[msg("Per-transaction deposit cap exceeded")]
+    DepositCapExceeded,
+    #[msg("Deposit would exceed the configured maximum total assets")]
+    MaxTotalAssetsExceeded,
+    #[msg("Per-transaction cap must not exceed the maximum total-assets cap")]
+    InvalidMintCaps,
+    #[msg(
+        "Immediate cap changes must strictly reduce at least one cap and cannot increase either"
+    )]
+    CapReductionRequired,
+    #[msg(
+        "Proposed MintConfig update must be risk-increasing and advance at most one rollout stage"
+    )]
+    InvalidMintConfigUpdate,
+    #[msg("No MintConfig update is pending")]
+    NoPendingMintConfigUpdate,
+    #[msg("MintConfig update timelock has not elapsed")]
+    MintConfigUpdateNotReady,
+    #[msg("Timestamp arithmetic overflowed")]
+    TimestampOverflow,
+    #[msg("Checked arithmetic overflowed")]
+    ArithmeticOverflow,
 }

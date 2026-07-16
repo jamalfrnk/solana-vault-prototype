@@ -2,6 +2,7 @@ import { expect } from "chai";
 
 import {
   accountDiscriminator,
+  eventDiscriminator,
   instructionDiscriminator,
 } from "../src/discriminator";
 import { verifyIdlDocument } from "../../scripts/verify_idl_discriminators";
@@ -18,6 +19,11 @@ const instructionNames = [
   "initialize_protocol_config",
   "emergency_pause",
   "emergency_resume",
+  "initialize_mint_config",
+  "propose_mint_config_update",
+  "execute_mint_config_update",
+  "disable_mint",
+  "lower_mint_caps",
 ];
 
 const instructionArgs: Record<string, { name: string; type: unknown }[]> = {
@@ -56,6 +62,75 @@ const instructionArgs: Record<string, { name: string; type: unknown }[]> = {
       type: { defined: { name: "OperationalStateReason" } },
     },
   ],
+  initialize_mint_config: [],
+  propose_mint_config_update: [
+    { name: "enabled", type: "bool" },
+    { name: "max_total_assets", type: "u64" },
+    { name: "max_deposit_assets_per_transaction", type: "u64" },
+    { name: "rollout_stage", type: { defined: { name: "RolloutStage" } } },
+  ],
+  execute_mint_config_update: [],
+  disable_mint: [],
+  lower_mint_caps: [
+    { name: "max_total_assets", type: "u64" },
+    { name: "max_deposit_assets_per_transaction", type: "u64" },
+  ],
+};
+
+const eventFields: Record<string, { name: string; type: unknown }[]> = {
+  MintConfigInitialized: [
+    { name: "mint_config", type: "pubkey" },
+    { name: "mint", type: "pubkey" },
+    { name: "authority", type: "pubkey" },
+    { name: "enabled", type: "bool" },
+    { name: "max_total_assets", type: "u64" },
+    { name: "max_deposit_assets_per_transaction", type: "u64" },
+    { name: "rollout_stage", type: "u8" },
+    { name: "slot", type: "u64" },
+    { name: "unix_timestamp", type: "i64" },
+    { name: "version", type: "u8" },
+  ],
+  MintConfigUpdateProposed: [
+    { name: "mint_config", type: "pubkey" },
+    { name: "mint", type: "pubkey" },
+    { name: "authority", type: "pubkey" },
+    { name: "previous_enabled", type: "bool" },
+    { name: "previous_max_total_assets", type: "u64" },
+    {
+      name: "previous_max_deposit_assets_per_transaction",
+      type: "u64",
+    },
+    { name: "previous_rollout_stage", type: "u8" },
+    { name: "proposed_enabled", type: "bool" },
+    { name: "proposed_max_total_assets", type: "u64" },
+    {
+      name: "proposed_max_deposit_assets_per_transaction",
+      type: "u64",
+    },
+    { name: "proposed_rollout_stage", type: "u8" },
+    { name: "effective_unix_timestamp", type: "i64" },
+    { name: "slot", type: "u64" },
+    { name: "unix_timestamp", type: "i64" },
+  ],
+  MintConfigChanged: [
+    { name: "mint_config", type: "pubkey" },
+    { name: "mint", type: "pubkey" },
+    { name: "authority", type: "pubkey" },
+    { name: "previous_enabled", type: "bool" },
+    { name: "previous_max_total_assets", type: "u64" },
+    {
+      name: "previous_max_deposit_assets_per_transaction",
+      type: "u64",
+    },
+    { name: "previous_rollout_stage", type: "u8" },
+    { name: "new_enabled", type: "bool" },
+    { name: "new_max_total_assets", type: "u64" },
+    { name: "new_max_deposit_assets_per_transaction", type: "u64" },
+    { name: "new_rollout_stage", type: "u8" },
+    { name: "slot", type: "u64" },
+    { name: "unix_timestamp", type: "i64" },
+    { name: "change_kind", type: "u8" },
+  ],
 };
 
 function validIdl(): Record<string, unknown> {
@@ -65,9 +140,18 @@ function validIdl(): Record<string, unknown> {
       discriminator: Array.from(instructionDiscriminator(name)),
       args: instructionArgs[name],
     })),
-    accounts: ["VaultState", "UserPosition", "ProtocolConfig"].map((name) => ({
+    accounts: [
+      "VaultState",
+      "UserPosition",
+      "ProtocolConfig",
+      "MintConfig",
+    ].map((name) => ({
       name,
       discriminator: Array.from(accountDiscriminator(name)),
+    })),
+    events: Object.keys(eventFields).map((name) => ({
+      name,
+      discriminator: Array.from(eventDiscriminator(name)),
     })),
     types: [
       {
@@ -90,6 +174,18 @@ function validIdl(): Record<string, unknown> {
             { name: "ExposureReduction" },
             { name: "IncidentResolved" },
             { name: "GovernanceAction" },
+          ],
+        },
+      },
+      {
+        name: "RolloutStage",
+        type: {
+          kind: "enum",
+          variants: [
+            { name: "Devnet" },
+            { name: "Canary" },
+            { name: "Limited" },
+            { name: "Expanded" },
           ],
         },
       },
@@ -141,6 +237,41 @@ function validIdl(): Record<string, unknown> {
           ],
         },
       },
+      {
+        name: "MintConfig",
+        type: {
+          kind: "struct",
+          fields: [
+            { name: "version", type: "u8" },
+            { name: "bump", type: "u8" },
+            { name: "mint", type: "pubkey" },
+            { name: "enabled", type: "bool" },
+            { name: "max_total_assets", type: "u64" },
+            { name: "max_deposit_assets_per_transaction", type: "u64" },
+            {
+              name: "rollout_stage",
+              type: { defined: { name: "RolloutStage" } },
+            },
+            { name: "has_pending_update", type: "bool" },
+            { name: "pending_enabled", type: "bool" },
+            { name: "pending_max_total_assets", type: "u64" },
+            {
+              name: "pending_max_deposit_assets_per_transaction",
+              type: "u64",
+            },
+            {
+              name: "pending_rollout_stage",
+              type: { defined: { name: "RolloutStage" } },
+            },
+            { name: "pending_effective_unix_timestamp", type: "i64" },
+            { name: "reserved", type: { array: ["u8", 73] } },
+          ],
+        },
+      },
+      ...Object.entries(eventFields).map(([name, fields]) => ({
+        name,
+        type: { kind: "struct", fields },
+      })),
     ],
   };
 }
@@ -214,5 +345,22 @@ describe("full IDL account-layout verification", () => {
     const errors = verifyIdlDocument(idl).join("\n");
     expect(errors).to.match(/ProtocolConfig.*reserved|field.*6/i);
     expect(errors).to.match(/200|size/i);
+  });
+
+  it("rejects MintConfig layout, RolloutStage, and event drift", () => {
+    const idl = validIdl() as any;
+    idl.types.find(
+      (entry: any) => entry.name === "MintConfig"
+    ).type.fields[13].type.array[1] = 72;
+    idl.types.find(
+      (entry: any) => entry.name === "RolloutStage"
+    ).type.variants[1].name = "Pilot";
+    idl.types.find(
+      (entry: any) => entry.name === "MintConfigChanged"
+    ).type.fields[13].name = "kind";
+    const errors = verifyIdlDocument(idl).join("\n");
+    expect(errors).to.match(/MintConfig.*reserved|field.*13|160|size/i);
+    expect(errors).to.match(/RolloutStage/i);
+    expect(errors).to.match(/event MintConfigChanged/i);
   });
 });

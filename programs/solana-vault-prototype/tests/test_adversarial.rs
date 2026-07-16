@@ -3,6 +3,8 @@
 /// Covers every SECURITY_CHECKLIST item not already exercised by M4-M7 tests:
 /// missing signers, wrong PDAs, account substitution, unrelated vault/user combos,
 /// wrong token program, overflow/boundary arithmetic.
+mod support;
+
 use {
     anchor_lang::{
         solana_program::instruction::{AccountMeta, Instruction},
@@ -41,10 +43,9 @@ fn system_program_id() -> Pubkey {
     Pubkey::from(anchor_lang::system_program::ID.to_bytes())
 }
 
-fn make_mint_account(mint_authority: &Pubkey, decimals: u8) -> Account {
+fn make_mint_account(_mint_authority: &Pubkey, decimals: u8) -> Account {
     let mut data = vec![0u8; 82];
-    data[0] = 1;
-    data[4..36].copy_from_slice(mint_authority.as_ref());
+    // [0..36] COption::None mint_authority: fixed supply required by M24.
     data[44] = decimals;
     data[45] = 1;
     Account {
@@ -153,6 +154,9 @@ fn make_initialize_ix(
             token_program: spl_token_id(),
             associated_token_program: ata_program_id(),
             system_program: system_program_id(),
+            protocol_governance_authority: payer,
+            protocol_config: support::find_protocol_config().0,
+            mint_config: support::find_mint_config(&mint).0,
         }
         .to_account_metas(None),
     )
@@ -182,6 +186,7 @@ fn make_deposit_ix(
             mint,
             token_program: spl_token_id(),
             system_program: system_program_id(),
+            mint_config: support::find_mint_config(&mint).0,
         }
         .to_account_metas(None),
     )
@@ -243,6 +248,7 @@ impl Vault {
         svm.airdrop(&payer.pubkey(), 10_000_000_000).unwrap();
         svm.set_account(mint_pk, make_mint_account(&keypair_pubkey(&ma), 6))
             .unwrap();
+        support::install_enabled_test_configs(&mut svm, keypair_pubkey(&payer), mint_pk);
 
         let (vault_state_pda, _) = find_vault_state(&mint_pk, &pid);
         let (vault_authority_pda, _) = find_vault_authority(&vault_state_pda, &pid);
@@ -381,6 +387,7 @@ fn test_deposit_wrong_vault_state() {
     v.svm
         .set_account(mint2_pk, make_mint_account(&keypair_pubkey(&ma2), 6))
         .unwrap();
+    support::install_enabled_test_configs(&mut v.svm, keypair_pubkey(&v.payer), mint2_pk);
     let (vs2, _) = find_vault_state(&mint2_pk, &v.pid);
     let (va2, _) = find_vault_authority(&vs2, &v.pid);
     let custody2 = ata(&va2, &mint2_pk);
@@ -585,6 +592,7 @@ fn test_deposit_wrong_token_program() {
             mint: v.mint_pk,
             token_program: fake_token_program,
             system_program: system_program_id(),
+            mint_config: support::find_mint_config(&v.mint_pk).0,
         }
         .to_account_metas(None),
     );
@@ -818,6 +826,7 @@ fn test_initialize_succeeds_with_preexisting_dust_in_custody_ata() {
     svm.airdrop(&payer.pubkey(), 10_000_000_000).unwrap();
     svm.set_account(mint_pk, make_mint_account(&keypair_pubkey(&ma), 6))
         .unwrap();
+    support::install_enabled_test_configs(&mut svm, keypair_pubkey(&payer), mint_pk);
 
     let (vault_state_pda, _) = find_vault_state(&mint_pk, &pid);
     let (vault_authority_pda, _) = find_vault_authority(&vault_state_pda, &pid);

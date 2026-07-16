@@ -15,9 +15,12 @@ exit-first slice: deposits require `Active`, withdrawals are permitted in `Activ
 `ExitOnly`, `FullyPaused` blocks both, and ordinary pause/unpause calls carry bounded,
 timestamped transition evidence. Milestone 23 implements the frozen version-1
 `ProtocolConfig` singleton and its separate emergency-authority path into
-`FullyPaused` and back first to `ExitOnly`. Mint allowlisting, governed vault
-initialization, caps, role rotation/timelocks, excess recovery, production multisig
-configuration, and 113-byte account retirement remain unimplemented.
+`FullyPaused` and back first to `ExitOnly`. Milestone 24 implements the exact
+version-1 `MintConfig`, fixed-supply legacy-SPL mint approval, governed vault
+initialization, timelocked risk increases, immediate risk reduction, and constant-time
+deposit exposure caps. Role rotation/timelocks, excess recovery, production multisig
+configuration, deployment of this M24 binary, and 113-byte account retirement remain
+unimplemented.
 
 ## Devnet deployment generations
 
@@ -30,6 +33,10 @@ This generation split preserves the old withdrawal-compatible binary while allow
 fresh 145-byte v1 demonstration; it is not account migration or legacy retirement.
 Public deployment and non-mutation evidence is recorded in
 [`docs/DEVNET_V1_DEPLOYMENT.md`](docs/DEVNET_V1_DEPLOYMENT.md).
+The repository source now contains M24 interfaces that this M23 devnet binary does
+not. Do not send M24 instructions or use the governed M24 initialize/deposit account
+contracts against that address until a separate deployment review records a new
+verified binary and compatible fixture.
 
 ## Accepted pre-audit target and implementation status
 
@@ -39,7 +46,7 @@ Public deployment and non-mutation evidence is recorded in
 | Pause | `Active`, `ExitOnly`, and exceptional `FullyPaused`; M22 implements exit-first gates/evidence and ordinary controls, and M23 implements the separate ProtocolConfig emergency path | [0004](docs/decisions/0004-exit-first-pause-semantics.md) |
 | Versioning | Same-size 145-byte VaultState v1 and deterministic v0 migration implemented in M21; 113-byte devnet retirement pending | [0005](docs/decisions/0005-account-versioning-and-migration.md) |
 | Upgrades | Established 3-of-5 multisig, 48-hour ordinary timelock, 4-of-5 emergency path, and later immutability review | [0006](docs/decisions/0006-upgrade-governance-and-immutability.md) |
-| Mint and exposure | Governance allowlist, one mint- and freeze-authority-free legacy SPL mint initially, on-chain TVL/deposit caps, and staged rollout | [0007](docs/decisions/0007-mint-policy-and-exposure-limits.md) |
+| Mint and exposure | M24 implements a governed fixed-supply legacy-SPL allowlist, 48-hour risk-increase delay, immediate risk reduction, on-chain TVL/deposit caps, and staged rollout; production values/deployment remain pending | [0007](docs/decisions/0007-mint-policy-and-exposure-limits.md) |
 | Donations | Internal accounting remains authoritative; only exact excess may be swept to the configured treasury while not active | [0008](docs/decisions/0008-donations-and-excess-recovery.md) |
 | Operations | Separated incident roles, explicit invariants, launch blockers, and sequential implementation/audit gates | [0009](docs/decisions/0009-incident-response-and-launch-gates.md) |
 
@@ -47,9 +54,9 @@ M21 reuses the former pause byte as `operational_state` and the first former
 reserved byte as `version`, so the 145-byte VaultState does not grow. Migration maps
 legacy `false`/`0` to `Active` and `true`/`1` to `ExitOnly` deterministically.
 M23 adds the separate versioned ProtocolConfig PDA without consuming any VaultState
-reserved bytes. Mint approval still requires the future MintConfig PDA. Later
-milestones must implement one accepted slice at a time before this document can
-describe that slice as current behavior.
+reserved bytes. M24 adds a separate per-mint MintConfig PDA, so neither change consumes
+VaultState reserved capacity. Later milestones must implement one accepted slice at a
+time before this document can describe that slice as current behavior.
 
 ## High-level design
 
@@ -88,6 +95,7 @@ authoritative.
 | `vault_authority` | `["vault_authority", vault_state]` | `VaultState.authority_bump` | PDA signer that owns custody ATA and signs withdrawals |
 | `user_position` | `["user_position", vault_state, user]` | `UserPosition.bump` | Per-user share ledger |
 | `protocol_config` | `["protocol_config"]` | `ProtocolConfig.bump` | Singleton protocol roles and canonical token-program identity |
+| `mint_config` | `["mint_config", mint]` | `MintConfig.bump` | Per-mint approval, staged exposure limits, and committed delayed update |
 
 ---
 
@@ -127,7 +135,7 @@ one-time bootstrap:
 | 0–7 | account discriminator | `[u8; 8]` | Anchor `ProtocolConfig` discriminator |
 | 8 | `version` | `u8` | Exactly `1` |
 | 9 | `bump` | `u8` | Canonical `["protocol_config"]` PDA bump |
-| 10–41 | `protocol_governance_authority` | `Pubkey` | Reserved for later governed configuration work |
+| 10–41 | `protocol_governance_authority` | `Pubkey` | Governs M24 mint approval, delayed risk increases, disablement, and vault creation |
 | 42–73 | `emergency_authority` | `Pubkey` | Sole M23 authority for exceptional full-pause transitions |
 | 74–105 | `treasury` | `Pubkey` | Reserved for later constrained excess recovery |
 | 106–137 | `token_program` | `Pubkey` | Canonical legacy SPL Token Program, assigned by program code |
@@ -136,6 +144,35 @@ one-time bootstrap:
 All three role addresses are non-default and pairwise distinct. This separation is
 structural but is not yet a production multisig/timelock deployment: M23 chooses no
 live addresses and performs no bootstrap transaction.
+
+### MintConfig
+
+The M24 per-mint configuration is exactly 160 bytes. Every consumer verifies its
+canonical PDA/bump/mint, version 1, bounded rollout enum, canonical pending state, and
+73 zero reserved bytes:
+
+| Offset | Field | Type | Notes |
+|--------|-------|------|-------|
+| 0–7 | account discriminator | `[u8; 8]` | Anchor `MintConfig` discriminator |
+| 8 | `version` | `u8` | Exactly `1` |
+| 9 | `bump` | `u8` | Canonical `["mint_config", mint]` PDA bump |
+| 10–41 | `mint` | `Pubkey` | Approved canonical legacy-SPL mint |
+| 42 | `enabled` | `bool` | Disabled blocks initialize/deposit, never withdraw |
+| 43–50 | `max_total_assets` | `u64` | Maximum accounted vault assets in mint base units |
+| 51–58 | `max_deposit_assets_per_transaction` | `u64` | Maximum single deposit; must not exceed total cap |
+| 59 | `rollout_stage` | `RolloutStage` | `Devnet=0`, `Canary=1`, `Limited=2`, `Expanded=3` |
+| 60 | `has_pending_update` | `bool` | Whether an exact delayed target is committed |
+| 61 | `pending_enabled` | `bool` | Pending target; true for every valid proposal |
+| 62–69 | `pending_max_total_assets` | `u64` | Exact delayed total-assets cap |
+| 70–77 | `pending_max_deposit_assets_per_transaction` | `u64` | Exact delayed per-transaction cap |
+| 78 | `pending_rollout_stage` | `RolloutStage` | Same stage or one-step promotion only |
+| 79–86 | `pending_effective_unix_timestamp` | `i64` | Proposal time plus exactly 172,800 seconds |
+| 87–159 | `reserved` | `[u8; 73]` | Must remain all zero in v1 |
+
+Initialization always assigns disabled, zero-cap `Devnet` state; callers choose no
+initial exposure. When no proposal exists every pending field must hold its canonical
+zero/`Devnet` value. This makes malformed state fail closed and prevents a mistaken
+initial cap from becoming an irreducible pre-vault floor.
 
 ### UserPosition
 
@@ -186,22 +223,48 @@ choose the token program. Immutable programs and substituted ProgramData fail cl
 Success emits `ProtocolConfigInitialized` with every configured identity, slot, Unix
 timestamp, and version.
 
+### `initialize_mint_config` and configuration lifecycle (M24)
+
+`initialize_mint_config` requires a payer, the configured protocol-governance signer,
+canonical version-1 ProtocolConfig, fixed-supply legacy-SPL mint with neither mint nor
+freeze authority, canonical MintConfig PDA, and System Program. It creates exactly the
+disabled, zero-cap `Devnet` state above and emits `MintConfigInitialized`.
+
+Risk-increasing changes use two instructions. `propose_mint_config_update` requires
+protocol governance and commits the complete enabled/caps/stage target plus an
+effective Unix timestamp exactly 172,800 seconds later. Caps cannot decrease, the mint
+must end enabled, and stage may stay fixed or advance by one. A later proposal replaces
+the previous complete target. `execute_mint_config_update` is permissionless only
+after the boundary and copies those exact committed values; it accepts no arguments
+that could change the proposal.
+
+Risk reduction is immediate. Protocol governance may `disable_mint`; the current
+vault pause authority may `lower_mint_caps` but never increase either cap. Both clear
+the pending update so delayed execution cannot undo incident response. Initialization,
+proposal, execution, disablement, and reduction emit bounded slot/timestamp evidence;
+none can transfer custody or alter vault accounting.
+
 ### `initialize`
 
 | Account | Type | Signer | Mut | Constraint |
 |---------|------|--------|-----|------------|
 | `payer` | `Signer` | yes | yes | Pays rent for vault_state and custody |
-| `pause_authority` | `Pubkey` | yes | no | Stored in VaultState |
-| `mint` | `Account<Mint>` | no | no | The accepted deposit mint; `freeze_authority` must be `None` (M12) |
+| `pause_authority` | `Signer` | yes | no | Stored in VaultState and must differ from payer |
+| `mint` | `Account<Mint>` | no | no | Must have neither mint nor freeze authority |
 | `vault_state` | `Account<VaultState>` | no | yes | PDA init: seeds = ["vault", mint] |
 | `vault_authority` | `UncheckedAccount` | no | no | PDA: seeds = ["vault_authority", vault_state]; owner = System Program (M12) |
 | `custody` | `Account<TokenAccount>` | no | yes | ATA init_if_needed (M12): owner = vault_authority, mint = mint |
 | `token_program` | `Program<Token>` | no | no | SPL Token |
 | `associated_token_program` | `Program<AssociatedToken>` | no | no | For ATA init |
 | `system_program` | `Program<System>` | no | no | For account init |
+| `protocol_governance_authority` | `Signer` | yes | no | Must match ProtocolConfig governance |
+| `protocol_config` | `Account<ProtocolConfig>` | no | no | Canonical version 1, legacy token program, zero reserved bytes |
+| `mint_config` | `Account<MintConfig>` | no | no | Canonical matching version 1, enabled, structurally valid |
 
 State changes: sets all VaultState fields; `total_assets = 0`, `total_shares = 0`,
 `operational_state = Active`, `version = 1`, and all reserved bytes zero.
+The additional governance signature and enabled MintConfig prevent an arbitrary caller
+from occupying the canonical vault PDA with an attacker-selected pause authority.
 
 ### `deposit`
 
@@ -216,9 +279,12 @@ State changes: sets all VaultState fields; `total_assets = 0`, `total_shares = 0
 | `mint` | `Account<Mint>` | no | no | For transfer_checked decimals |
 | `token_program` | `Program<Token>` | no | no | SPL Token |
 | `system_program` | `Program<System>` | no | no | For init_if_needed |
+| `mint_config` | `Account<MintConfig>` | no | no | Canonical matching enabled config; boxed read-only to stay below the SBF stack limit |
 
 Arguments: `amount: u64`
-Preconditions: `amount > 0`, `version == 1`, `operational_state == Active`, user has sufficient token balance.
+Preconditions: `amount > 0`, `version == 1`, `operational_state == Active`, config is
+enabled and structurally valid, `amount <= max_deposit_assets_per_transaction`, checked
+`total_assets + amount <= max_total_assets`, and the user has sufficient token balance.
 State changes: shares_out credited to user_position; total_assets += amount; total_shares += shares_out.
 CPI: `token::transfer_checked(user_token_account → custody, authority = user, amount, decimals)`.
 Postconditions: `shares_out > 0`.
@@ -242,6 +308,9 @@ and `operational_state` is `Active` or `ExitOnly`. `FullyPaused` fails closed.
 State changes: user_position.shares -= shares_in; total_shares -= shares_in; total_assets -= assets_out.
 CPI: `token::transfer_checked(custody → user_token_account, authority = vault_authority PDA, amount = assets_out, decimals)`.
 Postconditions: `assets_out > 0`.
+
+`withdraw` deliberately has no MintConfig account. Disablement, zero/reduced caps,
+pending updates, and rollout stage therefore cannot make a valid exit unavailable.
 
 ### `pause` / `unpause`
 
@@ -407,6 +476,15 @@ Rounding direction: floor (favors vault; dust accumulates in custody).
     ordinary pause authority after incident reconciliation.
 13. ProtocolConfig v1 has one canonical PDA, the canonical legacy token program,
     non-default separated roles, and zero reserved bytes.
+14. MintConfig v1 has one canonical PDA per mint, exact 160-byte structure, matching
+    mint/bump, bounded stages, canonical pending fields, and zero reserved bytes.
+15. MintConfig creation assigns no exposure. Enablement, cap increases, and stage
+    promotion require a complete 48-hour committed target; immediate paths only reduce
+    risk and cancel that target.
+16. `initialize` requires protocol governance plus an enabled matching config, and
+    `deposit` enforces both configured caps before CPI or state mutation.
+17. Withdrawals never load MintConfig and remain governed only by ownership,
+    accounting, token, PDA, version, and `Active`/`ExitOnly` availability checks.
 
 ---
 
@@ -414,7 +492,7 @@ Rounding direction: floor (favors vault; dust accumulates in custody).
 
 ```
 Uninitialized
-     │ initialize(v1)
+     │ initialize(v1; governance + enabled MintConfig)
      ▼
   Active  ◄──────────────── unpause
      │                          ▲
@@ -426,17 +504,23 @@ Legacy v0 Active/Paused ── migrate_v0_to_v1 ──► v1 Active/ExitOnly
 
  Any valid state ── emergency_pause ──► FullyPaused
  FullyPaused ── emergency_resume ──► ExitOnly
+
+MintConfig absent ── initialize_mint_config ──► Disabled / zero caps / Devnet
+Disabled or enabled ── propose target ── 48 hours ── permissionless execute
+Any MintConfig ── governance disable ──► Disabled
+Existing vault caps ── pause-authority reduction ──► Lower or zero caps
 ```
 
 Deposit is available only in `Active`. Withdraw is available in `Active` and
 `ExitOnly`, preserving user exits during the default incident response. `FullyPaused`
 blocks both paths and the ordinary pause authority cannot alter it. The M23 emergency
 authority may enter it and may recover only to `ExitOnly`, never directly to `Active`.
-Initialize is available regardless of pause state (vault is initialized exactly once).
+Initialize is available only once, with protocol governance and an enabled matching
+MintConfig. Configuration state affects initialization and deposits only, never exits.
 
 ---
 
-## Events (M12)
+## Events (M12–M24)
 
 Each instruction emits an Anchor event (`#[event]` + `emit!()`) at the end of its
 handler, after all state mutation, so every event reflects final post-instruction state.
@@ -454,6 +538,9 @@ one.
 | `PauseAuthorityRotated` | `vault`, `old_authority`, `new_authority` | `accept_pause_authority` (M18) |
 | `VaultStateMigrated` | `vault`, `old_version`, `new_version`, `operational_state` | `migrate_v0_to_v1` (M21) |
 | `ProtocolConfigInitialized` | `protocol_config`, `initializer`, three role addresses, `token_program`, `slot`, `unix_timestamp`, `version` | `initialize_protocol_config` (M23) |
+| `MintConfigInitialized` | config/mint/authority, disabled zero-cap stage, slot, Unix timestamp, version | `initialize_mint_config` (M24) |
+| `MintConfigUpdateProposed` | config/mint/authority, complete previous/proposed target, effective time, slot, Unix timestamp | `propose_mint_config_update` (M24) |
+| `MintConfigChanged` | config/mint/authority, complete previous/new state, slot, Unix timestamp, bounded change kind | execute, disable, and lower-cap paths (M24) |
 
 ## Governance-ready pause authority (M16)
 

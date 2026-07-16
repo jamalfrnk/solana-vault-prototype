@@ -10,6 +10,7 @@ import {
   VAULT_AUTHORITY_SEED,
   USER_POSITION_SEED,
   PROTOCOL_CONFIG_SEED,
+  MINT_CONFIG_SEED,
   BPF_UPGRADEABLE_LOADER_PROGRAM_ID,
 } from "../src/constants";
 import {
@@ -18,6 +19,7 @@ import {
   deriveUserPositionPda,
   deriveAssociatedTokenAddress,
   deriveProtocolConfigPda,
+  deriveMintConfigPda,
   deriveProgramDataPda,
 } from "../src/pdas";
 
@@ -40,6 +42,7 @@ describe("pdas", () => {
       LEGACY_DEVNET_PROGRAM_ID
     );
     const config = deriveProtocolConfigPda(LEGACY_DEVNET_PROGRAM_ID);
+    const mintConfig = deriveMintConfigPda(mint, LEGACY_DEVNET_PROGRAM_ID);
     const programData = deriveProgramDataPda(LEGACY_DEVNET_PROGRAM_ID);
 
     expect(
@@ -65,6 +68,12 @@ describe("pdas", () => {
         [PROTOCOL_CONFIG_SEED],
         LEGACY_DEVNET_PROGRAM_ID
       )[0].equals(config.address)
+    ).to.equal(true);
+    expect(
+      PublicKey.findProgramAddressSync(
+        [MINT_CONFIG_SEED, mint.toBuffer()],
+        LEGACY_DEVNET_PROGRAM_ID
+      )[0].equals(mintConfig.address)
     ).to.equal(true);
     expect(
       PublicKey.findProgramAddressSync(
@@ -96,6 +105,22 @@ describe("pdas", () => {
       const actual = deriveProgramDataPda();
       expect(actual.address.equals(expected)).to.equal(true);
       expect(actual.bump).to.equal(bump);
+    });
+  });
+
+  describe("deriveMintConfigPda", () => {
+    it("matches the canonical per-mint derivation and differs by mint", () => {
+      const mint = randomPubkey();
+      const [expected, bump] = PublicKey.findProgramAddressSync(
+        [MINT_CONFIG_SEED, mint.toBuffer()],
+        PROGRAM_ID
+      );
+      const actual = deriveMintConfigPda(mint);
+      expect(actual.address.equals(expected)).to.equal(true);
+      expect(actual.bump).to.equal(bump);
+      expect(
+        actual.address.equals(deriveMintConfigPda(randomPubkey()).address)
+      ).to.equal(false);
     });
   });
 

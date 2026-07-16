@@ -28,6 +28,21 @@ export enum VaultErrorCode {
   InvalidProtocolConfigReservedBytes = 6023,
   InvalidProtocolTokenProgram = 6024,
   InvalidEmergencyStateTransition = 6025,
+  MintAuthorityPresent = 6026,
+  UnsupportedMintConfigVersion = 6027,
+  InvalidMintConfigReservedBytes = 6028,
+  InvalidMintConfigPendingState = 6029,
+  InvalidMintConfigMint = 6030,
+  MintDisabled = 6031,
+  DepositCapExceeded = 6032,
+  MaxTotalAssetsExceeded = 6033,
+  InvalidMintCaps = 6034,
+  CapReductionRequired = 6035,
+  InvalidMintConfigUpdate = 6036,
+  NoPendingMintConfigUpdate = 6037,
+  MintConfigUpdateNotReady = 6038,
+  TimestampOverflow = 6039,
+  ArithmeticOverflow = 6040,
 }
 
 export interface ParsedVaultError {

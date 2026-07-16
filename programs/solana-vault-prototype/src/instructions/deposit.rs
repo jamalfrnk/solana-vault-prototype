@@ -2,10 +2,10 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{transfer_checked, Mint, Token, TokenAccount, TransferChecked};
 
 use crate::{
-    constants::{USER_POSITION_SEED, VAULT_AUTHORITY_SEED, VAULT_SEED},
+    constants::{MINT_CONFIG_SEED, USER_POSITION_SEED, VAULT_AUTHORITY_SEED, VAULT_SEED},
     error::VaultError,
     events::Deposited,
-    state::{UserPosition, VaultState, VAULT_STATE_VERSION_V1},
+    state::{MintConfig, UserPosition, VaultState, MINT_CONFIG_VERSION_V1, VAULT_STATE_VERSION_V1},
 };
 
 #[derive(Accounts)]
@@ -59,12 +59,39 @@ pub struct Deposit<'info> {
 
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
+
+    #[account(
+        seeds = [MINT_CONFIG_SEED, vault_state.mint.as_ref()],
+        bump = mint_config.bump,
+        constraint = mint_config.version == MINT_CONFIG_VERSION_V1
+            @ VaultError::UnsupportedMintConfigVersion,
+        constraint = mint_config.mint == vault_state.mint @ VaultError::InvalidMintConfigMint,
+        constraint = mint_config.enabled @ VaultError::MintDisabled,
+        constraint = mint_config.reserved.iter().all(|byte| *byte == 0)
+            @ VaultError::InvalidMintConfigReservedBytes,
+        constraint = mint_config.pending_state_is_valid()
+            @ VaultError::InvalidMintConfigPendingState,
+    )]
+    pub mint_config: Box<Account<'info, MintConfig>>,
 }
 
 pub fn handler(ctx: Context<Deposit>, amount: u64) -> Result<()> {
     require!(amount > 0, VaultError::ZeroAmount);
 
     let vs = &ctx.accounts.vault_state;
+    let mint_config = &ctx.accounts.mint_config;
+    require!(
+        amount <= mint_config.max_deposit_assets_per_transaction,
+        VaultError::DepositCapExceeded
+    );
+    let new_total_assets = vs
+        .total_assets
+        .checked_add(amount)
+        .ok_or(VaultError::ArithmeticOverflow)?;
+    require!(
+        new_total_assets <= mint_config.max_total_assets,
+        VaultError::MaxTotalAssetsExceeded
+    );
 
     // Share issuance: 1:1 on first deposit; proportional thereafter.
     let shares_out: u64 = if vs.total_shares == 0 {
@@ -96,10 +123,7 @@ pub fn handler(ctx: Context<Deposit>, amount: u64) -> Result<()> {
 
     // Update vault accounting.
     let vs = &mut ctx.accounts.vault_state;
-    vs.total_assets = vs
-        .total_assets
-        .checked_add(amount)
-        .ok_or(VaultError::ZeroDenominator)?;
+    vs.total_assets = new_total_assets;
     vs.total_shares = vs
         .total_shares
         .checked_add(shares_out)

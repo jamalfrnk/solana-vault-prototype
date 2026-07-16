@@ -9,6 +9,8 @@
  * enum so pause/unpause wire changes cannot silently drift from the SDK.
  * M23 adds the three emergency/config instruction schemas and freezes the exact
  * 200-byte ProtocolConfig layout alongside VaultState and UserPosition.
+ * M24 adds five MintConfig/configuration instruction schemas, the exact
+ * 160-byte MintConfig layout, RolloutStage, and the three configuration events.
  */
 
 import * as fs from "fs";
@@ -16,6 +18,7 @@ import * as path from "path";
 
 import {
   accountDiscriminator,
+  eventDiscriminator,
   instructionDiscriminator,
 } from "../sdk/src/discriminator";
 
@@ -45,6 +48,7 @@ interface IdlDocument {
     args?: IdlField[];
   }[];
   accounts?: { name: string; discriminator?: number[] }[];
+  events?: { name: string; discriminator?: number[] }[];
   types?: IdlTypeDefinition[];
 }
 
@@ -83,6 +87,19 @@ const INSTRUCTION_LAYOUTS: Record<string, IdlField[]> = {
       name: "reason",
       type: { defined: { name: "OperationalStateReason" } },
     },
+  ],
+  initialize_mint_config: [],
+  propose_mint_config_update: [
+    { name: "enabled", type: "bool" },
+    { name: "max_total_assets", type: "u64" },
+    { name: "max_deposit_assets_per_transaction", type: "u64" },
+    { name: "rollout_stage", type: { defined: { name: "RolloutStage" } } },
+  ],
+  execute_mint_config_update: [],
+  disable_mint: [],
+  lower_mint_caps: [
+    { name: "max_total_assets", type: "u64" },
+    { name: "max_deposit_assets_per_transaction", type: "u64" },
   ],
 };
 
@@ -129,7 +146,98 @@ const ACCOUNT_LAYOUTS: Record<
       { name: "reserved", type: { array: ["u8", 62] } },
     ],
   },
+  MintConfig: {
+    accountSize: 160,
+    fields: [
+      { name: "version", type: "u8" },
+      { name: "bump", type: "u8" },
+      { name: "mint", type: "pubkey" },
+      { name: "enabled", type: "bool" },
+      { name: "max_total_assets", type: "u64" },
+      { name: "max_deposit_assets_per_transaction", type: "u64" },
+      { name: "rollout_stage", type: { defined: { name: "RolloutStage" } } },
+      { name: "has_pending_update", type: "bool" },
+      { name: "pending_enabled", type: "bool" },
+      { name: "pending_max_total_assets", type: "u64" },
+      {
+        name: "pending_max_deposit_assets_per_transaction",
+        type: "u64",
+      },
+      {
+        name: "pending_rollout_stage",
+        type: { defined: { name: "RolloutStage" } },
+      },
+      { name: "pending_effective_unix_timestamp", type: "i64" },
+      { name: "reserved", type: { array: ["u8", 73] } },
+    ],
+  },
 };
+
+const EVENT_LAYOUTS: Record<string, { eventSize: number; fields: IdlField[] }> =
+  {
+    MintConfigInitialized: {
+      eventSize: 139,
+      fields: [
+        { name: "mint_config", type: "pubkey" },
+        { name: "mint", type: "pubkey" },
+        { name: "authority", type: "pubkey" },
+        { name: "enabled", type: "bool" },
+        { name: "max_total_assets", type: "u64" },
+        { name: "max_deposit_assets_per_transaction", type: "u64" },
+        { name: "rollout_stage", type: "u8" },
+        { name: "slot", type: "u64" },
+        { name: "unix_timestamp", type: "i64" },
+        { name: "version", type: "u8" },
+      ],
+    },
+    MintConfigUpdateProposed: {
+      eventSize: 164,
+      fields: [
+        { name: "mint_config", type: "pubkey" },
+        { name: "mint", type: "pubkey" },
+        { name: "authority", type: "pubkey" },
+        { name: "previous_enabled", type: "bool" },
+        { name: "previous_max_total_assets", type: "u64" },
+        {
+          name: "previous_max_deposit_assets_per_transaction",
+          type: "u64",
+        },
+        { name: "previous_rollout_stage", type: "u8" },
+        { name: "proposed_enabled", type: "bool" },
+        { name: "proposed_max_total_assets", type: "u64" },
+        {
+          name: "proposed_max_deposit_assets_per_transaction",
+          type: "u64",
+        },
+        { name: "proposed_rollout_stage", type: "u8" },
+        { name: "effective_unix_timestamp", type: "i64" },
+        { name: "slot", type: "u64" },
+        { name: "unix_timestamp", type: "i64" },
+      ],
+    },
+    MintConfigChanged: {
+      eventSize: 157,
+      fields: [
+        { name: "mint_config", type: "pubkey" },
+        { name: "mint", type: "pubkey" },
+        { name: "authority", type: "pubkey" },
+        { name: "previous_enabled", type: "bool" },
+        { name: "previous_max_total_assets", type: "u64" },
+        {
+          name: "previous_max_deposit_assets_per_transaction",
+          type: "u64",
+        },
+        { name: "previous_rollout_stage", type: "u8" },
+        { name: "new_enabled", type: "bool" },
+        { name: "new_max_total_assets", type: "u64" },
+        { name: "new_max_deposit_assets_per_transaction", type: "u64" },
+        { name: "new_rollout_stage", type: "u8" },
+        { name: "slot", type: "u64" },
+        { name: "unix_timestamp", type: "i64" },
+        { name: "change_kind", type: "u8" },
+      ],
+    },
+  };
 
 const OPERATIONAL_STATE_VARIANTS = ["Active", "ExitOnly", "FullyPaused"];
 const OPERATIONAL_STATE_REASON_VARIANTS = [
@@ -176,6 +284,7 @@ function fixedSerializedSize(
       bool: 1,
       u8: 1,
       u64: 8,
+      i64: 8,
       pubkey: 32,
     };
     const size = sizes[type];
@@ -247,6 +356,7 @@ export function verifyIdlDocument(value: unknown): string[] {
   const errors: string[] = [];
   const instructions = idl.instructions ?? [];
   const accounts = idl.accounts ?? [];
+  const events = idl.events ?? [];
   const definitions = idl.types ?? [];
 
   for (const [name, expectedArgs] of Object.entries(INSTRUCTION_LAYOUTS)) {
@@ -374,6 +484,61 @@ export function verifyIdlDocument(value: unknown): string[] {
     }
   }
 
+  for (const [name, expectedLayout] of Object.entries(EVENT_LAYOUTS)) {
+    const event = findNamed(events, name);
+    if (!event) {
+      errors.push(`event ${name}: missing from IDL events`);
+    } else if (!event.discriminator) {
+      errors.push(`event ${name}: discriminator missing`);
+    } else {
+      const expected = eventDiscriminator(name);
+      if (!bytesEqual(event.discriminator, expected)) {
+        errors.push(
+          `event ${name}: IDL discriminator [${
+            event.discriminator
+          }] != SDK [${Array.from(expected)}]`
+        );
+      }
+    }
+
+    const definition = findNamed(definitions, name);
+    if (!definition || definition.type.kind !== "struct") {
+      errors.push(
+        `event ${name}: matching struct definition missing from IDL types`
+      );
+      continue;
+    }
+    const actualFields = definition.type.fields ?? [];
+    const actualWireFields = actualFields.map(({ name, type }) => ({
+      name,
+      type,
+    }));
+    if (typeText(actualWireFields) !== typeText(expectedLayout.fields)) {
+      errors.push(
+        `event ${name}: field order/types do not match the frozen layout`
+      );
+    }
+    let bodySize = 0;
+    let fixed = true;
+    for (const field of actualFields) {
+      const size = fixedSerializedSize(
+        field.type,
+        definitions,
+        errors,
+        `event ${name}.${field.name}`
+      );
+      if (size === null) fixed = false;
+      else bodySize += size;
+    }
+    if (fixed && bodySize + 8 !== expectedLayout.eventSize) {
+      errors.push(
+        `event ${name}: serialized size is ${bodySize + 8}, expected ${
+          expectedLayout.eventSize
+        }`
+      );
+    }
+  }
+
   const operationalState = findNamed(definitions, "OperationalState");
   if (!operationalState || operationalState.type.kind !== "enum") {
     errors.push("OperationalState enum definition missing from IDL types");
@@ -429,6 +594,19 @@ export function verifyIdlDocument(value: unknown): string[] {
     }
   }
 
+  const rolloutStage = findNamed(definitions, "RolloutStage");
+  const rolloutStageVariants = ["Devnet", "Canary", "Limited", "Expanded"];
+  if (!rolloutStage || rolloutStage.type.kind !== "enum") {
+    errors.push("RolloutStage enum definition missing from IDL types");
+  } else if (
+    typeText(rolloutStage.type.variants ?? []) !==
+    typeText(rolloutStageVariants.map((name) => ({ name })))
+  ) {
+    errors.push(
+      "RolloutStage variants do not match Devnet/Canary/Limited/Expanded"
+    );
+  }
+
   return errors;
 }
 
@@ -452,7 +630,7 @@ function main(): void {
   console.log(
     `All ${
       Object.keys(INSTRUCTION_LAYOUTS).length
-    } instruction interfaces, 3 account discriminators, exact 145/81/200-byte account layouts, and operational-state enums match the generated IDL.`
+    } instruction interfaces, 4 account discriminators, exact 145/81/200/160-byte account layouts, MintConfig events, and bounded enums match the generated IDL.`
   );
 }
 
