@@ -1,9 +1,9 @@
 # Test Plan
 
-**Status: M21–M23 are complete through PRs #34–#36; the M23 devnet/UI follow-up is
-in review — 78 Rust tests, 89 SDK tests, and 94 dApp tests. The new isolated devnet
-deployment, exact v1 fixture, strict decoder, browser route, and legacy non-mutation
-evidence are observed; full local validation and pull-request CI remain gates.**
+**Status: M21–M23 and the isolated devnet/UI follow-up are complete through PRs
+#34–#37; the persistent wallet-header follow-up is in review — 78 Rust tests, 89 SDK
+tests, and 96 dApp tests. Desktop and narrow-viewport browser behavior plus full local
+validation are observed; pull-request CI remains the publication gate.**
 
 ## Repository hygiene (complete)
 
@@ -466,7 +466,7 @@ Observed in PR #36 CI run `29471576382`: the Rust/Anchor, cargo-audit, SDK,
 dApp, and generated-IDL jobs all passed. GitHub merged PR #36 as `7aa260b` on
 2026-07-16.
 
-## M23 devnet/UI follow-up (in progress)
+## M23 devnet/UI follow-up (complete — PR #37)
 
 - [x] The legacy program remains at
       `FYqCCoAnM9tUYRcSRbeLbUE9LBPv8bN2uyuhcz46pSgq`; no transaction was sent to it.
@@ -491,7 +491,7 @@ dApp, and generated-IDL jobs all passed. GitHub merged PR #36 as `7aa260b` on
       clippy, 78 Rust tests, Rust audit, root typecheck, 89 SDK tests/build, dApp
       typecheck/build/94 tests/audit, IDL verification, local documentation links,
       secret scan, and whitespace checks.
-- [ ] Observe every pull-request CI job green before merge.
+- [x] Observe every pull-request CI job green before merge.
 
 Observed locally (2026-07-16): all gates above exited 0. The first parallel
 `cargo test` link attempt hit an Ubuntu Binutils 2.38 internal BFD error in
@@ -501,6 +501,36 @@ reported seven allowed upstream warnings and no blocking vulnerability; the dApp
 audit reported zero vulnerabilities. Yarn Classic's retired audit endpoint again
 returned HTTP 410 locally, so the existing CI severity-bitmask audit remains the root
 package's authoritative dependency gate.
+
+Observed in PR #37 CI run `29479838988`: all five jobs passed. GitHub merged PR #37
+as `9ec205e` on 2026-07-16.
+
+## Persistent header wallet control follow-up (in progress)
+
+- [x] The shared header renders the same wallet control on `/` and
+      `/vault/[mint]`; the landing panel no longer renders a duplicate control.
+- [x] The disconnected control has the accessible name `Connect Wallet`, while
+      connected-address, copy, switch-wallet, and disconnect behavior remain inside
+      wallet-adapter's multi-button implementation.
+- [x] Focused tests cover the accessible header link, explicit disconnected label,
+      and right-side wallet-control container, raising the dApp suite from 94 to 96
+      tests.
+- [x] Manual browser checks at 1440×900 and 390×844 confirm no horizontal overflow
+      or overlap with the cluster warning on the landing and live devnet vault routes.
+- [x] The wallet modal lists exactly Phantom and Solflare, and browser error logs are
+      empty on both routes.
+- [x] The complete local dApp typecheck/build/test/audit and repository hygiene gates
+      pass.
+- [ ] Observe every pull-request CI job green before merge.
+
+No program, SDK, account-layout, program-ID, devnet-state, keypair, token-balance, or
+transaction-authorization behavior changes in this follow-up.
+
+Observed locally (2026-07-16): root and dApp typechecks, the Next.js production build,
+all 96 dApp tests, high-severity npm audit, new component/test formatting, documentation
+links, prohibited-attribution and suspicious-artifact scans, and whitespace checks
+exited 0. Vitest retained its known jsdom canvas warning; it is non-fatal, and the
+real-browser canvas and console checks were clean.
 
 ## Anchor scaffold baseline (complete — M2)
 

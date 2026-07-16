@@ -22,8 +22,9 @@ vault product without building custody logic from zero.
 ## Status
 
 **All 14 MVP milestones and post-MVP M15–M23 are merged.** M23's separate
-ProtocolConfig and emergency-control milestone merged through PR #36. A small M23
-devnet/UI follow-up is in review; see `ROADMAP.md` for the full history.
+ProtocolConfig and emergency-control milestone merged through PR #36, and its isolated
+devnet/UI follow-up merged through PR #37. A small persistent wallet-header follow-up
+is in review; see `ROADMAP.md` for the full history.
 
 The original lifecycle was confirmed live on Solana devnet in June 2026. The reviewed
 M23 binary is now deployed separately at the current-layout devnet address; its
@@ -32,7 +33,7 @@ the legacy program. A CI pipeline (fmt, build, clippy, test, audit) gates every
 PR. A production-hardening pass closed four MVP-accepted risks and added instruction
 events. A TypeScript SDK (`sdk/`) and a minimal Next.js dApp (`app/`) sit on top of
 the program, both IDL-free and independently testable offline. The current recorded
-suite contains 78 Rust tests, 89 SDK tests, and 94 dApp tests. Current architecture is
+suite contains 78 Rust tests, 89 SDK tests, and 96 dApp tests. Current architecture is
 accepted in ADR 0002; ADRs 0003–0009 define the narrower pre-audit production target.
 M21 implements its account-versioning slice, M22 its exit-first availability slice,
 and M23 the ProtocolConfig/emergency-control slice. Mint/cap governance, role
@@ -191,7 +192,10 @@ Two known, deliberate limitations:
 
 Manual browser verification against the fresh devnet v1 fixture confirmed the vault
 route renders `Active`, deposits/withdrawals enabled, no visible alert, and no console
-error. The dedicated Phantom burner is funded; Malcolm still performs the final
+error. The shared header now keeps a single `Connect Wallet` control available on the
+landing and vault routes; desktop and narrow-viewport checks confirmed that it does
+not overlap the devnet warning or page content, and its modal lists only Phantom and
+Solflare. The dedicated Phantom burner is funded; Malcolm still performs the final
 wallet-extension approval check locally.
 
 ## Development workflow
@@ -225,7 +229,7 @@ GitHub, **Code → Codespaces → Create codespace on main**, and wait for
 ## Testing strategy
 
 > See `TEST_PLAN.md`. The current suites contain 78 Rust tests, 89 SDK tests, and
-> 94 dApp tests; M23's local Rust/SBF/generated-IDL results are recorded there and PR
+> 96 dApp tests; M23's local Rust/SBF/generated-IDL results are recorded there and PR
 > CI remains the publication gate.
 
 ```bash
