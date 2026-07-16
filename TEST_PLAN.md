@@ -1,11 +1,11 @@
 # Test Plan
 
 **Status: M20 complete (PR #33, merged 2026-07-15); M21 VaultState versioning
-in review — 65 Rust tests (55 through M18 + 10 migration/version-gate tests),
+in review — 66 Rust tests (56 through M18 + 10 migration/version-gate tests),
 68 SDK tests (53 through the M18/M19 follow-up + 15 strict decode, migration
 builder/client, inventory, and full synthetic IDL-layout cases), and 90 dApp tests. Rust
-execution and real generated-IDL verification are pending pull-request CI because
-this Windows host lacks the MSVC linker; the SDK suite is observed green locally.**
+execution and the real generated-IDL verifier passed in initial PR CI run 29461693429;
+the SDK and dApp suites are also observed green locally and in that run.**
 
 ## Repository hygiene (complete)
 
@@ -151,7 +151,7 @@ Observed: CI run 29128852767 (2026-07-10), `tests/test_governance.rs` — 5 pass
 0 failed. (No local Rust toolchain on the M16 development machine; CI is the
 observation source, same pattern as pre-M13 milestones.)
 
-## Authority-rotation tests (9 tests — M18)
+## Authority-rotation tests (10 tests — M18)
 
 All in `tests/test_rotation.rs`. The final test reuses M16's
 `LiteSVM::with_sigverify(false)` pattern to prove a keypair-run vault can
@@ -191,7 +191,7 @@ so `tests/test_rotation.rs` could not be run locally. `cargo fmt --all --
 CI, same pattern as M13–M17.
 
 Observed (2026-07-13, CI run 29224127072 on PR #28): `fmt, clippy, build-sbf,
-test` job green in 2m1s — all 55 Rust tests passed, including all 9 above.
+test` job green in 2m1s — all 56 Rust tests passed, including all 10 above.
 
 ## IDL discriminator and account-layout verification (M19/M21)
 
@@ -237,9 +237,9 @@ serialized sizes, and the exact `OperationalState` enum variants.
       missing-migration, field-count, field-name/type, reserved-size, and enum errors;
       this is the expected negative control, not a claim that an M21 IDL was generated
       locally.
-- [ ] The M21 verifier passes against the real Anchor-generated IDL.
-      — Pending the pull-request `idl-verify` job; update with the observed run before
-        milestone handoff.
+- [x] The M21 verifier passes against the real Anchor-generated IDL.
+      — PR CI run 29461693429 reported: all 8 instruction discriminators, both account
+        discriminators, and the exact 145/81-byte account layouts match.
 
 ## M18/M19 follow-up verification (complete — PR #32)
 
@@ -359,6 +359,13 @@ any infrastructure failure addressed explicitly before handoff. The broad legacy
 `yarn lint` script also fails before checking sources because its first glob matches no
 files and it traverses ignored `.next` output; all changed TypeScript files were
 formatted and rechecked explicitly instead of rewriting unrelated generated/app files.
+
+Observed in initial PR CI (2026-07-15/16, run 29461693429, commit `539ddf1`):
+`anchor build`, fmt, clippy, all 66 Rust tests, whitespace, and IDL artifact upload —
+passed in 2m52s; cargo audit — passed in 17s; 68 SDK tests, typecheck, and high/critical
+Yarn audit gate — passed in 12s; dApp typecheck/build, 90 tests, and high/critical npm
+audit gate — passed in 47s; generated-IDL discriminator/account-layout verification —
+passed in 14s. All five jobs were green.
 
 ## Anchor scaffold baseline (complete — M2)
 

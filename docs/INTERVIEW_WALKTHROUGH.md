@@ -184,7 +184,7 @@ version 1. It never transfers tokens or reallocates an account.
 
 In-process Solana VM. Load the compiled `.so` via `include_bytes!`, airdrop SOL,
 inject SPL mint and token accounts via `svm.set_account()`, send transactions.
-No external validator. The current program suite contains 65 tests, including 10 raw-
+No external validator. The current program suite contains 66 tests, including 10 raw-
 wire migration/version cases.
 
 ### SPL account injection

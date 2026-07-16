@@ -31,7 +31,7 @@ deployed. A CI pipeline (fmt, build, clippy, test, audit) gates every
 PR. A production-hardening pass closed four MVP-accepted risks and added instruction
 events. A TypeScript SDK (`sdk/`) and a minimal Next.js dApp (`app/`) sit on top of
 the program, both IDL-free and independently testable offline. The current recorded
-suite contains 65 Rust tests, 68 SDK tests, and 90 dApp tests. Current architecture is
+suite contains 66 Rust tests, 68 SDK tests, and 90 dApp tests. Current architecture is
 accepted in ADR 0002; ADRs 0003–0009 define the narrower pre-audit production target.
 M21 implements its account-versioning slice, while pause availability, mint/cap,
 upgrade, recovery, audit, and launch requirements remain incomplete.
@@ -210,7 +210,7 @@ GitHub, **Code → Codespaces → Create codespace on main**, and wait for
 
 ## Testing strategy
 
-> See `TEST_PLAN.md`. The current suites contain 65 Rust tests, 68 SDK tests, and
+> See `TEST_PLAN.md`. The current suites contain 66 Rust tests, 68 SDK tests, and
 > 90 dApp tests; M21's Rust and generated-IDL results are recorded from PR CI.
 
 ```bash

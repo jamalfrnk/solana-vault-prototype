@@ -175,16 +175,16 @@ file is what gets deployed to devnet or loaded by the LiteSVM test harness.
 
 ## 5. Run the full test suite
 
-### Step 1 — Run all 65 Rust tests
+### Step 1 — Run all 66 Rust tests
 
 ```bash
 cargo test
 ```
 
-All 65 tests must pass. Expected output (abbreviated):
+All 66 tests must pass. Expected output (abbreviated):
 
 ```
-running 65 tests across the program test targets
+running 66 tests across the program test targets
 test test_id ... ok
 test test_vault_initialize_creates_correct_state ... ok
 test test_pause_sets_exit_only ... ok
@@ -623,7 +623,7 @@ cargo fmt --all -- --check
 # 2. Build program and generated IDL (must exit 0, zero warnings)
 anchor build --ignore-keys
 
-# 3. Rust checks (all 65 tests must pass)
+# 3. Rust checks (all 66 tests must pass)
 cargo clippy --all-targets --all-features -- -D warnings
 cargo test
 

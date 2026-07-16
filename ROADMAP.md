@@ -479,7 +479,7 @@ deferred to CI, same pattern as M13–M17. SDK-side verification (53/53
 observed passing.
 
 Observed (2026-07-13, CI run 29224127072 on PR #28): all four jobs green —
-`fmt, clippy, build-sbf, test` (2m1s; includes all 55 Rust tests, the 9 new
+`fmt, clippy, build-sbf, test` (2m1s; includes all 56 Rust tests, the 10 new
 in `tests/test_rotation.rs`), `cargo audit`, SDK tests, dApp tests. Merged
 into `main` as `6d329e3` (PR #28, 2026-07-13).
 
@@ -654,9 +654,13 @@ to require `Active`. Exit-first withdrawals and the stronger full-pause authorit
 matrix remain the next separate milestone.
 
 Observed locally: formatting passed; 68/68 SDK tests, root typecheck, and SDK build
-passed; the inventory completed successfully. Rust compile/test is deferred to PR CI
-because this Windows host has no `link.exe`. Pull-request CI results will be recorded
-before the milestone handoff.
+passed; the inventory completed successfully. Local Rust compile/test remains blocked
+because this Windows host has no `link.exe`.
+
+Observed in initial PR CI run 29461693429 on commit `539ddf1`: Anchor/SBF build, fmt,
+clippy, all 66 Rust tests, cargo audit, 68 SDK tests/audit, dApp typecheck/build/90 tests/
+audit, and real generated-IDL verification all passed. The IDL gate confirmed all 8
+instruction discriminators, both account discriminators, and exact 145/81-byte layouts.
 
 ## Post-MVP Roadmap (candidate pool — implementation requires separate approval)
 
