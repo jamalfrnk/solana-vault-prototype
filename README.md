@@ -22,9 +22,10 @@ vault product without building custody logic from zero.
 ## Status
 
 **All 14 MVP milestones and post-MVP M15–M23 are merged.** M23's separate
-ProtocolConfig and emergency-control milestone merged through PR #36, and its isolated
-devnet/UI follow-up merged through PR #37. A small persistent wallet-header follow-up
-is in review; see `ROADMAP.md` for the full history.
+ProtocolConfig and emergency-control milestone merged through PR #36, its isolated
+devnet/UI follow-up through PR #37, and the persistent wallet-header follow-up through
+PR #38. A connected-wallet balance UX follow-up is in review; see `ROADMAP.md` for the
+full history.
 
 The original lifecycle was confirmed live on Solana devnet in June 2026. The reviewed
 M23 binary is now deployed separately at the current-layout devnet address; its
@@ -33,7 +34,7 @@ the legacy program. A CI pipeline (fmt, build, clippy, test, audit) gates every
 PR. A production-hardening pass closed four MVP-accepted risks and added instruction
 events. A TypeScript SDK (`sdk/`) and a minimal Next.js dApp (`app/`) sit on top of
 the program, both IDL-free and independently testable offline. The current recorded
-suite contains 78 Rust tests, 89 SDK tests, and 96 dApp tests. Current architecture is
+suite contains 78 Rust tests, 89 SDK tests, and 117 dApp tests. Current architecture is
 accepted in ADR 0002; ADRs 0003–0009 define the narrower pre-audit production target.
 M21 implements its account-versioning slice, M22 its exit-first availability slice,
 and M23 the ProtocolConfig/emergency-control slice. Mint/cap governance, role
@@ -166,16 +167,19 @@ exercise M23 ProtocolConfig/emergency controls.
 ## dApp
 
 `app/` is a minimal Next.js (App Router) dApp built on `sdk/` — connect wallet, enter
-a mint, view vault state, deposit, withdraw, view shares, an admin pause/unpause
-panel, and a cluster warning banner. Deliberately not a polished product: no charts,
-no analytics, plain CSS only — see the Post-MVP Roadmap for what a real product
-version would add.
+a mint, view vault state, deposit, withdraw, view confirmed wallet assets and vault
+shares, use an admin pause/unpause panel, and see a cluster warning banner. Wallet
+assets come from the connected owner's canonical legacy-SPL ATA; withdrawable shares
+come from the program's `UserPosition`, and the displayed redeemable-asset value uses
+the same floor formula as the program. Deliberately not a polished product: no charts,
+no analytics, plain CSS only — see the Post-MVP Roadmap for what a real product version
+would add.
 
 ```bash
 cd app
 npm install
 npm run dev     # http://localhost:3000
-npm run test    # 94 tests, offline, mocked wallet + SDK, no live RPC
+npm run test    # 117 tests, offline, mocked wallet + SDK, no live RPC
 npm run build
 ```
 
@@ -229,7 +233,7 @@ GitHub, **Code → Codespaces → Create codespace on main**, and wait for
 ## Testing strategy
 
 > See `TEST_PLAN.md`. The current suites contain 78 Rust tests, 89 SDK tests, and
-> 96 dApp tests; M23's local Rust/SBF/generated-IDL results are recorded there and PR
+> 117 dApp tests; M23's local Rust/SBF/generated-IDL results are recorded there and PR
 > CI remains the publication gate.
 
 ```bash

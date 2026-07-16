@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { Keypair } from "@solana/web3.js";
+import type { ComponentProps } from "react";
 import { OperationalState } from "../../sdk/src";
 
 const sendTransactionMock = vi.fn();
@@ -11,8 +12,31 @@ vi.mock("@solana/wallet-adapter-react", () => ({
   useConnection: () => useConnectionMock(),
 }));
 
-import { DepositForm } from "../components/DepositForm";
+import { DepositForm as DepositFormComponent } from "../components/DepositForm";
 import type { VaultClient } from "../../sdk/src";
+
+type DepositFormProps = ComponentProps<typeof DepositFormComponent>;
+type TestDepositFormProps = Omit<
+  DepositFormProps,
+  "availableAssets" | "balanceStatus" | "transactionPending"
+> &
+  Partial<
+    Pick<
+      DepositFormProps,
+      "availableAssets" | "balanceStatus" | "transactionPending"
+    >
+  >;
+
+function DepositForm(props: TestDepositFormProps) {
+  return (
+    <DepositFormComponent
+      availableAssets={1_000_000_000n}
+      balanceStatus="ready"
+      transactionPending={false}
+      {...props}
+    />
+  );
+}
 
 const buildDepositIxMock = vi
   .fn()
@@ -59,6 +83,8 @@ describe("DepositForm", () => {
         vaultClient={fakeVaultClient}
         operationalState={OperationalState.Active}
         decimals={0}
+        availableAssets={null}
+        balanceStatus="disconnected"
       />
     );
     expect(screen.getByRole("button", { name: /deposit/i })).to.have.property(
@@ -66,6 +92,7 @@ describe("DepositForm", () => {
       true
     );
     expect(screen.getByText(/connect your wallet/i)).to.exist;
+    expect(screen.getByText("Connect wallet")).to.exist;
   });
 
   it("is disabled in exit-only mode while explaining that withdrawals remain available", () => {
@@ -114,6 +141,98 @@ describe("DepositForm", () => {
       "disabled",
       false
     );
+  });
+
+  it("shows the confirmed wallet assets available to deposit", () => {
+    connectWallet();
+    render(
+      <DepositForm
+        vaultClient={fakeVaultClient}
+        operationalState={OperationalState.Active}
+        decimals={6}
+        availableAssets={12_500_000n}
+      />
+    );
+
+    expect(screen.getByText(/assets available to deposit/i)).to.exist;
+    expect(screen.getByText("12.5")).to.exist;
+  });
+
+  it("fails closed when live balances are unavailable while preserving the last value", () => {
+    connectWallet();
+    render(
+      <DepositForm
+        vaultClient={fakeVaultClient}
+        operationalState={OperationalState.Active}
+        decimals={0}
+        availableAssets={25n}
+        balanceStatus="error"
+      />
+    );
+
+    expect(screen.getByText("25")).to.exist;
+    expect(screen.getByText(/balance data is unavailable/i)).to.exist;
+    expect(screen.getByRole("button", { name: /deposit/i })).toBeDisabled();
+  });
+
+  it("does not permit a deposit above the confirmed wallet balance", () => {
+    connectWallet();
+    render(
+      <DepositForm
+        vaultClient={fakeVaultClient}
+        operationalState={OperationalState.Active}
+        decimals={0}
+        availableAssets={10n}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText(/amount/i), {
+      target: { value: "11" },
+    });
+    expect(screen.getByText(/exceeds your available assets/i)).to.exist;
+    expect(screen.getByRole("button", { name: /deposit/i })).toBeDisabled();
+    expect(sendTransactionMock).not.toHaveBeenCalled();
+  });
+
+  it("marks the visible amount as last confirmed while a transaction is pending", () => {
+    connectWallet();
+    render(
+      <DepositForm
+        vaultClient={fakeVaultClient}
+        operationalState={OperationalState.Active}
+        decimals={0}
+        availableAssets={10n}
+        transactionPending
+      />
+    );
+
+    expect(screen.getByText("10")).to.exist;
+    expect(screen.getByText(/last confirmed/i)).to.exist;
+    expect(screen.getByRole("button", { name: /deposit/i })).toBeDisabled();
+  });
+
+  it("honors the shared transaction lock before interacting with the wallet", () => {
+    connectWallet();
+    const acquireTransaction = vi.fn(() => false);
+    const releaseTransaction = vi.fn();
+    render(
+      <DepositForm
+        vaultClient={fakeVaultClient}
+        operationalState={OperationalState.Active}
+        decimals={0}
+        acquireTransaction={acquireTransaction}
+        releaseTransaction={releaseTransaction}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText(/amount/i), {
+      target: { value: "5" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /deposit/i }));
+
+    expect(acquireTransaction).toHaveBeenCalledTimes(1);
+    expect(sendTransactionMock).not.toHaveBeenCalled();
+    expect(releaseTransaction).not.toHaveBeenCalled();
   });
 
   it("scales token-denominated input by mint decimals", async () => {

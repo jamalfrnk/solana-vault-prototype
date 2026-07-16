@@ -61,6 +61,23 @@ controls (pause/unpause) are gated by an explicit `pause_authority` key stored i
 `VaultState`. Exceptional withdrawal blocking is gated independently by the emergency
 authority stored in the singleton `ProtocolConfig`.
 
+### Client financial-balance projection
+
+The dApp keeps wallet assets and vault shares as distinct concepts. Deposit availability
+is the exact `u64` balance of the connected owner's canonical, initialized legacy-SPL
+ATA for the vault mint. Withdrawal availability is `UserPosition.shares`; a missing
+position is zero only after a successful RPC absence result. Estimated redeemable assets
+mirror the program's `floor(user_shares * total_assets / total_shares)` arithmetic with
+integer `bigint` operations and never use JavaScript floating point.
+
+RPC data is untrusted: the client validates token-program ownership, executable flag,
+exact layout size, embedded mint/owner, and initialized state, and otherwise disables
+both value-moving forms. During a transaction it displays the last confirmed snapshot,
+then replaces vault totals, wallet assets, and shares together only after confirmation
+and a successful authoritative refresh. These controls improve user safety but are not
+an authorization boundary; the on-chain account constraints and arithmetic remain
+authoritative.
+
 ---
 
 ## PDA table
