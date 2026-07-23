@@ -6,10 +6,12 @@
  * signature as an Explorer URL.
  *
  * Usage (from repo root):
- *   npx ts-node scripts/devnet_demo.ts
+ *   npx ts-node scripts/devnet_demo.ts --keypair <path-to-funded-devnet-keypair.json>
  *
- * Prerequisites: the vault program must already be deployed to devnet and
- * ~/.config/solana/id.json must hold a funded devnet keypair.
+ * Prerequisites: the vault program must already be deployed to devnet and the
+ * supplied keypair file must hold a funded devnet keypair. There is no default
+ * wallet path — an explicit --keypair flag is required so a real funded wallet
+ * is never loaded implicitly.
  */
 
 import * as anchor from "@anchor-lang/core";
@@ -58,6 +60,17 @@ function loadKeypair(filePath: string): Keypair {
   return Keypair.fromSecretKey(Uint8Array.from(raw));
 }
 
+function requireKeypairPath(args: string[]): string {
+  const index = args.indexOf("--keypair");
+  if (index === -1 || !args[index + 1]) {
+    throw new Error(
+      "Missing required --keypair <path> flag. This script never falls back " +
+        "to a default wallet; pass the path to a funded devnet keypair explicitly."
+    );
+  }
+  return args[index + 1];
+}
+
 async function getAta(owner: PublicKey, mint: PublicKey): Promise<PublicKey> {
   const [ata] = PublicKey.findProgramAddressSync(
     [owner.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(), mint.toBuffer()],
@@ -85,8 +98,9 @@ async function getTokenBalance(
 async function main(): Promise<void> {
   const connection = new Connection(RPC_URL, "confirmed");
 
-  // Load payer keypair from default Solana CLI location.
-  const payer = loadKeypair("~/.config/solana/id.json");
+  // Load payer keypair from the caller-supplied path; never a default wallet.
+  const keypairPath = requireKeypairPath(process.argv.slice(2));
+  const payer = loadKeypair(keypairPath);
   console.log(`\nPayer: ${payer.publicKey.toBase58()}`);
   console.log(
     `Balance: ${

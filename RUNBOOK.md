@@ -832,9 +832,10 @@ is already initialized; do not rerun those commands with newly generated role fi
 ### Scripted lifecycle demos
 
 `scripts/devnet_demo.ts` creates a fresh mint and calls initialize → deposit →
-withdraw → pause against the current program. It requires a funded keypair at
-`~/.config/solana/id.json`. `scripts/sdk_devnet_smoke.ts` extends that flow through
-two-step authority rotation and final unpause.
+withdraw → pause against the current program. It requires an explicit
+`--keypair <path>` flag pointing at a funded devnet keypair; there is no default
+wallet path. `scripts/sdk_devnet_smoke.ts` takes the same flag and extends that
+flow through two-step authority rotation and final unpause.
 
 These scripts describe the pre-M24 deployed interface. Do not run them from an M24/M25
 checkout against the M23 address; the new governed account contracts require a later
@@ -847,7 +848,7 @@ initialize → deposit → withdraw → pause → propose authority → accept a
 unpause with the new authority.
 
 ```bash
-./node_modules/.bin/ts-node scripts/sdk_devnet_smoke.ts
+./node_modules/.bin/ts-node scripts/sdk_devnet_smoke.ts --keypair <path-to-funded-devnet-keypair.json>
 ```
 
 It creates and funds ephemeral pause-authority keypairs from the configured devnet

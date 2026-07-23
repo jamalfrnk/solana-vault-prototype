@@ -9,12 +9,15 @@
  * against a real cluster, not just the offline unit tests in sdk/tests/.
  *
  * NOT executed as part of this milestone: this machine has no funded devnet keypair
- * at ~/.config/solana/id.json to confirm against. Deliberately kept outside
- * sdk/tests/ so mocha (and the sdk-test CI job, which globs sdk/tests/**\/*.test.ts)
- * never picks it up as a unit test.
+ * to confirm against. Deliberately kept outside sdk/tests/ so mocha (and the
+ * sdk-test CI job, which globs sdk/tests/**\/*.test.ts) never picks it up as a
+ * unit test.
  *
- * Usage (from repo root, with a funded devnet keypair in place):
- *   npx ts-node scripts/sdk_devnet_smoke.ts
+ * Usage (from repo root):
+ *   npx ts-node scripts/sdk_devnet_smoke.ts --keypair <path-to-funded-devnet-keypair.json>
+ *
+ * There is no default wallet path — an explicit --keypair flag is required so a
+ * real funded wallet is never loaded implicitly.
  */
 
 import {
@@ -52,9 +55,21 @@ function loadKeypair(filePath: string): Keypair {
   return Keypair.fromSecretKey(Uint8Array.from(raw));
 }
 
+function requireKeypairPath(args: string[]): string {
+  const index = args.indexOf("--keypair");
+  if (index === -1 || !args[index + 1]) {
+    throw new Error(
+      "Missing required --keypair <path> flag. This script never falls back " +
+        "to a default wallet; pass the path to a funded devnet keypair explicitly."
+    );
+  }
+  return args[index + 1];
+}
+
 async function main(): Promise<void> {
   const connection = new Connection(RPC_URL, "confirmed");
-  const payer = loadKeypair("~/.config/solana/id.json");
+  const keypairPath = requireKeypairPath(process.argv.slice(2));
+  const payer = loadKeypair(keypairPath);
   console.log(`\nPayer: ${payer.publicKey.toBase58()}`);
   console.log(
     `Balance: ${
