@@ -740,6 +740,21 @@ private-key custody action. The two current devnet blockers and their public evi
 are documented in
 [docs/LEGACY_ACCOUNT_INVENTORY.md](docs/LEGACY_ACCOUNT_INVENTORY.md).
 
+`scripts/retire_legacy_vault_3c94.ts` implements the drain step for the one vault
+whose recorded signer keypair is still available (`keys/ui-wallet.json`):
+
+```bash
+npx ts-node scripts/retire_legacy_vault_3c94.ts --keypair keys/ui-wallet.json --dry-run
+npx ts-node scripts/retire_legacy_vault_3c94.ts --keypair keys/ui-wallet.json --confirm
+```
+
+`--dry-run` simulates only (no broadcast, no fee, no state change); `--confirm` sends
+the real transaction. Per this document's standing policy, running `--confirm` is
+Malcolm's manual, signed action — no automated tool sends it. The other inventoried
+vault's signer keypair was never persisted anywhere this repository has access to;
+[ADR 0010](docs/decisions/0010-legacy-signer-loss-acceptance.md) records the decision
+to accept that loss rather than build a privileged recovery instruction.
+
 ---
 
 ## 8. Run the devnet demo

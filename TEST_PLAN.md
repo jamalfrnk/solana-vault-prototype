@@ -1,9 +1,9 @@
 # Test Plan
 
 **Status: M21–M26 and all earlier follow-ups are complete through PR #42. The M26
-Node-24 GitHub Action refresh (PR #43) and devnet script wallet-path hardening
-(PR #44) follow-ups are merged. The dependency advisory remediation follow-up is in
-progress; pull-request CI remains the publication gate.**
+Node-24 GitHub Action refresh (PR #43), devnet script wallet-path hardening (PR #44),
+and dependency advisory remediation (PR #45) follow-ups are merged. The legacy vault
+retirement follow-up is in progress; pull-request CI remains the publication gate.**
 
 ## Repository hygiene (complete)
 
@@ -764,7 +764,7 @@ typecheck, production build, and all 122 dApp tests pass unchanged.
 
 GitHub merged PR #44 as `30170d3` on 2026-07-25.
 
-## Dependency advisory remediation follow-up (in progress)
+## Dependency advisory remediation follow-up (complete — PR #45)
 
 Continues dependency-security hygiene after PR #44. Full detail in
 `SECURITY_CHECKLIST.md`'s "Dependency security follow-up" section.
@@ -783,6 +783,49 @@ Observed locally (2026-07-25): `corepack yarn install` after adding the
 audited); `corepack yarn test:sdk` — 128/128 pass; root `tsc --noEmit` and
 `corepack yarn sdk:build` — clean. No Rust, program, SDK wire-contract, or dApp
 behavior change; app-side dependencies untouched by this pass.
+
+GitHub merged PR #45 as `a14bca7` on 2026-07-25.
+
+## Legacy vault retirement follow-up (in progress)
+
+Full detail in `docs/LEGACY_ACCOUNT_INVENTORY.md`'s "2026-07-25 signer check and
+ADR 0010" section and
+[ADR 0010](docs/decisions/0010-legacy-signer-loss-acceptance.md).
+
+- [x] A fresh, read-only `corepack yarn inventory:legacy` run against the legacy
+      program matches the 2026-07-16 snapshot exactly for both 113-byte vaults —
+      no state drifted before this pass touched anything.
+- [x] Every keypair this repository holds locally (`keys/*.json`) is checked against
+      both vaults' recorded pause authority/position owner addresses. Vault
+      `3c94…BnCL`'s signer matches `keys/ui-wallet.json`; vault `E268…B9GV`'s
+      signer matches none of them.
+- [x] `scripts/retire_legacy_vault_3c94.ts` derives the legacy PDAs via the SDK's
+      program-ID-overridable helpers, reuses `inspectVaultStateAccount`/
+      `decodeUserPosition` for pre- and post-flight verification, refuses to
+      proceed on any account/state mismatch, and requires exactly one of
+      `--dry-run`/`--confirm` (no default that could run destructively by
+      accident).
+- [ ] The real `--confirm` transaction has not been sent. Per this project's
+      standing "no automated tool signs this step" policy, sending it is
+      Malcolm's manual action; this checklist item stays open until he runs it
+      and the resulting evidence is recorded in
+      `docs/LEGACY_ACCOUNT_INVENTORY.md`.
+- [x] ADR 0010 documents the decision not to build a privileged recovery
+      instruction for vault `E268…B9GV`'s permanently unavailable signer, and
+      reclassifies it from "retirement required" to "permanently unrecoverable,
+      accepted."
+
+Observed locally (2026-07-25): `corepack yarn inventory:legacy --program-id
+FYqCCoAnM9tUYRcSRbeLbUE9LBPv8bN2uyuhcz46pSgq` — matches the prior snapshot exactly;
+`corepack yarn typecheck` — clean with the new script; `npx ts-node
+scripts/retire_legacy_vault_3c94.ts --keypair keys/ui-wallet.json --dry-run` —
+simulation returned `err: null`, full `101000000` base units moving from custody to
+the owner's existing token account, matching the expected full-withdrawal formula
+exactly. That dry run loaded the real local secret key to sign a simulate-only
+transaction (never broadcast, no fee paid, no state change, secret never printed) —
+noted explicitly as more automated-tool involvement with a real signer than
+originally scoped for this pass. No Rust, program, SDK wire-contract, or dApp
+behavior change; no devnet state was mutated.
 
 ## Anchor scaffold baseline (complete — M2)
 

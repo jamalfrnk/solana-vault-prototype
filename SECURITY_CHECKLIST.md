@@ -470,6 +470,16 @@ below are implemented and tested; every unchecked item remains a launch blocker.
 - [ ] Every inventoried 113-byte account is drained with a compatible binary,
       reconciled with transaction evidence, recorded, and retired before persistent
       deployment.
+      — 2026-07-25: vault `3c94…BnCL`'s recorded signer keypair is available;
+        `scripts/retire_legacy_vault_3c94.ts` is prepared and dry-run verified
+        (simulation `err: null`, exact full-withdrawal amount). Sending the real
+        transaction remains Malcolm's manual, signed action per this document's
+        "no automated tool signs this step" policy — still open until that runs
+        and evidence is recorded. Vault `E268…B9GV`'s recorded signer keypair was
+        never persisted anywhere this repository has access to; per
+        [ADR 0010](docs/decisions/0010-legacy-signer-loss-acceptance.md), no
+        recovery mechanism will be built and this vault is accepted as a
+        permanent, documented devnet-only loss rather than a pending item.
 - [x] The SDK rejects 113-byte, v0, unsupported-version, invalid-enum, nonzero-reserved,
       and incorrectly sized layouts. CI verifies all instruction interfaces and account
       discriminators, exact account field order/types/sizes, and both operational-state
