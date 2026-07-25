@@ -1,8 +1,9 @@
 # Test Plan
 
 **Status: M21–M26 and all earlier follow-ups are complete through PR #42. The M26
-Node-24 GitHub Action refresh follow-up is in review through draft PR #43;
-pull-request CI remains the publication gate.**
+Node-24 GitHub Action refresh (PR #43) and devnet script wallet-path hardening
+(PR #44) follow-ups are merged. The dependency advisory remediation follow-up is in
+progress; pull-request CI remains the publication gate.**
 
 ## Repository hygiene (complete)
 
@@ -723,7 +724,7 @@ Rust/Anchor, cargo-audit, SDK/manifest/root-audit, dApp, full-history Gitleaks,
 generated-IDL, and deterministic-release-evidence jobs passed. GitHub merged PR #42
 as `03a25d1` on 2026-07-16.
 
-## M26 Node-24 GitHub Action refresh follow-up (in review — PR #43)
+## M26 Node-24 GitHub Action refresh follow-up (complete — PR #43)
 
 - [x] Every checkout, cache, setup-node, upload-artifact, and download-artifact use is
       updated to a current Node-24 major release and pinned to its full commit SHA.
@@ -731,8 +732,57 @@ as `03a25d1` on 2026-07-16.
 - [x] Workflow permissions, commands, environment pins, artifact behavior, and job
       dependencies are unchanged.
 - [x] Both workflow YAML files parse and pass focused Prettier/whitespace checks.
-- [ ] The follow-up PR's final-head CI passes all seven jobs without Node 20
+- [x] The follow-up PR's final-head CI passes all seven jobs without Node 20
       runtime-deprecation annotations.
+
+GitHub merged PR #43 as `dd4df5f` on 2026-07-16.
+
+## Devnet script wallet-path hardening follow-up (complete — PR #44)
+
+Full scanner triage recorded in `docs/security/scanner-finding-triage.md`.
+
+- [x] `scripts/devnet_demo.ts` and `scripts/sdk_devnet_smoke.ts` require an explicit
+      `--keypair <path>` flag and fail closed with no fallback to
+      `~/.config/solana/id.json` or any other default wallet location.
+- [x] `scripts/generate_release_evidence.ts` and `scripts/ui_test_vault_setup.ts` were
+      reviewed and confirmed already safe (fixed-argument-array subprocess calls and
+      gitignored disposable keypairs respectively); no change was needed.
+- [x] `RUNBOOK.md`'s usage examples match the new required flag.
+
+Observed locally (2026-07-22): root `tsc --noEmit` clean; both scripts fail closed with
+the new error message and no network call when `--keypair` is omitted;
+`corepack yarn test:sdk` — 128/128 pass; `npx prettier --check` clean on both edited
+scripts.
+
+While in review, pull-request CI's `npm audit --audit-level=high` gate began failing
+on newly disclosed advisories against `next@16.2.10` and its bundled `sharp`, unrelated
+to this PR's own script changes. Fixed on the same branch before merge: `next` bumped
+to `16.2.11`, a `sharp >=0.35.0` override added, and the already-stale
+`postcss >=8.5.10` override (see M15's cadence note) raised to `>=8.5.18`. Observed
+locally and in CI: `npm audit --audit-level=high` in `app/` — 0 vulnerabilities;
+typecheck, production build, and all 122 dApp tests pass unchanged.
+
+GitHub merged PR #44 as `30170d3` on 2026-07-25.
+
+## Dependency advisory remediation follow-up (in progress)
+
+Continues dependency-security hygiene after PR #44. Full detail in
+`SECURITY_CHECKLIST.md`'s "Dependency security follow-up" section.
+
+- [x] `brace-expansion` (high; pulled in only by `mocha`'s `minimatch` at the root) is
+      forced to `5.0.8` via a new root `resolutions` entry.
+- [x] `rand@0.7.3` (low; transitive through `libsecp256k1@0.6.0` in the pinned
+      Agave/Anchor toolchain) is documented as an accepted, toolchain-pinned risk
+      rather than force-patched — its unsound condition does not apply to any code in
+      this repository, and a `[patch]` override would diverge from the exact pinned
+      toolchain versions M1/M11 established.
+- [x] `corepack yarn audit` at root reports 0 vulnerabilities after the fix.
+
+Observed locally (2026-07-25): `corepack yarn install` after adding the
+`brace-expansion` resolution; `corepack yarn audit` — 0 vulnerabilities (192 packages
+audited); `corepack yarn test:sdk` — 128/128 pass; root `tsc --noEmit` and
+`corepack yarn sdk:build` — clean. No Rust, program, SDK wire-contract, or dApp
+behavior change; app-side dependencies untouched by this pass.
 
 ## Anchor scaffold baseline (complete — M2)
 
