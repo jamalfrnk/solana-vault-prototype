@@ -67,6 +67,35 @@ If either signer is unavailable or the compatible binary cannot safely return al
 accounted test assets, stop. ADR 0005 requires a separate recovery ADR, implementation,
 rehearsal, and review; M21 does not authorize a recovery shortcut.
 
+## 2026-07-25 signer check and ADR 0010
+
+A check of every keypair this repository holds locally (`keys/*.json`) against
+both vaults' recorded signers found:
+
+- Vault `3c94…BnCL`'s pause authority *and* position owner
+  (`2bGnA3bzDTkXbD84foGReaVzu5Bs2CBD7aRae6VWGbKe`) is `keys/ui-wallet.json`.
+  `scripts/retire_legacy_vault_3c94.ts` is prepared and verified by devnet
+  simulation (`err: null`; the full `101000000` base units move from custody to
+  the owner's existing token account with no rounding artifact). Sending the
+  real transaction is Malcolm's manual, signed action per this document's
+  existing "no automated tool may sign this step" policy — status below is
+  **retirement prepared, not yet executed.**
+- Vault `E268…B9GV`'s pause authority (`A6GUvgZDWXSD8wgtDzum4GG2zHdiGamhUQa4LEbTF7ip`)
+  and position owner (`4zmQQyXsjQFGKoHo1uNDsFCBDd5uuKeFhVNbqgVXPiy`) match no
+  keypair this repository has ever held, consistent with `devnet_demo.ts`'s
+  in-memory-only `Keypair.generate()` pattern for ephemeral roles. Per this
+  document's own stop condition, [ADR 0010](decisions/0010-legacy-signer-loss-acceptance.md)
+  records the decision: **no recovery mechanism will be built.** This vault's
+  `500000000` base units are permanently stranded and accepted as a documented
+  devnet-only loss — see the ADR for why a privileged override instruction was
+  rejected. Blocker reclassified below from "retirement required" to
+  "permanently unrecoverable, accepted."
+
+| Vault | Status |
+|---|---|
+| `3c94…BnCL` | Retirement prepared (`scripts/retire_legacy_vault_3c94.ts`, dry-run verified); pending Malcolm's signed execution |
+| `E268…B9GV` | Permanently unrecoverable, accepted per ADR 0010; no further action planned |
+
 ## M23 devnet/UI follow-up non-mutation evidence
 
 The follow-up deployed the reviewed v1 program under the separate address

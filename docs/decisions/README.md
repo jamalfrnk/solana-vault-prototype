@@ -74,6 +74,7 @@ Accepted ADRs fall into two categories:
 | [0007](0007-mint-policy-and-exposure-limits.md) | Mint policy and exposure limits | Accepted | Program/SDK/dApp mechanics implemented through M24; production values/deployment pending |
 | [0008](0008-donations-and-excess-recovery.md) | Donations, dust, and excess recovery | Accepted | Accounting policy and constrained recovery implemented through M25; deployment pending |
 | [0009](0009-incident-response-and-launch-gates.md) | Incident response, invariants, and launch gates | Accepted | Versioning/exit-first/emergency/mint-exposure/excess-recovery slices implemented; operational gates not met |
+| [0010](0010-legacy-signer-loss-acceptance.md) | Legacy vault signer-loss acceptance | Accepted | Vault `3c94…BnCL` drain script prepared, pending Malcolm's manual execution; vault `E268…B9GV` accepted as permanently unrecoverable, no code change |
 
 When current behavior and a target ADR differ, documentation must say which one it is
 describing. A target ADR does not authorize its implementation; project milestone and
