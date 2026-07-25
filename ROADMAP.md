@@ -39,7 +39,8 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 | 25 | Constrained exact-excess recovery | `[x]` complete — PR #41 |
 | 26 | Release and operations evidence automation | `[x]` complete — PR #42 |
 | — | M26 follow-up — Node 24 GitHub Action refresh | `[x]` complete — PR #43 |
-| — | Follow-up — devnet script wallet-path hardening | `[~]` in progress |
+| — | Follow-up — devnet script wallet-path hardening | `[x]` complete — PR #44 |
+| — | Follow-up — dependency advisory remediation | `[~]` in progress |
 
 ## Milestone 0 — Repository bootstrap (complete)
 
@@ -965,7 +966,7 @@ release semantics.
 
 GitHub merged PR #43 as `dd4df5f` on 2026-07-16.
 
-## Follow-up — devnet script wallet-path hardening (in progress)
+## Follow-up — devnet script wallet-path hardening (complete — PR #44)
 
 Approved by Malcolm 2026-07-22 in response to an external static scanner's high-risk
 score (41% file coverage) on the then-public repository, on
@@ -992,6 +993,38 @@ fail closed with the new error message and no network call when `--keypair` is
 omitted; `corepack yarn test:sdk` — 128/128 pass (no SDK regressions — these scripts
 sit outside the SDK test glob); `npx prettier --check` clean on both edited scripts
 after formatting.
+
+While this PR was in review, pull-request CI's `npm audit --audit-level=high` gate
+started failing on newly disclosed advisories against `next@16.2.10` and its bundled
+`sharp` (unrelated to this PR's own script changes — see the dependency-advisory
+follow-up below for the fix that was folded into this branch before merge).
+
+GitHub merged PR #44 as `30170d3` on 2026-07-25.
+
+## Follow-up — dependency advisory remediation (in progress)
+
+Continues the security-hardening pass after PR #44, addressing dependency advisories
+disclosed since M15 and PR #44's mid-review dependency-audit fix, on
+`codex/dependency-advisory-remediation`.
+
+Three fixes, all in `SECURITY_CHECKLIST.md`'s new "Dependency security follow-up"
+section: a stale `postcss` override floor (still resolving a vulnerable `8.5.16`
+despite M15's `>=8.5.10` pin — the exact staleness the M15 cadence note warned about),
+newly disclosed `next`/`sharp` advisories, and a `brace-expansion` advisory pulled in
+only by `mocha`'s `minimatch` at the root. The first two were already committed and
+merged directly onto PR #44's branch to unblock its failing CI gate; this follow-up
+adds the `brace-expansion` fix and documents both. A `rand@0.7.3` low-severity Rust
+advisory is documented as an accepted, toolchain-pinned risk rather than fixed — it is
+transitive through `libsecp256k1@0.6.0` deep inside the pinned Agave/Anchor toolchain,
+its unsound condition (a custom logger calling `rand::rng()`) does not apply anywhere
+in this codebase, and forcing a bump would require a `[patch]` override against a
+version the pinned toolchain was never built or tested against.
+
+Observed locally (2026-07-25): `corepack yarn install` after adding the
+`brace-expansion` resolution; `corepack yarn audit` — 0 vulnerabilities (192 packages
+audited); `corepack yarn test:sdk` — 128/128 pass; root `tsc --noEmit` and
+`corepack yarn sdk:build` — clean. No Rust, program, SDK wire-contract, or dApp
+behavior change.
 
 ## Post-MVP Roadmap (candidate pool — implementation requires separate approval)
 

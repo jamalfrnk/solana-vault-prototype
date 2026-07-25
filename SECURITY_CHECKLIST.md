@@ -317,6 +317,51 @@ plus a `mocha` 9→11 dev-dependency upgrade.
 Cadence note: `overrides`/`resolutions` pins go stale — when a parent package ships its
 own fixed dependency, remove the pin rather than letting it mask future range bumps.
 
+## Dependency security follow-up (2026-07-23/24)
+
+Two further passes remediated newly disclosed advisories beyond M15's original set,
+both merged through PR #44:
+
+- **Stale `postcss` floor**: M15's `postcss >=8.5.10` override had gone stale exactly
+  as the cadence note above warns — it was still resolving `8.5.16`, which remained
+  vulnerable to a path-traversal advisory (GHSA-r28c-9q8g-f849, fixed at `8.5.18`).
+  Raised the floor to `>=8.5.18`.
+- **`next`/`sharp`**: newly disclosed high-severity advisories against
+  `next@16.2.10` and its bundled `sharp@<0.35.0` (GHSA-f88m-g3jw-g9cj). Bumped `next`
+  to `16.2.11` and added a `sharp >=0.35.0` override in `app/package.json`.
+- **`brace-expansion`** (high, GHSA fixed at `5.0.8`): pulled in only by `mocha`'s
+  `minimatch` at the root (`sdk/tests/**/*.test.ts` glob matching), not shipped in any
+  runtime path. Forced via a new root `resolutions` entry rather than an `overrides`
+  block, following the existing `js-yaml`/`uuid`/`diff`/`serialize-javascript` pattern.
+
+- [x] `npm audit --audit-level=high` in `app/` reports 0 vulnerabilities after the
+      `next`/`sharp`/`postcss` fix.
+      — Observed locally and in PR #44 CI: typecheck, production build, and all 122
+        dApp tests pass unchanged.
+- [x] `yarn audit` at root reports 0 vulnerabilities after the `brace-expansion` fix.
+      — Observed locally: root typecheck, SDK build, and all 128 SDK tests pass
+        unchanged.
+
+### Accepted risk: `rand` 0.7.3 (Rust, low severity)
+
+`Cargo.lock` carries `rand@0.7.3` as a transitive dependency of `libsecp256k1@0.6.0`,
+itself pulled in deep inside the pinned Agave v3.1.10 / Anchor 1.0.2 toolchain's own
+dependency graph — not a crate this repository's `Cargo.toml` selects directly. The
+advisory (low severity, fixed at `0.8.6`) describes unsoundness only when a consumer
+installs a custom logger and calls `rand::rng()` directly; no code in this program,
+its tests, or its scripts does either. Forcing a bump here would require a `[patch]`
+override against a version the pinned toolchain was not built or tested against — a
+larger, riskier change than the risk it removes, and one that could silently diverge
+this program's dependency tree from the exact toolchain versions M1/M11 pin. This is
+the same accept-in-place judgment M15 used for the then-unpatched `elliptic` advisory:
+`cargo audit`'s existing "allowed upstream warnings" pass (see per-milestone `TEST_PLAN.md`
+entries since M21) already covers this advisory without failing CI; this entry makes
+that acceptance explicit rather than implicit.
+
+- [ ] Revisit this pin if a future Agave/Anchor toolchain bump changes `libsecp256k1`'s
+      own `rand` requirement, or if this program ever calls `rand::rng()` with a custom
+      logger installed.
+
 ## Governance readiness (M16)
 
 `pause_authority`'s constraint surface is `Signer` + key equality only — no on-curve
