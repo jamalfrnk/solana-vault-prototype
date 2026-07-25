@@ -38,7 +38,8 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 | 24 | MintConfig, governed initialization, and exposure caps | `[x]` complete |
 | 25 | Constrained exact-excess recovery | `[x]` complete — PR #41 |
 | 26 | Release and operations evidence automation | `[x]` complete — PR #42 |
-| — | M26 follow-up — Node 24 GitHub Action refresh | `[~]` in review — PR #43 |
+| — | M26 follow-up — Node 24 GitHub Action refresh | `[x]` complete — PR #43 |
+| — | Follow-up — devnet script wallet-path hardening | `[~]` in progress |
 
 ## Milestone 0 — Repository bootstrap (complete)
 
@@ -955,12 +956,42 @@ as `03a25d1` on 2026-07-16. The run retained non-failing Node 20 runtime-depreca
 annotations from the then-current v4 action pins; the separate Node 24 follow-up
 refreshes only those immutable pins.
 
-## M26 follow-up — Node 24 GitHub Action refresh (in review — PR #43)
+## M26 follow-up — Node 24 GitHub Action refresh (complete — PR #43)
 
 Refreshes checkout, cache, setup-node, upload-artifact, and download-artifact to their
 current Node-24 major releases at immutable full SHAs. It changes no workflow
 permissions, commands, artifacts, program/SDK/dApp behavior, manifest policy, or
-release semantics. Focused and final-head follow-up evidence remains to be recorded.
+release semantics.
+
+GitHub merged PR #43 as `dd4df5f` on 2026-07-16.
+
+## Follow-up — devnet script wallet-path hardening (in progress)
+
+Approved by Malcolm 2026-07-22 in response to an external static scanner's high-risk
+score (41% file coverage) on the then-public repository, on
+`codex/devnet-wallet-path-hardening`. Full triage of all four scanner-flagged files —
+`scripts/generate_release_evidence.ts`, `scripts/devnet_demo.ts`,
+`scripts/sdk_devnet_smoke.ts`, `scripts/ui_test_vault_setup.ts` — is recorded in
+`docs/security/scanner-finding-triage.md`.
+
+Two findings were false positives already following safe patterns
+(`generate_release_evidence.ts`'s `execFileSync` with a fixed executable and argument
+array; `ui_test_vault_setup.ts`'s gitignored, repository-local disposable keypairs).
+The other two — `devnet_demo.ts` and `sdk_devnet_smoke.ts` — unconditionally loaded
+`~/.config/solana/id.json` as the payer keypair with no explicit flag and no override.
+Neither script is reachable from CI or any automated/pull-request path, and neither
+ever printed secret-key bytes, but the silent default itself was an unsafe development
+practice. Both scripts now require an explicit `--keypair <path>` flag and fail closed
+with a clear error if it is omitted, with no fallback to any default wallet location.
+`RUNBOOK.md`'s usage examples were updated to match.
+
+The repository remains private while this fix is completed and reviewed.
+
+Observed locally (2026-07-22): root `tsc --noEmit` clean; both scripts confirmed to
+fail closed with the new error message and no network call when `--keypair` is
+omitted; `corepack yarn test:sdk` — 128/128 pass (no SDK regressions — these scripts
+sit outside the SDK test glob); `npx prettier --check` clean on both edited scripts
+after formatting.
 
 ## Post-MVP Roadmap (candidate pool — implementation requires separate approval)
 
