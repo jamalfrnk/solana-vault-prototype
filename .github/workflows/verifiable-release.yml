@@ -24,8 +24,57 @@ jobs:
           echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
           echo "$HOME/.avm/bin" >> "$GITHUB_PATH"
 
+      - name: Record identity-file hashes before any Anchor invocation
+        run: |
+          sha256sum Anchor.toml programs/solana-vault-prototype/src/lib.rs \
+            > /tmp/identity-before.sha256
+          cat /tmp/identity-before.sha256
+
+      - name: Pre-create target/deploy to suppress Anchor's initial-build keys sync
+        # Anchor's CLI (cli/src/lib.rs) runs an unconditional program-id sync
+        # exactly once, gated only on `!target/deploy.exists()` (added in
+        # solana-foundation/anchor#3023) -- independent of --ignore-keys, which
+        # only skips a *separate* mismatch check for a keypair that already
+        # exists. On a fresh checkout target/deploy is always absent, so that
+        # sync fires and rewrites declare_id!()/Anchor.toml to a freshly
+        # generated keypair's address every run, making the compiled binary
+        # non-reproducible across independent dispatches. Pre-creating the
+        # (empty) directory here makes `!target/deploy.exists()` false, so the
+        # sync never runs and the committed program ID is what gets compiled
+        # in, every time -- with no keypair file needed anywhere.
+        run: mkdir -p target/deploy
+
+      - name: Ordinary prebuild (populates target/deploy/*.so for IDL extraction)
+        # anchor build --verifiable's own host-side IDL-extraction step
+        # recompiles the test crate, which needs target/deploy/*.so via
+        # include_bytes! in tests/test_pause.rs. The verifiable Docker build
+        # only ever writes target/verifiable/*.so, so without this ordinary
+        # prebuild first, IDL extraction fails with a missing-file error.
+        run: anchor build --ignore-keys
+
+      - name: Assert the ordinary prebuild kept identity stable and made no keypair
+        run: |
+          test -s target/deploy/solana_vault_prototype.so
+          if compgen -G "target/deploy/*-keypair.json" > /dev/null; then
+            echo "::error::A program keypair was generated during the ordinary prebuild." >&2
+            exit 1
+          fi
+          sha256sum -c /tmp/identity-before.sha256
+          git diff --exit-code
+
       - name: Build in Anchor's pinned verifiable Docker environment
         run: anchor build --verifiable --ignore-keys
+
+      - name: Assert the verifiable build kept identity stable and made no keypair
+        run: |
+          test -s target/verifiable/solana_vault_prototype.so
+          test -s target/idl/solana_vault_prototype.json
+          if compgen -G "target/deploy/*-keypair.json" > /dev/null; then
+            echo "::error::A program keypair was generated during the verifiable build." >&2
+            exit 1
+          fi
+          sha256sum -c /tmp/identity-before.sha256
+          git diff --exit-code
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -48,13 +97,24 @@ jobs:
             --agave-version "$AGAVE_VERSION" \
             --rust-version 1.89.0
 
+      - name: Stage only approved release artifacts
+        # An explicit allowlist, not a broad target/** glob, so nothing under
+        # target/deploy (where a keypair would live, if one ever existed) can
+        # be uploaded even by accident.
+        run: |
+          mkdir -p release-artifacts
+          install -m 0644 target/verifiable/solana_vault_prototype.so release-artifacts/
+          install -m 0644 target/idl/solana_vault_prototype.json release-artifacts/
+          install -m 0644 target/release-evidence/verifiable-release-evidence.json release-artifacts/
+          if find release-artifacts -iname '*keypair*' -o -iname 'id.json' -o -iname 'wallet*.json' | grep -q .; then
+            echo "::error::Keypair-shaped file found in release-artifacts; refusing to upload." >&2
+            exit 1
+          fi
+
       - name: Upload verifiable release artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: verifiable-release-${{ github.sha }}
-          path: |
-            target/verifiable/solana_vault_prototype.so
-            target/idl/solana_vault_prototype.json
-            target/release-evidence/verifiable-release-evidence.json
+          path: release-artifacts/
           retention-days: 90
           if-no-files-found: error
