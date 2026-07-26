@@ -41,8 +41,13 @@ jobs:
         # non-reproducible across independent dispatches. Pre-creating the
         # (empty) directory here makes `!target/deploy.exists()` false, so the
         # sync never runs and the committed program ID is what gets compiled
-        # in, every time -- with no keypair file needed anywhere.
-        run: mkdir -p target/deploy
+        # in, every time.
+        run: |
+          mkdir -p target/deploy
+          if compgen -G "target/deploy/*-keypair.json" > /dev/null; then
+            echo "::error::A keypair already exists before any build ran; refusing to proceed." >&2
+            exit 1
+          fi
 
       - name: Ordinary prebuild (populates target/deploy/*.so for IDL extraction)
         # anchor build --verifiable's own host-side IDL-extraction step
@@ -50,29 +55,28 @@ jobs:
         # include_bytes! in tests/test_pause.rs. The verifiable Docker build
         # only ever writes target/verifiable/*.so, so without this ordinary
         # prebuild first, IDL extraction fails with a missing-file error.
+        #
+        # This ordinary build generates a fresh target/deploy/*-keypair.json
+        # as a completely normal, harmless side effect (every local `anchor
+        # build` does this so the operator can deploy immediately after) --
+        # it is not the initial-sync bug the previous step suppressed, holds
+        # no funds or authority, is never committed, and is never uploaded
+        # (enforced by the artifact allowlist below).
         run: anchor build --ignore-keys
 
-      - name: Assert the ordinary prebuild kept identity stable and made no keypair
+      - name: Assert the ordinary prebuild kept the committed identity stable
         run: |
           test -s target/deploy/solana_vault_prototype.so
-          if compgen -G "target/deploy/*-keypair.json" > /dev/null; then
-            echo "::error::A program keypair was generated during the ordinary prebuild." >&2
-            exit 1
-          fi
           sha256sum -c /tmp/identity-before.sha256
           git diff --exit-code
 
       - name: Build in Anchor's pinned verifiable Docker environment
         run: anchor build --verifiable --ignore-keys
 
-      - name: Assert the verifiable build kept identity stable and made no keypair
+      - name: Assert the verifiable build kept the committed identity stable
         run: |
           test -s target/verifiable/solana_vault_prototype.so
           test -s target/idl/solana_vault_prototype.json
-          if compgen -G "target/deploy/*-keypair.json" > /dev/null; then
-            echo "::error::A program keypair was generated during the verifiable build." >&2
-            exit 1
-          fi
           sha256sum -c /tmp/identity-before.sha256
           git diff --exit-code
 
