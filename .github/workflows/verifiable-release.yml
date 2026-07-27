@@ -17,6 +17,15 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
+      - name: Free additional disk space
+        # The Docker-verifiable build (a full second SBF compile inside a
+        # pulled Docker image) plus the ordinary prebuild below can exceed a
+        # standard runner's free disk; these preinstalled toolchains are
+        # unused by this repository and safe to remove.
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+
       - name: Install pinned Rust, Agave, and Anchor toolchains
         run: |
           rustup show
@@ -56,13 +65,18 @@ jobs:
         # only ever writes target/verifiable/*.so, so without this ordinary
         # prebuild first, IDL extraction fails with a missing-file error.
         #
-        # This ordinary build generates a fresh target/deploy/*-keypair.json
-        # as a completely normal, harmless side effect (every local `anchor
-        # build` does this so the operator can deploy immediately after) --
-        # it is not the initial-sync bug the previous step suppressed, holds
-        # no funds or authority, is never committed, and is never uploaded
-        # (enforced by the artifact allowlist below).
-        run: anchor build --ignore-keys
+        # Uses bare `cargo build-sbf` rather than `anchor build --ignore-keys`
+        # deliberately: the latter also runs its own IDL-extraction phase as
+        # part of the same command, recompiling and executing the entire test
+        # crate in debug mode a second time -- output this step never needs,
+        # since only the verifiable build's own IDL matters. That redundant
+        # compile (on top of the Docker build repeating the SBF compile a
+        # third time) was what exhausted the runner's disk in an earlier
+        # attempt. `cargo build-sbf` produces the identical
+        # target/deploy/solana_vault_prototype.so with none of that: it is
+        # Solana's own subcommand, entirely unaware of Anchor's declare_id!()
+        # sync wrapper, so it also cannot touch program identity.
+        run: cargo build-sbf --manifest-path programs/solana-vault-prototype/Cargo.toml
 
       - name: Assert the ordinary prebuild kept the committed identity stable
         run: |
