@@ -17,6 +17,15 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
+      - name: Free additional disk space
+        # The Docker-verifiable build (a full second SBF compile inside a
+        # pulled Docker image) plus the ordinary prebuild below can exceed a
+        # standard runner's free disk; these preinstalled toolchains are
+        # unused by this repository and safe to remove.
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+
       - name: Install pinned Rust, Agave, and Anchor toolchains
         run: |
           rustup show
@@ -41,6 +50,13 @@ jobs:
         # non-reproducible across independent dispatches. Pre-creating the
         # (empty) directory here makes `!target/deploy.exists()` false, so the
         # sync never runs and the committed program ID is what gets compiled
+        # in, every time.
+        run: |
+          mkdir -p target/deploy
+          if compgen -G "target/deploy/*-keypair.json" > /dev/null; then
+            echo "::error::A keypair already exists before any build ran; refusing to proceed." >&2
+            exit 1
+          fi
         # in, every time -- with no keypair file needed anywhere.
         run: mkdir -p target/deploy
 
@@ -50,6 +66,23 @@ jobs:
         # include_bytes! in tests/test_pause.rs. The verifiable Docker build
         # only ever writes target/verifiable/*.so, so without this ordinary
         # prebuild first, IDL extraction fails with a missing-file error.
+        #
+        # Uses bare `cargo build-sbf` rather than `anchor build --ignore-keys`
+        # deliberately: the latter also runs its own IDL-extraction phase as
+        # part of the same command, recompiling and executing the entire test
+        # crate in debug mode a second time -- output this step never needs,
+        # since only the verifiable build's own IDL matters. That redundant
+        # compile (on top of the Docker build repeating the SBF compile a
+        # third time) was what exhausted the runner's disk in an earlier
+        # attempt. `cargo build-sbf` produces the identical
+        # target/deploy/solana_vault_prototype.so with none of that: it is
+        # Solana's own subcommand, entirely unaware of Anchor's declare_id!()
+        # sync wrapper, so it also cannot touch program identity.
+        run: cargo build-sbf --manifest-path programs/solana-vault-prototype/Cargo.toml
+
+      - name: Assert the ordinary prebuild kept the committed identity stable
+        run: |
+          test -s target/deploy/solana_vault_prototype.so
         run: anchor build --ignore-keys
 
       - name: Assert the ordinary prebuild kept identity stable and made no keypair
@@ -65,6 +98,10 @@ jobs:
       - name: Build in Anchor's pinned verifiable Docker environment
         run: anchor build --verifiable --ignore-keys
 
+      - name: Assert the verifiable build kept the committed identity stable
+        run: |
+          test -s target/verifiable/solana_vault_prototype.so
+          test -s target/idl/solana_vault_prototype.json
       - name: Assert the verifiable build kept identity stable and made no keypair
         run: |
           test -s target/verifiable/solana_vault_prototype.so
