@@ -96,12 +96,42 @@ of any local `anchor build`, unrelated to either bug) was never staged into the
 uploaded release artifacts, which use an explicit allowlist rather than a broad
 `target/**` glob.
 
+## Merge incident and hotfix (2026-07-27)
+
+A separate PR (#47) had independently merged just the first commit of this work a day
+before the full fix was reviewed and merged as PR #48. That made PR #48's merge
+non-trivial; whatever resolved the resulting conflict kept both sides of three
+conflicting hunks instead of picking one, leaving `verifiable-release.yml` on `main`
+with duplicate step names and a duplicate `run:` key in the same YAML mapping —
+confirmed with `js-yaml` to be a hard parse error, not merely "last value wins." PR #49
+restored the file byte-for-byte from the exact commit (`2df1ee3`) verified above.
+
+## Independent verification (2026-07-27)
+
+After PR #49 merged (commit `86e2b9b47163cfd0ab9f71481b99abbbd968b3d3`), Malcolm
+independently dispatched the workflow himself via the GitHub web UI — a genuinely
+separate action from every automated dispatch recorded above. Run
+[30300453773](https://github.com/jamalfrnk/solana-vault-prototype/actions/runs/30300453773)
+succeeded and produced:
+
+| Artifact | Malcolm's run |
+|---|---|
+| `solana_vault_prototype.so` | `69603a99...` (identical) |
+| `solana_vault_prototype.json` (IDL) | `af8d62ba...` (identical) |
+| `verifiable-release-evidence.json` | `88530b88...` (differs only in `sourceCommit`) |
+
+The program `.so` and IDL hashes are byte-identical to both earlier automated runs.
+The release-evidence JSON's hash differs only because it embeds `sourceCommit`
+(`86e2b9b...` vs. `7f675b7...`, the pre- and post-hotfix commits) — every other field,
+including the `Cargo.lock` hash, matches exactly. Three separate dispatches (two
+automated under one account, one manual under Malcolm's own account) of source that
+compiles identically now agree byte-for-byte.
+
 ## What this does and does not prove
 
-This proves the workflow itself now runs correctly and deterministically under
-repeated automated dispatch from this one CI account. It does **not** constitute the
-independent external verification or deployed-binary comparison
-`SECURITY_CHECKLIST.md`'s launch gate still requires — two dispatches from the same
-GitHub Actions account are same-CI automation evidence, not an independent verifier,
-and no M24/M25-era binary is deployed anywhere yet to compare against. Both remain
-open launch blockers.
+This proves the workflow runs correctly and deterministically, including under a
+genuinely independent operator's own manual dispatch — the "independent verifier"
+half of `SECURITY_CHECKLIST.md`'s launch-gate item is satisfied. It does **not**
+constitute the deployed-binary comparison that item still requires: no M24/M25-era
+binary is deployed anywhere yet to compare this output against. That half remains an
+open launch blocker.

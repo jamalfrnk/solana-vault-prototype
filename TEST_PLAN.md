@@ -2,9 +2,9 @@
 
 **Status: M21–M26 and all earlier follow-ups are complete through PR #42. The M26
 Node-24 GitHub Action refresh (PR #43), devnet script wallet-path hardening (PR #44),
-dependency advisory remediation (PR #45), and legacy vault retirement (PR #46)
-follow-ups are merged. The verifiable-build determinism fix follow-up is in progress;
-pull-request CI remains the publication gate.**
+dependency advisory remediation (PR #45), legacy vault retirement (PR #46), and
+verifiable-build determinism fix (PR #48, hotfixed by PR #49) follow-ups are merged.
+Pull-request CI remains the publication gate.**
 
 ## Repository hygiene (complete)
 
@@ -830,7 +830,7 @@ behavior change; no devnet state was mutated.
 
 GitHub merged PR #46 as `15db9fd` on 2026-07-25.
 
-## Verifiable-build determinism fix follow-up (in progress)
+## Verifiable-build determinism fix follow-up (complete — PR #48, #49)
 
 Full root-cause analysis and verification evidence in
 `docs/security/verifiable-build-determinism.md`. M26's manually dispatched
@@ -856,9 +856,12 @@ successfully before this pass.
 - [x] Release-artifact upload uses an explicit allowlist (the verifiable `.so`,
       IDL, and release-evidence JSON) rather than a broad `target/**` glob, so a
       keypair could never be uploaded even by accident.
-- [ ] Independent external verification and comparison to a deployed binary
-      remain open launch blockers — this pass is same-CI automation evidence
-      only, not either of those.
+- [x] Independent external verification: Malcolm independently dispatched the
+      restored workflow himself via the GitHub web UI (run `30300453773`),
+      producing a byte-identical program `.so` and IDL against a third,
+      genuinely independent build.
+- [ ] Comparison to a deployed binary remains an open launch blocker — no
+      M24/M25-era binary is deployed anywhere yet to compare against.
 
 Observed (2026-07-27): two fully independent `workflow_dispatch` runs of commit
 `7f675b7209954173d37f7633962e0aeeaff00abc` both succeeded and produced
@@ -871,6 +874,19 @@ CI, confirming neither build mutated `Anchor.toml` or
 uploaded, or required at any point. No Rust, program, SDK wire-contract, or dApp
 behavior changed — this pass touched only `.github/workflows/verifiable-release.yml`
 and documentation.
+
+GitHub merged PR #48 as `fdc4987` on 2026-07-27. A separate PR (#47), merged a day
+earlier from the same branch, made that merge non-trivial; the resulting conflict
+resolution left the merged file with a duplicate `run:` key in the same YAML mapping
+— a hard parse error under `js-yaml`, not code this pass had tested. PR #49 restored
+the file byte-for-byte from the exact verified commit and merged as `86e2b9b` the
+same day; re-validated clean (14 steps, no duplicates) after merge.
+
+Observed (2026-07-27): Malcolm's independent web-UI dispatch of the restored
+workflow (run `30300453773`, commit `86e2b9b`) produced `solana_vault_prototype.so`
+(sha256 `69603a99...`) and IDL (sha256 `af8d62ba...`) byte-identical to both earlier
+automated dispatches; the release-evidence JSON differed only in its `sourceCommit`
+field, with every other field — including the `Cargo.lock` hash — matching exactly.
 
 ## Anchor scaffold baseline (complete — M2)
 

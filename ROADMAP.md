@@ -42,7 +42,7 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 | — | Follow-up — devnet script wallet-path hardening | `[x]` complete — PR #44 |
 | — | Follow-up — dependency advisory remediation | `[x]` complete — PR #45 |
 | — | Follow-up — legacy vault retirement | `[x]` complete — PR #46 |
-| — | Follow-up — verifiable-build determinism fix | `[~]` in progress |
+| — | Follow-up — verifiable-build determinism fix | `[x]` complete — PR #48, #49 |
 
 ## Milestone 0 — Repository bootstrap (complete)
 
@@ -1069,7 +1069,7 @@ GitHub merged PR #46 as `15db9fd` on 2026-07-25. Live devnet state confirmed
 afterward that vault `3c94…BnCL` remains un-drained (`--confirm` still Malcolm's
 pending manual action) and vault `E268…B9GV` unchanged, as expected.
 
-## Follow-up — verifiable-build determinism fix (in progress)
+## Follow-up — verifiable-build determinism fix (complete — PR #48, #49)
 
 Approved by Malcolm 2026-07-26 as the next security-hardening step, on
 `codex/verifiable-build-determinism`. M26's manually dispatched **Verifiable release
@@ -1100,9 +1100,22 @@ release-evidence JSON (all three SHA-256 hashes matched exactly), each correctly
 embedding the real committed `HaryVUcfDqxpzFS7JyNe1XuqscFWyYFVAJdYoUX6jEcS` program
 ID. Both runs' identity-file hash and `git diff --exit-code` assertions passed,
 confirming no tracked file was mutated by either build. No keypair was committed,
-uploaded, or required. This is same-CI automation evidence, not the independent
-external verifier or deployed-binary comparison `SECURITY_CHECKLIST.md`'s launch gate
-still requires — both remain open.
+uploaded, or required.
+
+GitHub merged PR #48 as `fdc4987` on 2026-07-27. A separate PR (#47) had
+independently merged just the first WIP commit of this work a day earlier, making PR
+#48's merge non-trivial; whatever resolved the resulting conflict kept both sides of
+three conflicting hunks instead of picking one, leaving `verifiable-release.yml` on
+`main` with a duplicate `run:` key in the same YAML mapping — a hard parse error,
+confirmed with `js-yaml`. PR #49 restored the file byte-for-byte from the exact
+verified commit and merged as `86e2b9b` the same day.
+
+Malcolm then independently dispatched the restored workflow himself via the GitHub
+web UI (run `30300453773`), producing a byte-identical program `.so` and IDL against
+this third, genuinely independent build. That satisfies the "reproduced by an
+independent verifier" half of `SECURITY_CHECKLIST.md`'s launch-gate item; the
+"compared to a deployed binary" half remains open, since no M24/M25-era binary is
+deployed anywhere yet to compare against.
 
 ## Post-MVP Roadmap (candidate pool — implementation requires separate approval)
 

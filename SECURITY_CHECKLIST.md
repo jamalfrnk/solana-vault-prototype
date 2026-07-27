@@ -588,9 +588,15 @@ below are implemented and tested; every unchecked item remains a launch blocker.
         commit `7f675b7` now produce byte-identical `solana_vault_prototype.so`
         (sha256 `69603a99...`), IDL (sha256 `af8d62ba...`), and release-evidence
         JSON, all correctly embedding the real committed `HaryVUcfDqxpzFS7JyNe1XuqscFWyYFVAJdYoUX6jEcS`
-        program ID. This is same-CI automation evidence, not the independent
-        external verifier or deployed-binary comparison this item still
-        requires — both remain open launch blockers.
+        program ID. A separate merge incident then corrupted the merged workflow
+        YAML into invalid, unparseable content; PR #49 restored it byte-for-byte
+        from the verified commit. Malcolm then independently dispatched the
+        restored workflow himself via the GitHub web UI (run `30300453773`),
+        producing a byte-identical program `.so` and IDL against a third,
+        genuinely independent build — satisfying the "reproduced by an
+        independent verifier" half of this item. The "compared to a deployed
+        binary" half remains open: no M24/M25-era binary is deployed anywhere
+        yet to compare this output against.
 - [ ] Real multisig/timelock addresses, approved mint/caps, private RPC providers,
       alert routes, role holders, and rehearsal evidence replace every placeholder and
       are independently approved. M26 does not choose or provision them.
