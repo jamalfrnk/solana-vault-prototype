@@ -2,8 +2,9 @@
 
 **Status: M21–M26 and all earlier follow-ups are complete through PR #42. The M26
 Node-24 GitHub Action refresh (PR #43), devnet script wallet-path hardening (PR #44),
-and dependency advisory remediation (PR #45) follow-ups are merged. The legacy vault
-retirement follow-up is in progress; pull-request CI remains the publication gate.**
+dependency advisory remediation (PR #45), and legacy vault retirement (PR #46)
+follow-ups are merged. The verifiable-build determinism fix follow-up is in progress;
+pull-request CI remains the publication gate.**
 
 ## Repository hygiene (complete)
 
@@ -786,7 +787,7 @@ behavior change; app-side dependencies untouched by this pass.
 
 GitHub merged PR #45 as `a14bca7` on 2026-07-25.
 
-## Legacy vault retirement follow-up (in progress)
+## Legacy vault retirement follow-up (complete — PR #46)
 
 Full detail in `docs/LEGACY_ACCOUNT_INVENTORY.md`'s "2026-07-25 signer check and
 ADR 0010" section and
@@ -826,6 +827,50 @@ transaction (never broadcast, no fee paid, no state change, secret never printed
 noted explicitly as more automated-tool involvement with a real signer than
 originally scoped for this pass. No Rust, program, SDK wire-contract, or dApp
 behavior change; no devnet state was mutated.
+
+GitHub merged PR #46 as `15db9fd` on 2026-07-25.
+
+## Verifiable-build determinism fix follow-up (in progress)
+
+Full root-cause analysis and verification evidence in
+`docs/security/verifiable-build-determinism.md`. M26's manually dispatched
+**Verifiable release evidence** workflow had never actually been dispatched
+successfully before this pass.
+
+- [x] Root cause of the build crash identified: `anchor build --verifiable`'s
+      host-side IDL-extraction step needs `target/deploy/solana_vault_prototype.so`,
+      which the verifiable Docker build never writes (it only writes
+      `target/verifiable/...`).
+- [x] Root cause of cross-run non-determinism identified and confirmed against
+      Anchor's own source (`solana-foundation/anchor#3023`): an unconditional
+      program-id sync gated only on `target/deploy`'s absence, independent of
+      `--ignore-keys`, rewrites `declare_id!()`/`Anchor.toml` to a fresh random
+      address on every checkout where that directory doesn't yet exist.
+- [x] Fix requires no committed keypair: pre-creating an empty `target/deploy`
+      directory before any Anchor invocation suppresses the sync entirely.
+- [x] A disk-exhaustion regression from the first fix attempt (a full
+      `anchor build --ignore-keys` prebuild silently recompiles the whole crate
+      twice, on top of the Docker build's own compile) is fixed by using bare
+      `cargo build-sbf` for the prebuild instead — identical output artifact,
+      no redundant compile, and no awareness of Anchor's sync wrapper at all.
+- [x] Release-artifact upload uses an explicit allowlist (the verifiable `.so`,
+      IDL, and release-evidence JSON) rather than a broad `target/**` glob, so a
+      keypair could never be uploaded even by accident.
+- [ ] Independent external verification and comparison to a deployed binary
+      remain open launch blockers — this pass is same-CI automation evidence
+      only, not either of those.
+
+Observed (2026-07-27): two fully independent `workflow_dispatch` runs of commit
+`7f675b7209954173d37f7633962e0aeeaff00abc` both succeeded and produced
+byte-identical `solana_vault_prototype.so` (sha256 `69603a99...`), IDL (sha256
+`af8d62ba...`), and release-evidence JSON (sha256 `bac98af9...`); both recorded
+`programId: HaryVUcfDqxpzFS7JyNe1XuqscFWyYFVAJdYoUX6jEcS`, the real committed
+identity. Both runs' identity-hash and `git diff --exit-code` assertions passed in
+CI, confirming neither build mutated `Anchor.toml` or
+`programs/solana-vault-prototype/src/lib.rs`. No keypair file was committed,
+uploaded, or required at any point. No Rust, program, SDK wire-contract, or dApp
+behavior changed — this pass touched only `.github/workflows/verifiable-release.yml`
+and documentation.
 
 ## Anchor scaffold baseline (complete — M2)
 

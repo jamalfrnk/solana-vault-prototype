@@ -202,7 +202,11 @@ candidate, dispatch **Verifiable release evidence** at the exact reviewed commit
 runs Anchor's Docker-verifiable build and retains the binary, IDL, and deterministic
 evidence. Download that artifact, have a second operator reproduce it, and compare all
 hashes before any separately approved deployment. The workflow does not deploy and has
-no signer or write permission.
+no signer or write permission. It never runs `anchor keys sync` and never needs or
+generates a committed keypair — see
+[`docs/security/verifiable-build-determinism.md`](docs/security/verifiable-build-determinism.md)
+for the 2026-07-27 fix that made it dispatchable at all and proved two independent
+dispatches produce byte-identical output.
 
 CI also performs a full-history Gitleaks scan using a fixed binary version and archive
 checksum. Findings are redacted. A clean scan does not make it safe to commit secrets;

@@ -572,6 +572,25 @@ below are implemented and tested; every unchecked item remains a launch blocker.
 - [ ] The Docker-verifiable workflow is run for an approved release, reproduced by an
       independent verifier, and compared to a deployed binary. Automation alone does
       not prove an existing deployment.
+      — 2026-07-27: the workflow itself was broken and had never successfully
+        completed since M26 introduced it — the first real dispatch surfaced two
+        bugs (documented in `docs/security/verifiable-build-determinism.md`):
+        a host-side IDL-extraction step that needed an artifact the verifiable
+        Docker build never wrote, and an Anchor CLI behavior that rewrote
+        `declare_id!()`/`Anchor.toml` to a fresh random address on every fresh
+        checkout (`solana-foundation/anchor#3023`'s initial-build keys sync,
+        independent of `--ignore-keys`). Both are fixed without any committed
+        keypair: pre-creating an empty `target/deploy` directory before any
+        Anchor invocation suppresses the sync (proven from Anchor's own source),
+        and a bare `cargo build-sbf` prebuild (which has no awareness of
+        Anchor's sync wrapper at all) satisfies the IDL-extraction dependency
+        without redundant compilation. Two fully independent CI dispatches of
+        commit `7f675b7` now produce byte-identical `solana_vault_prototype.so`
+        (sha256 `69603a99...`), IDL (sha256 `af8d62ba...`), and release-evidence
+        JSON, all correctly embedding the real committed `HaryVUcfDqxpzFS7JyNe1XuqscFWyYFVAJdYoUX6jEcS`
+        program ID. This is same-CI automation evidence, not the independent
+        external verifier or deployed-binary comparison this item still
+        requires — both remain open launch blockers.
 - [ ] Real multisig/timelock addresses, approved mint/caps, private RPC providers,
       alert routes, role holders, and rehearsal evidence replace every placeholder and
       are independently approved. M26 does not choose or provision them.

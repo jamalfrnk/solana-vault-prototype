@@ -41,7 +41,8 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 | — | M26 follow-up — Node 24 GitHub Action refresh | `[x]` complete — PR #43 |
 | — | Follow-up — devnet script wallet-path hardening | `[x]` complete — PR #44 |
 | — | Follow-up — dependency advisory remediation | `[x]` complete — PR #45 |
-| — | Follow-up — legacy vault retirement | `[~]` in progress |
+| — | Follow-up — legacy vault retirement | `[x]` complete — PR #46 |
+| — | Follow-up — verifiable-build determinism fix | `[~]` in progress |
 
 ## Milestone 0 — Repository bootstrap (complete)
 
@@ -1029,7 +1030,7 @@ behavior change.
 
 GitHub merged PR #45 as `a14bca7` on 2026-07-25.
 
-## Follow-up — legacy vault retirement (in progress)
+## Follow-up — legacy vault retirement (complete — PR #46)
 
 Approved by Malcolm 2026-07-25 as the next security-hardening step, on
 `codex/legacy-vault-retirement`. Checks every keypair this repository holds locally
@@ -1063,6 +1064,45 @@ simulate-only transaction (never broadcast, no fee paid, no state change, secret
 printed) — flagged explicitly since it is more automated-tool involvement with a real
 signer than originally scoped; the real `--confirm` send has not been run and remains
 Malcolm's action.
+
+GitHub merged PR #46 as `15db9fd` on 2026-07-25. Live devnet state confirmed
+afterward that vault `3c94…BnCL` remains un-drained (`--confirm` still Malcolm's
+pending manual action) and vault `E268…B9GV` unchanged, as expected.
+
+## Follow-up — verifiable-build determinism fix (in progress)
+
+Approved by Malcolm 2026-07-26 as the next security-hardening step, on
+`codex/verifiable-build-determinism`. M26's manually dispatched **Verifiable release
+evidence** workflow had never actually been dispatched successfully — its checklist
+entries described intended, not observed, behavior. The first real dispatch surfaced
+two real bugs, fully diagnosed and fixed without ever committing or requiring a
+program keypair. Complete root-cause analysis, fix rationale, and verification
+evidence are in
+[`docs/security/verifiable-build-determinism.md`](docs/security/verifiable-build-determinism.md).
+
+In short: Anchor's CLI runs an unconditional program-id sync exactly once, gated only
+on whether `target/deploy` exists (`solana-foundation/anchor#3023`), independent of
+`--ignore-keys` — on every fresh CI checkout that directory is absent, so every
+dispatch rewrote `declare_id!()`/`Anchor.toml` to a fresh random address before
+building, making the compiled binary non-reproducible across independent runs.
+Pre-creating an empty `target/deploy` directory before any Anchor invocation
+suppresses the sync entirely, proven directly against Anchor's own source rather than
+assumed. A separate crash (host-side IDL extraction needing an artifact the verifiable
+build never wrote) and a disk-exhaustion regression from an early fix attempt (a full
+`anchor build --ignore-keys` prebuild silently recompiles the whole crate twice) were
+also found and fixed — the final prebuild uses bare `cargo build-sbf`, which is
+Solana's own subcommand with no awareness of Anchor's sync wrapper and cannot touch
+program identity even in principle.
+
+Observed (2026-07-27): two fully independent `workflow_dispatch` runs of commit
+`7f675b7` produced byte-identical `solana_vault_prototype.so`, generated IDL, and
+release-evidence JSON (all three SHA-256 hashes matched exactly), each correctly
+embedding the real committed `HaryVUcfDqxpzFS7JyNe1XuqscFWyYFVAJdYoUX6jEcS` program
+ID. Both runs' identity-file hash and `git diff --exit-code` assertions passed,
+confirming no tracked file was mutated by either build. No keypair was committed,
+uploaded, or required. This is same-CI automation evidence, not the independent
+external verifier or deployed-binary comparison `SECURITY_CHECKLIST.md`'s launch gate
+still requires — both remain open.
 
 ## Post-MVP Roadmap (candidate pool — implementation requires separate approval)
 
