@@ -57,6 +57,8 @@ jobs:
             echo "::error::A keypair already exists before any build ran; refusing to proceed." >&2
             exit 1
           fi
+        # in, every time -- with no keypair file needed anywhere.
+        run: mkdir -p target/deploy
 
       - name: Ordinary prebuild (populates target/deploy/*.so for IDL extraction)
         # anchor build --verifiable's own host-side IDL-extraction step
@@ -81,6 +83,15 @@ jobs:
       - name: Assert the ordinary prebuild kept the committed identity stable
         run: |
           test -s target/deploy/solana_vault_prototype.so
+        run: anchor build --ignore-keys
+
+      - name: Assert the ordinary prebuild kept identity stable and made no keypair
+        run: |
+          test -s target/deploy/solana_vault_prototype.so
+          if compgen -G "target/deploy/*-keypair.json" > /dev/null; then
+            echo "::error::A program keypair was generated during the ordinary prebuild." >&2
+            exit 1
+          fi
           sha256sum -c /tmp/identity-before.sha256
           git diff --exit-code
 
@@ -91,6 +102,14 @@ jobs:
         run: |
           test -s target/verifiable/solana_vault_prototype.so
           test -s target/idl/solana_vault_prototype.json
+      - name: Assert the verifiable build kept identity stable and made no keypair
+        run: |
+          test -s target/verifiable/solana_vault_prototype.so
+          test -s target/idl/solana_vault_prototype.json
+          if compgen -G "target/deploy/*-keypair.json" > /dev/null; then
+            echo "::error::A program keypair was generated during the verifiable build." >&2
+            exit 1
+          fi
           sha256sum -c /tmp/identity-before.sha256
           git diff --exit-code
 
