@@ -806,11 +806,11 @@ ADR 0010" section and
       proceed on any account/state mismatch, and requires exactly one of
       `--dry-run`/`--confirm` (no default that could run destructively by
       accident).
-- [ ] The real `--confirm` transaction has not been sent. Per this project's
-      standing "no automated tool signs this step" policy, sending it is
-      Malcolm's manual action; this checklist item stays open until he runs it
-      and the resulting evidence is recorded in
-      `docs/LEGACY_ACCOUNT_INVENTORY.md`.
+- [x] Malcolm ran the real `--confirm` transaction himself on 2026-07-27
+      (`5fysieLSHBKb4a92Z7PGb43aokRc9EKe338DJY8YfDzBxk9S989oVYvgYHy3nUhhjUTp9E3bK3goZamH2CB3rxTS`).
+      `total_assets`/`total_shares`/custody/position shares all confirmed zero,
+      independently reconciled with a fresh read-only inventory run afterward —
+      evidence recorded in `docs/LEGACY_ACCOUNT_INVENTORY.md`.
 - [x] ADR 0010 documents the decision not to build a privileged recovery
       instruction for vault `E268…B9GV`'s permanently unavailable signer, and
       reclassifies it from "retirement required" to "permanently unrecoverable,

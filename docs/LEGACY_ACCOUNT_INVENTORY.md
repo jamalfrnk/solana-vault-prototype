@@ -1,6 +1,9 @@
 # Devnet Legacy Account Inventory
 
-**Status:** Pre-retirement snapshot; launch blockers remain
+**Status:** Vault `3c94…BnCL` retired 2026-07-27 (see below). Vault `E268…B9GV`
+permanently unrecoverable, accepted per ADR 0010. One launch blocker remains: the
+113-byte layout itself is still incompatible with the current program and must stay
+retired/never migrated, per ADR 0005.
 
 **Observed:** 2026-07-16T00:23:43Z against `https://api.devnet.solana.com` at
 `confirmed` commitment
@@ -93,8 +96,34 @@ both vaults' recorded signers found:
 
 | Vault | Status |
 |---|---|
-| `3c94…BnCL` | Retirement prepared (`scripts/retire_legacy_vault_3c94.ts`, dry-run verified); pending Malcolm's signed execution |
+| `3c94…BnCL` | **Retired 2026-07-27** — see evidence below |
 | `E268…B9GV` | Permanently unrecoverable, accepted per ADR 0010; no further action planned |
+
+## 2026-07-27 vault `3c94…BnCL` retirement executed
+
+Malcolm ran `scripts/retire_legacy_vault_3c94.ts --keypair keys/ui-wallet.json
+--confirm` himself, signing with the recorded pause authority / position owner key.
+
+- **Transaction:** `5fysieLSHBKb4a92Z7PGb43aokRc9EKe338DJY8YfDzBxk9S989oVYvgYHy3nUhhjUTp9E3bK3goZamH2CB3rxTS`
+- **Explorer:** https://explorer.solana.com/tx/5fysieLSHBKb4a92Z7PGb43aokRc9EKe338DJY8YfDzBxk9S989oVYvgYHy3nUhhjUTp9E3bK3goZamH2CB3rxTS?cluster=devnet
+
+| Field | Before | After |
+|---|---:|---:|
+| `total_assets` | `101000000` | `0` |
+| `total_shares` | `101000000` | `0` |
+| custody balance | `101000000` | `0` |
+| position shares | `101000000` | `0` |
+| owner token balance | `9899000000` | `10000000000` |
+
+Independently reconciled with a fresh read-only `corepack yarn inventory:legacy
+--program-id FYqCCoAnM9tUYRcSRbeLbUE9LBPv8bN2uyuhcz46pSgq` run after the transaction
+confirmed: `totalAssets: 0`, `totalShares: 0`, `custody.amount: 0`, linked position
+`shares: 0` — matching the script's own reported evidence exactly, not merely
+trusting its self-report. The vault remains structurally a 113-byte account (its
+layout cannot and does not change), so the read-only inventory tool still reports
+`legacy-113-retirement-required` as a structural fact; the account itself is not
+migrated or deleted, only fully drained and reconciled to zero, satisfying ADR 0005's
+retirement procedure.
 
 ## M23 devnet/UI follow-up non-mutation evidence
 
