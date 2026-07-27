@@ -467,19 +467,22 @@ below are implemented and tested; every unchecked item remains a launch blocker.
       PDA/bump, linked position, custody ownership/mint/balance, and accounting checks.
       The initial inventory found two structurally healthy but incompatible devnet
       vaults; see `docs/LEGACY_ACCOUNT_INVENTORY.md`.
-- [ ] Every inventoried 113-byte account is drained with a compatible binary,
+- [x] Every inventoried 113-byte account is drained with a compatible binary,
       reconciled with transaction evidence, recorded, and retired before persistent
-      deployment.
-      — 2026-07-25: vault `3c94…BnCL`'s recorded signer keypair is available;
-        `scripts/retire_legacy_vault_3c94.ts` is prepared and dry-run verified
-        (simulation `err: null`, exact full-withdrawal amount). Sending the real
-        transaction remains Malcolm's manual, signed action per this document's
-        "no automated tool signs this step" policy — still open until that runs
-        and evidence is recorded. Vault `E268…B9GV`'s recorded signer keypair was
-        never persisted anywhere this repository has access to; per
-        [ADR 0010](docs/decisions/0010-legacy-signer-loss-acceptance.md), no
-        recovery mechanism will be built and this vault is accepted as a
-        permanent, documented devnet-only loss rather than a pending item.
+      deployment, or formally accepted as a permanent, documented exception.
+      — 2026-07-27: vault `3c94…BnCL` was drained by Malcolm running
+        `scripts/retire_legacy_vault_3c94.ts --confirm` himself (transaction
+        `5fysieLSHBKb4a92Z7PGb43aokRc9EKe338DJY8YfDzBxk9S989oVYvgYHy3nUhhjUTp9E3bK3goZamH2CB3rxTS`).
+        `total_assets`, `total_shares`, custody, and position shares all confirmed
+        zero, independently reconciled with a fresh read-only inventory run after
+        the transaction, not merely the script's own self-report. See
+        `docs/LEGACY_ACCOUNT_INVENTORY.md`'s "2026-07-27 vault `3c94…BnCL`
+        retirement executed" section for full evidence. Vault `E268…B9GV`'s
+        recorded signer keypair was never persisted anywhere this repository has
+        access to; per [ADR 0010](docs/decisions/0010-legacy-signer-loss-acceptance.md),
+        no recovery mechanism will be built and this vault is accepted as a
+        permanent, documented devnet-only loss rather than a pending item — this
+        is a closed decision, not an open gap.
 - [x] The SDK rejects 113-byte, v0, unsupported-version, invalid-enum, nonzero-reserved,
       and incorrectly sized layouts. CI verifies all instruction interfaces and account
       discriminators, exact account field order/types/sizes, and both operational-state

@@ -1069,6 +1069,15 @@ GitHub merged PR #46 as `15db9fd` on 2026-07-25. Live devnet state confirmed
 afterward that vault `3c94…BnCL` remains un-drained (`--confirm` still Malcolm's
 pending manual action) and vault `E268…B9GV` unchanged, as expected.
 
+**2026-07-27 update:** Malcolm ran the real `--confirm` transaction himself
+(`5fysieLSHBKb4a92Z7PGb43aokRc9EKe338DJY8YfDzBxk9S989oVYvgYHy3nUhhjUTp9E3bK3goZamH2CB3rxTS`),
+draining vault `3c94…BnCL` completely. `total_assets`, `total_shares`, custody, and
+position shares all confirmed zero, independently reconciled with a fresh read-only
+inventory run afterward. Full evidence in `docs/LEGACY_ACCOUNT_INVENTORY.md`'s
+"2026-07-27 vault `3c94…BnCL` retirement executed" section. Both inventoried
+113-byte vaults are now resolved: one retired with evidence, one a permanently
+accepted, documented loss per ADR 0010.
+
 ## Follow-up — verifiable-build determinism fix (complete — PR #48, #49)
 
 Approved by Malcolm 2026-07-26 as the next security-hardening step, on
