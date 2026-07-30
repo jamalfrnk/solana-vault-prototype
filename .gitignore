@@ -40,3 +40,15 @@ keypairs/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Additional recommended ignores
+.env.local
+.env.*.local
+.npmrc
+.npmrc.local
+.history/
+.cache/
+.next/cache/
+.yarn-cache/
+# prevent accidental checkin of generated keypairs in target/deploy
+target/deploy/*-keypair.json

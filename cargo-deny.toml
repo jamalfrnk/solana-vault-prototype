@@ -1,0 +1,15 @@
+# cargo-deny.toml
+
+[advisories]
+# Use the advisory DB and fail the check if any high/critical advisories are found.
+ignore = []
+
+[checks]
+# Deny git dependencies (require crates.io/tarball releases)
+deny = [
+  { type = "git" }
+]
+
+[policies]
+# Deny yanked crates by default
+deny-yanked = true
