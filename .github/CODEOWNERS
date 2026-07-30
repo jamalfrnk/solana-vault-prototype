@@ -1,0 +1,21 @@
+# CODEOWNERS
+
+# NOTE: Replace REPO_OWNERS_PLACEHOLDER with the actual GitHub username or team
+# Example: /programs/ @org/security-team
+# The following entries require explicit review by repository owners/maintainers.
+
+# Repository-wide
+/* REPO_OWNERS_PLACEHOLDER
+
+# Security sensitive areas
+/.github/ REPO_OWNERS_PLACEHOLDER
+/programs/ REPO_OWNERS_PLACEHOLDER
+/scripts/ REPO_OWNERS_PLACEHOLDER
+/Cargo.toml REPO_OWNERS_PLACEHOLDER
+/Cargo.lock REPO_OWNERS_PLACEHOLDER
+/package.json REPO_OWNERS_PLACEHOLDER
+/yarn.lock REPO_OWNERS_PLACEHOLDER
+/Anchor.toml REPO_OWNERS_PLACEHOLDER
+/Dockerfile REPO_OWNERS_PLACEHOLDER
+/ops/ REPO_OWNERS_PLACEHOLDER
+/docs/ REPO_OWNERS_PLACEHOLDER
