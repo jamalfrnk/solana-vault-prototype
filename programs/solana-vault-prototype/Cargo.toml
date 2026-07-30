@@ -30,6 +30,12 @@ solana-message = "3.0.1"
 solana-transaction = "3.0.2"
 solana-signer = "3.0.0"
 solana-keypair = "3.0.1"
+# litesvm-0.10.0 depends on solana-account 3.x. Bumping this to a 4.x release
+# introduces a second version of the crate into the dependency graph; because
+# solana_account::Account from 4.x and 3.x are distinct Rust types, every
+# svm.set_account() call in the test suite would fail to compile with
+# E0308 mismatched types.  Do not upgrade past the 3.x series until litesvm
+# itself migrates to solana-account 4.x.
 solana-account = "3.4.0"
 solana-pubkey = { version = "4.0.0", features = ["curve25519"] }
 solana-clock = "3.0.0"
