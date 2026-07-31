@@ -89,6 +89,12 @@ pub fn handler(ctx: Context<SweepExcess>) -> Result<()> {
         .ok_or(VaultError::CustodyShortfall)?;
     require!(excess > 0, VaultError::NoExcessToSweep);
 
+    ctx.accounts
+        .treasury_token_account
+        .amount
+        .checked_add(excess)
+        .ok_or(VaultError::ArithmeticOverflow)?;
+
     let vault_state_key = ctx.accounts.vault_state.key();
     let authority_bump = ctx.accounts.vault_state.authority_bump;
     let signer_seeds: &[&[&[u8]]] = &[&[
