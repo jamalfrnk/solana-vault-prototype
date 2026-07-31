@@ -89,6 +89,15 @@ pub fn handler(ctx: Context<SweepExcess>) -> Result<()> {
         .ok_or(VaultError::CustodyShortfall)?;
     require!(excess > 0, VaultError::NoExcessToSweep);
 
+    // Guard against destination overflow before issuing the CPI. The SPL
+    // token program would also reject this, but an explicit check produces a
+    // clear program-level error and avoids relying on CPI-level behaviour.
+    ctx.accounts
+        .treasury_token_account
+        .amount
+        .checked_add(excess)
+        .ok_or(VaultError::ArithmeticOverflow)?;
+
     let vault_state_key = ctx.accounts.vault_state.key();
     let authority_bump = ctx.accounts.vault_state.authority_bump;
     let signer_seeds: &[&[&[u8]]] = &[&[
