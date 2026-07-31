@@ -1633,7 +1633,7 @@ dependencies = [
  "solana-last-restart-slot",
  "solana-loader-v3-interface",
  "solana-loader-v4-interface",
- "solana-message",
+ "solana-message 3.1.0",
  "solana-native-token",
  "solana-nonce",
  "solana-nonce-account",
@@ -1656,7 +1656,7 @@ dependencies = [
  "solana-system-program",
  "solana-sysvar",
  "solana-sysvar-id",
- "solana-transaction",
+ "solana-transaction 3.1.0",
  "solana-transaction-context",
  "solana-transaction-error",
  "thiserror 2.0.18",
@@ -2942,6 +2942,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "solana-message"
+version = "4.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b94164f9740d40f41568f6f48140a0866251a79a7bce013eb4ffefe12d0e38cc"
+dependencies = [
+ "solana-address 2.6.1",
+ "solana-hash 4.4.0",
+ "solana-instruction",
+ "solana-sanitize",
+ "solana-sdk-ids",
+ "solana-transaction-error",
+]
+
+[[package]]
 name = "solana-msg"
 version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3393,11 +3407,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "be3250a278a769ba59059e13d0f16c2aba0ca1de7595fb0e02556091751560c8"
 dependencies = [
  "solana-hash 3.1.0",
- "solana-message",
+ "solana-message 3.1.0",
  "solana-pubkey 3.0.0",
  "solana-sdk-ids",
  "solana-signature",
- "solana-transaction",
+ "solana-transaction 3.1.0",
 ]
 
 [[package]]
@@ -3520,12 +3534,29 @@ dependencies = [
  "solana-hash 4.4.0",
  "solana-instruction",
  "solana-instruction-error",
- "solana-message",
+ "solana-message 3.1.0",
  "solana-sanitize",
  "solana-sdk-ids",
  "solana-short-vec",
  "solana-signature",
  "solana-signer",
+ "solana-transaction-error",
+]
+
+[[package]]
+name = "solana-transaction"
+version = "4.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "47d105ecce084206697230226c6b2230401c220feb4dc63e1274d58b38969292"
+dependencies = [
+ "solana-address 2.6.1",
+ "solana-hash 4.4.0",
+ "solana-instruction",
+ "solana-instruction-error",
+ "solana-message 4.2.3",
+ "solana-sanitize",
+ "solana-sdk-ids",
+ "solana-signature",
  "solana-transaction-error",
 ]
 
@@ -3570,10 +3601,10 @@ dependencies = [
  "solana-account",
  "solana-clock",
  "solana-keypair",
- "solana-message",
+ "solana-message 3.1.0",
  "solana-pubkey 4.2.0",
  "solana-signer",
- "solana-transaction",
+ "solana-transaction 4.1.3",
 ]
 
 [[package]]
@@ -3628,7 +3659,7 @@ dependencies = [
  "solana-sdk-ids",
  "solana-signer",
  "solana-slot-hashes",
- "solana-transaction",
+ "solana-transaction 3.1.0",
  "solana-transaction-context",
  "solana-vote-interface",
  "thiserror 2.0.18",
