@@ -36,7 +36,7 @@ solana-keypair = "3.0.1"
 # svm.set_account() call in the test suite would fail to compile with
 # E0308 mismatched types.  Do not upgrade past the 3.x series until litesvm
 # itself migrates to solana-account 4.x.
-solana-account = "3.4.0"
+solana-account = "4.3.1"
 solana-pubkey = { version = "4.0.0", features = ["curve25519"] }
 solana-clock = "3.0.0"
 base64 = "0.22.1"
