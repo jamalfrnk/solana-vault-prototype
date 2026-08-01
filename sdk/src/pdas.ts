@@ -19,7 +19,7 @@ export interface PdaResult {
 
 function derive(
   seeds: (Buffer | Uint8Array)[],
-  programId: PublicKey
+  programId: PublicKey,
 ): PdaResult {
   const [address, bump] = PublicKey.findProgramAddressSync(seeds, programId);
   return { address, bump };
@@ -28,7 +28,7 @@ function derive(
 /** Deterministic vault identity per mint: seeds = ["vault", mint]. */
 export function deriveVaultStatePda(
   mint: PublicKey,
-  programId: PublicKey = PROGRAM_ID
+  programId: PublicKey = PROGRAM_ID,
 ): PdaResult {
   return derive([VAULT_SEED, mint.toBuffer()], programId);
 }
@@ -36,7 +36,7 @@ export function deriveVaultStatePda(
 /** PDA signer that owns custody and signs withdrawals: seeds = ["vault_authority", vault_state]. */
 export function deriveVaultAuthorityPda(
   vaultState: PublicKey,
-  programId: PublicKey = PROGRAM_ID
+  programId: PublicKey = PROGRAM_ID,
 ): PdaResult {
   return derive([VAULT_AUTHORITY_SEED, vaultState.toBuffer()], programId);
 }
@@ -45,17 +45,17 @@ export function deriveVaultAuthorityPda(
 export function deriveUserPositionPda(
   vaultState: PublicKey,
   user: PublicKey,
-  programId: PublicKey = PROGRAM_ID
+  programId: PublicKey = PROGRAM_ID,
 ): PdaResult {
   return derive(
     [USER_POSITION_SEED, vaultState.toBuffer(), user.toBuffer()],
-    programId
+    programId,
   );
 }
 
 /** Singleton protocol configuration: seeds = ["protocol_config"]. */
 export function deriveProtocolConfigPda(
-  programId: PublicKey = PROGRAM_ID
+  programId: PublicKey = PROGRAM_ID,
 ): PdaResult {
   return derive([PROTOCOL_CONFIG_SEED], programId);
 }
@@ -63,14 +63,14 @@ export function deriveProtocolConfigPda(
 /** Per-mint allowlist/exposure configuration: seeds = ["mint_config", mint]. */
 export function deriveMintConfigPda(
   mint: PublicKey,
-  programId: PublicKey = PROGRAM_ID
+  programId: PublicKey = PROGRAM_ID,
 ): PdaResult {
   return derive([MINT_CONFIG_SEED, mint.toBuffer()], programId);
 }
 
 /** Canonical upgradeable-loader ProgramData account for this program. */
 export function deriveProgramDataPda(
-  programId: PublicKey = PROGRAM_ID
+  programId: PublicKey = PROGRAM_ID,
 ): PdaResult {
   return derive([programId.toBuffer()], BPF_UPGRADEABLE_LOADER_PROGRAM_ID);
 }
@@ -78,11 +78,11 @@ export function deriveProgramDataPda(
 /** Standard Associated Token Account address for (owner, mint). */
 export function deriveAssociatedTokenAddress(
   owner: PublicKey,
-  mint: PublicKey
+  mint: PublicKey,
 ): PublicKey {
   const [address] = PublicKey.findProgramAddressSync(
     [owner.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(), mint.toBuffer()],
-    ASSOCIATED_TOKEN_PROGRAM_ID
+    ASSOCIATED_TOKEN_PROGRAM_ID,
   );
   return address;
 }

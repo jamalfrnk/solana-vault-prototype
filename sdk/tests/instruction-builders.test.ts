@@ -52,16 +52,16 @@ interface ExpectedMeta {
 
 function assertKeys(
   actual: { pubkey: PublicKey; isSigner: boolean; isWritable: boolean }[],
-  expected: ExpectedMeta[]
+  expected: ExpectedMeta[],
 ) {
   expect(actual).to.have.lengthOf(expected.length);
   actual.forEach((meta, i) => {
     expect(meta.pubkey.toBase58(), `key[${i}].pubkey`).to.equal(
-      expected[i].pubkey.toBase58()
+      expected[i].pubkey.toBase58(),
     );
     expect(meta.isSigner, `key[${i}].isSigner`).to.equal(expected[i].isSigner);
     expect(meta.isWritable, `key[${i}].isWritable`).to.equal(
-      expected[i].isWritable
+      expected[i].isWritable,
     );
   });
 }
@@ -116,7 +116,7 @@ describe("instructions", () => {
 
     it("data is exactly the 8-byte instruction discriminator", () => {
       expect(ix.data.toString("hex")).to.equal(
-        instructionDiscriminator("initialize").toString("hex")
+        instructionDiscriminator("initialize").toString("hex"),
       );
       expect(ix.data).to.have.lengthOf(8);
     });
@@ -153,7 +153,7 @@ describe("instructions", () => {
     it("data is discriminator + 8-byte LE amount (16 bytes total)", () => {
       expect(ix.data).to.have.lengthOf(16);
       expect(ix.data.subarray(0, 8).toString("hex")).to.equal(
-        instructionDiscriminator("deposit").toString("hex")
+        instructionDiscriminator("deposit").toString("hex"),
       );
       expect(ix.data.readBigUInt64LE(8)).to.equal(amount);
     });
@@ -187,7 +187,7 @@ describe("instructions", () => {
     it("data is discriminator + 8-byte LE shares_in (16 bytes total)", () => {
       expect(ix.data).to.have.lengthOf(16);
       expect(ix.data.subarray(0, 8).toString("hex")).to.equal(
-        instructionDiscriminator("withdraw").toString("hex")
+        instructionDiscriminator("withdraw").toString("hex"),
       );
       expect(ix.data.readBigUInt64LE(8)).to.equal(sharesIn);
     });
@@ -209,7 +209,7 @@ describe("instructions", () => {
         { pubkey: vaultState.address, isSigner: false, isWritable: true },
       ]);
       expect(ix.data.subarray(0, 8).toString("hex")).to.equal(
-        instructionDiscriminator("pause").toString("hex")
+        instructionDiscriminator("pause").toString("hex"),
       );
       expect(ix.data).to.have.lengthOf(9);
       expect(ix.data[8]).to.equal(OperationalStateReason.IncidentResponse);
@@ -226,7 +226,7 @@ describe("instructions", () => {
         { pubkey: vaultState.address, isSigner: false, isWritable: true },
       ]);
       expect(ix.data.subarray(0, 8).toString("hex")).to.equal(
-        instructionDiscriminator("unpause").toString("hex")
+        instructionDiscriminator("unpause").toString("hex"),
       );
       expect(ix.data).to.have.lengthOf(9);
       expect(ix.data[8]).to.equal(OperationalStateReason.IncidentResolved);
@@ -238,7 +238,7 @@ describe("instructions", () => {
           pauseAuthority,
           mint,
           reason: 4 as OperationalStateReason,
-        })
+        }),
       ).to.throw(/reason code 4/i);
     });
   });
@@ -271,18 +271,18 @@ describe("instructions", () => {
       ]);
       expect(ix.data).to.have.lengthOf(104);
       expect(ix.data.subarray(0, 8).toString("hex")).to.equal(
-        instructionDiscriminator("initialize_protocol_config").toString("hex")
+        instructionDiscriminator("initialize_protocol_config").toString("hex"),
       );
       expect(
         new PublicKey(ix.data.subarray(8, 40)).equals(
-          protocolGovernanceAuthority
-        )
+          protocolGovernanceAuthority,
+        ),
       ).to.equal(true);
       expect(
-        new PublicKey(ix.data.subarray(40, 72)).equals(emergencyAuthority)
+        new PublicKey(ix.data.subarray(40, 72)).equals(emergencyAuthority),
       ).to.equal(true);
       expect(
-        new PublicKey(ix.data.subarray(72, 104)).equals(treasury)
+        new PublicKey(ix.data.subarray(72, 104)).equals(treasury),
       ).to.equal(true);
     });
 
@@ -318,7 +318,7 @@ describe("instructions", () => {
         ]);
         expect(ix.data).to.have.lengthOf(9);
         expect(ix.data.subarray(0, 8).toString("hex")).to.equal(
-          instructionDiscriminator(name).toString("hex")
+          instructionDiscriminator(name).toString("hex"),
         );
       }
     });
@@ -329,7 +329,7 @@ describe("instructions", () => {
           emergencyAuthority,
           mint,
           reason: 4 as OperationalStateReason,
-        })
+        }),
       ).to.throw(/reason code 4/i);
     });
   });
@@ -352,10 +352,10 @@ describe("instructions", () => {
       ]);
       expect(ix.data).to.have.lengthOf(40);
       expect(ix.data.subarray(0, 8).toString("hex")).to.equal(
-        instructionDiscriminator("propose_pause_authority").toString("hex")
+        instructionDiscriminator("propose_pause_authority").toString("hex"),
       );
       expect(new PublicKey(ix.data.subarray(8, 40)).toBase58()).to.equal(
-        newPauseAuthority.toBase58()
+        newPauseAuthority.toBase58(),
       );
     });
 
@@ -366,7 +366,7 @@ describe("instructions", () => {
         { pubkey: vaultState.address, isSigner: false, isWritable: true },
       ]);
       expect(ix.data.toString("hex")).to.equal(
-        instructionDiscriminator("accept_pause_authority").toString("hex")
+        instructionDiscriminator("accept_pause_authority").toString("hex"),
       );
     });
   });
@@ -381,7 +381,7 @@ describe("instructions", () => {
         { pubkey: vaultState.address, isSigner: false, isWritable: true },
       ]);
       expect(ix.data.toString("hex")).to.equal(
-        instructionDiscriminator("migrate_v0_to_v1").toString("hex")
+        instructionDiscriminator("migrate_v0_to_v1").toString("hex"),
       );
     });
   });
@@ -410,7 +410,7 @@ describe("instructions", () => {
       ]);
       expect(ix.data).to.have.lengthOf(8);
       expect(ix.data.subarray(0, 8)).to.deep.equal(
-        instructionDiscriminator("initialize_mint_config")
+        instructionDiscriminator("initialize_mint_config"),
       );
     });
 
@@ -444,7 +444,7 @@ describe("instructions", () => {
           maxTotalAssets: 1n,
           maxDepositAssetsPerTransaction: 1n,
           rolloutStage: 4 as RolloutStage,
-        })
+        }),
       ).to.throw(/rollout-stage/i);
     });
 
@@ -466,7 +466,7 @@ describe("instructions", () => {
             isWritable: false,
           },
           { pubkey: mintConfig.address, isSigner: false, isWritable: true },
-        ]
+        ],
       );
     });
 
@@ -528,11 +528,11 @@ describe("instructions", () => {
     it("vaultStatePda/vaultAuthorityPda match direct pdas.ts calls", () => {
       const vaultState = deriveVaultStatePda(mint);
       expect(client.vaultStatePda.address.toBase58()).to.equal(
-        vaultState.address.toBase58()
+        vaultState.address.toBase58(),
       );
       const vaultAuthority = deriveVaultAuthorityPda(vaultState.address);
       expect(client.vaultAuthorityPda.address.toBase58()).to.equal(
-        vaultAuthority.address.toBase58()
+        vaultAuthority.address.toBase58(),
       );
     });
 
@@ -541,7 +541,7 @@ describe("instructions", () => {
       const viaClient = client.buildDepositIx(user, 42n);
       const viaFreeFunction = buildDepositIx({ user, mint, amount: 42n });
       expect(viaClient.data.toString("hex")).to.equal(
-        viaFreeFunction.data.toString("hex")
+        viaFreeFunction.data.toString("hex"),
       );
       assertKeys(
         viaClient.keys,
@@ -549,7 +549,7 @@ describe("instructions", () => {
           pubkey: k.pubkey,
           isSigner: k.isSigner,
           isWritable: k.isWritable,
-        }))
+        })),
       );
     });
 
@@ -559,7 +559,7 @@ describe("instructions", () => {
 
       const proposeViaClient = client.buildProposePauseAuthorityIx(
         pauseAuthority,
-        newAuthority
+        newAuthority,
       );
       const proposeViaFreeFunction = buildProposePauseAuthorityIx({
         pauseAuthority,
@@ -567,7 +567,7 @@ describe("instructions", () => {
         newAuthority,
       });
       expect(proposeViaClient.data.toString("hex")).to.equal(
-        proposeViaFreeFunction.data.toString("hex")
+        proposeViaFreeFunction.data.toString("hex"),
       );
 
       const acceptViaClient = client.buildAcceptPauseAuthorityIx(newAuthority);
@@ -576,7 +576,7 @@ describe("instructions", () => {
         mint,
       });
       expect(acceptViaClient.data.toString("hex")).to.equal(
-        acceptViaFreeFunction.data.toString("hex")
+        acceptViaFreeFunction.data.toString("hex"),
       );
     });
 
@@ -584,7 +584,7 @@ describe("instructions", () => {
       const viaClient = client.buildMigrateV0ToV1Ix();
       const viaFreeFunction = buildMigrateV0ToV1Ix({ mint });
       expect(viaClient.data.toString("hex")).to.equal(
-        viaFreeFunction.data.toString("hex")
+        viaFreeFunction.data.toString("hex"),
       );
       assertKeys(
         viaClient.keys,
@@ -592,7 +592,7 @@ describe("instructions", () => {
           pubkey: k.pubkey,
           isSigner: k.isSigner,
           isWritable: k.isWritable,
-        }))
+        })),
       );
     });
 
@@ -602,7 +602,7 @@ describe("instructions", () => {
       expect(
         client
           .buildInitializeMintConfigIx(randomPubkey(), governance)
-          .keys[4].pubkey.equals(deriveMintConfigPda(mint).address)
+          .keys[4].pubkey.equals(deriveMintConfigPda(mint).address),
       ).to.equal(true);
       expect(
         client
@@ -611,7 +611,7 @@ describe("instructions", () => {
             true,
             20_000n,
             2_000n,
-            RolloutStage.Canary
+            RolloutStage.Canary,
           )
           .data.equals(
             buildProposeMintConfigUpdateIx({
@@ -621,13 +621,13 @@ describe("instructions", () => {
               maxTotalAssets: 20_000n,
               maxDepositAssetsPerTransaction: 2_000n,
               rolloutStage: RolloutStage.Canary,
-            }).data
-          )
+            }).data,
+          ),
       ).to.equal(true);
       expect(client.buildExecuteMintConfigUpdateIx().keys).to.have.lengthOf(2);
       expect(client.buildDisableMintIx(governance).keys).to.have.lengthOf(3);
       expect(
-        client.buildLowerMintCapsIx(pauseAuthority, 5_000n, 500n).keys
+        client.buildLowerMintCapsIx(pauseAuthority, 5_000n, 500n).keys,
       ).to.have.lengthOf(3);
     });
 
@@ -647,7 +647,7 @@ describe("instructions", () => {
           pubkey: key.pubkey,
           isSigner: key.isSigner,
           isWritable: key.isWritable,
-        }))
+        })),
       );
     });
 
@@ -662,7 +662,7 @@ describe("instructions", () => {
         upgradeAuthority,
         governance,
         emergency,
-        treasury
+        treasury,
       );
       const configDirect = buildInitializeProtocolConfigIx({
         payer,
@@ -677,29 +677,29 @@ describe("instructions", () => {
         client
           .buildEmergencyPauseIx(
             emergency,
-            OperationalStateReason.IncidentResponse
+            OperationalStateReason.IncidentResponse,
           )
           .data.equals(
             buildEmergencyPauseIx({
               emergencyAuthority: emergency,
               mint,
               reason: OperationalStateReason.IncidentResponse,
-            }).data
-          )
+            }).data,
+          ),
       ).to.equal(true);
       expect(
         client
           .buildEmergencyResumeIx(
             emergency,
-            OperationalStateReason.IncidentResolved
+            OperationalStateReason.IncidentResolved,
           )
           .data.equals(
             buildEmergencyResumeIx({
               emergencyAuthority: emergency,
               mint,
               reason: OperationalStateReason.IncidentResolved,
-            }).data
-          )
+            }).data,
+          ),
       ).to.equal(true);
     });
   });

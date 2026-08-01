@@ -45,7 +45,7 @@ export function createReleaseEvidence(input: ReleaseEvidenceInput) {
     throw new Error("sourceCommit must be a lowercase 40-character commit SHA");
   }
   const idlBytes = fs.readFileSync(
-    path.resolve(input.repositoryRoot, input.idlPath)
+    path.resolve(input.repositoryRoot, input.idlPath),
   );
   const idl = JSON.parse(idlBytes.toString("utf8")) as { address?: unknown };
   if (typeof idl.address !== "string")
@@ -128,7 +128,7 @@ function main(): void {
     flag: "wx",
   });
   process.stdout.write(
-    `Wrote deterministic release evidence to ${outputPath}\n`
+    `Wrote deterministic release evidence to ${outputPath}\n`,
   );
 }
 

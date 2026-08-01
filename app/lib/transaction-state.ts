@@ -54,7 +54,8 @@ export function isBusy(state: TxState): boolean {
 
 /** Signature to show an Explorer link for, if any phase carries one. */
 export function signatureOf(state: TxState): string | null {
-  if (state.phase === "confirming" || state.phase === "success") return state.signature;
+  if (state.phase === "confirming" || state.phase === "success")
+    return state.signature;
   if (state.phase === "error") return state.signature ?? null;
   return null;
 }

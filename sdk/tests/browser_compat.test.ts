@@ -30,8 +30,9 @@ describe("browser compatibility", () => {
         }
       }
     }
-    expect(offenders, `Node-only Buffer BigInt methods found:\n${offenders.join("\n")}`).to.deep.equal(
-      [],
-    );
+    expect(
+      offenders,
+      `Node-only Buffer BigInt methods found:\n${offenders.join("\n")}`,
+    ).to.deep.equal([]);
   });
 });

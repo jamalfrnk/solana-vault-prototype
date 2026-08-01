@@ -43,6 +43,7 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 | — | Follow-up — dependency advisory remediation | `[x]` complete — PR #45 |
 | — | Follow-up — legacy vault retirement | `[x]` complete — PR #46 |
 | — | Follow-up — verifiable-build determinism fix | `[x]` complete — PR #48, #49 |
+| CI-001 | Follow-up — CI lint gate | `[~]` in progress |
 
 ## Milestone 0 — Repository bootstrap (complete)
 
@@ -1125,6 +1126,35 @@ this third, genuinely independent build. That satisfies the "reproduced by an
 independent verifier" half of `SECURITY_CHECKLIST.md`'s launch-gate item; the
 "compared to a deployed binary" half remains open, since no M24/M25-era binary is
 deployed anywhere yet to compare against.
+
+## Follow-up — CI lint gate (CI-001) (in progress)
+
+Approved by Malcolm 2026-07-31 as the next step, on `feature/ci-lint-gate`, sourced
+from a same-day read-only production-readiness audit
+(`docs/production-readiness/backlog.md`, `docs/engineering/baseline.md`). `yarn lint`
+had been silently broken since PR #55's Dependabot bump of `prettier` `2.8.8` →
+`3.9.6` — a major version with different default formatting rules that nothing
+caught because `lint` was never wired into `.github/workflows/ci.yml`.
+
+Two fixes: `prettier --write` reformatted the 46 files Prettier 3 flagged (formatting
+only, no logic changes), and the root `lint`/`lint:fix` scripts' dead `*/*.js` glob —
+which matches zero files in this repository and independently makes `prettier --check`
+exit 2 even when every matched file is clean — was dropped, since the remaining
+recursive `*/**/*{.js,.ts}` pattern already covers every `.ts`/`.js` file under any
+top-level directory. A `lint (prettier --check)` step was added to the existing
+`sdk-test` CI job, right after `typecheck`, so a future formatting regression fails
+the build instead of going unnoticed again.
+
+Observed locally (2026-07-31): `corepack yarn lint` — clean, exit 0; `corepack yarn
+typecheck` — clean; `corepack yarn test:sdk` — 128/128; `corepack yarn sdk:build` —
+clean; `corepack yarn manifests:validate:examples` — clean; `npm run typecheck`,
+`npm run test` (122/122), and `npm run build` in `app/` all clean. `git diff --stat`
+confirms no file under `programs/`, `Cargo.toml`, or `Cargo.lock` was touched, so no
+Rust/Anchor re-verification is needed; this native Windows host has no MSVC linker or
+Anchor/Solana CLI to run that suite locally regardless (same documented gap as
+`docs/engineering/baseline.md`), so CI remains the authoritative source for it. Not
+yet committed, pushed, or opened as a PR — per this project's permission boundaries,
+that remains Malcolm's step.
 
 ## Post-MVP Roadmap (candidate pool — implementation requires separate approval)
 

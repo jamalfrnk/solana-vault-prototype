@@ -47,7 +47,7 @@ function exactKeys(
   value: unknown,
   expected: readonly string[],
   location: string,
-  errors: string[]
+  errors: string[],
 ): value is JsonObject {
   if (!isObject(value)) {
     errors.push(`${location} must be an object`);
@@ -66,7 +66,7 @@ function exactKeys(
 function requiredString(
   value: unknown,
   location: string,
-  errors: string[]
+  errors: string[],
 ): value is string {
   if (typeof value !== "string" || value.trim().length === 0) {
     errors.push(`${location} must be a non-empty string`);
@@ -77,7 +77,7 @@ function requiredString(
 
 function placeholderAllowed(
   value: unknown,
-  allowPlaceholders: boolean
+  allowPlaceholders: boolean,
 ): boolean {
   return (
     allowPlaceholders && typeof value === "string" && PLACEHOLDER.test(value)
@@ -88,7 +88,7 @@ function publicKey(
   value: unknown,
   location: string,
   allowPlaceholders: boolean,
-  errors: string[]
+  errors: string[],
 ): void {
   if (placeholderAllowed(value, allowPlaceholders)) return;
   if (!requiredString(value, location, errors)) return;
@@ -106,7 +106,7 @@ function isoDate(
   value: unknown,
   location: string,
   allowPlaceholders: boolean,
-  errors: string[]
+  errors: string[],
 ): void {
   if (placeholderAllowed(value, allowPlaceholders)) return;
   if (!requiredString(value, location, errors)) return;
@@ -123,7 +123,7 @@ function stringArray(
   value: unknown,
   location: string,
   minimum: number,
-  errors: string[]
+  errors: string[],
 ): string[] {
   if (!Array.isArray(value) || value.length < minimum) {
     errors.push(`${location} must contain at least ${minimum} entries`);
@@ -143,7 +143,7 @@ function stringArray(
 function relativeJsonOrArtifactPath(
   value: unknown,
   location: string,
-  errors: string[]
+  errors: string[],
 ): void {
   if (!requiredString(value, location, errors)) return;
   const segments = value.replace(/\\/g, "/").split("/");
@@ -161,7 +161,7 @@ function validateMembers(
   count: number,
   location: string,
   allowPlaceholders: boolean,
-  errors: string[]
+  errors: string[],
 ): void {
   if (!Array.isArray(value) || value.length !== count) {
     errors.push(`${location} must contain exactly ${count} members`);
@@ -175,7 +175,7 @@ function validateMembers(
         member,
         ["id", "hardwareBacked", "backupAttestation"],
         memberLocation,
-        errors
+        errors,
       )
     )
       return;
@@ -188,7 +188,7 @@ function validateMembers(
     requiredString(
       member.backupAttestation,
       `${memberLocation}.backupAttestation`,
-      errors
+      errors,
     );
     if (
       !allowPlaceholders &&
@@ -209,7 +209,7 @@ function validateThresholdRole(
   memberCount: number,
   location: string,
   allowPlaceholders: boolean,
-  errors: string[]
+  errors: string[],
 ): string | undefined {
   if (
     !exactKeys(value, ["address", "threshold", "members"], location, errors)
@@ -225,7 +225,7 @@ function validateThresholdRole(
     memberCount,
     `${location}.members`,
     allowPlaceholders,
-    errors
+    errors,
   );
   return typeof value.address === "string" ? value.address : undefined;
 }
@@ -233,7 +233,7 @@ function validateThresholdRole(
 function validateAuthorityManifest(
   value: unknown,
   allowPlaceholders: boolean,
-  errors: string[]
+  errors: string[],
 ): void {
   if (
     !exactKeys(
@@ -246,7 +246,7 @@ function validateAuthorityManifest(
         "approvalEvidence",
       ],
       "authority",
-      errors
+      errors,
     )
   )
     return;
@@ -262,7 +262,7 @@ function validateAuthorityManifest(
       value.roles,
       ["pause", "protocol", "upgrade", "treasury"],
       "authority.roles",
-      errors
+      errors,
     )
   )
     return;
@@ -274,7 +274,7 @@ function validateAuthorityManifest(
     3,
     "authority.roles.pause",
     allowPlaceholders,
-    errors
+    errors,
   );
   const protocol = validateThresholdRole(
     value.roles.protocol,
@@ -282,7 +282,7 @@ function validateAuthorityManifest(
     5,
     "authority.roles.protocol",
     allowPlaceholders,
-    errors
+    errors,
   );
   const treasury = validateThresholdRole(
     value.roles.treasury,
@@ -290,7 +290,7 @@ function validateAuthorityManifest(
     3,
     "authority.roles.treasury",
     allowPlaceholders,
-    errors
+    errors,
   );
   for (const address of [pause, protocol, treasury])
     if (address) addresses.push(address);
@@ -307,14 +307,14 @@ function validateAuthorityManifest(
         "members",
       ],
       upgradeLocation,
-      errors
+      errors,
     )
   ) {
     publicKey(
       value.roles.upgrade.address,
       `${upgradeLocation}.address`,
       allowPlaceholders,
-      errors
+      errors,
     );
     if (value.roles.upgrade.ordinaryThreshold !== 3)
       errors.push(`${upgradeLocation}.ordinaryThreshold must equal 3`);
@@ -322,14 +322,14 @@ function validateAuthorityManifest(
       errors.push(`${upgradeLocation}.emergencyThreshold must equal 4`);
     if (value.roles.upgrade.ordinaryTimelockSeconds !== 172800)
       errors.push(
-        `${upgradeLocation}.ordinaryTimelockSeconds must equal 172800`
+        `${upgradeLocation}.ordinaryTimelockSeconds must equal 172800`,
       );
     validateMembers(
       value.roles.upgrade.members,
       5,
       `${upgradeLocation}.members`,
       allowPlaceholders,
-      errors
+      errors,
     );
     if (typeof value.roles.upgrade.address === "string")
       addresses.push(value.roles.upgrade.address);
@@ -342,7 +342,7 @@ function validateAuthorityManifest(
 function validateDeploymentManifest(
   value: unknown,
   allowPlaceholders: boolean,
-  errors: string[]
+  errors: string[],
 ): void {
   if (
     !exactKeys(
@@ -363,7 +363,7 @@ function validateDeploymentManifest(
         "approvalEvidence",
       ],
       "deployment",
-      errors
+      errors,
     )
   )
     return;
@@ -377,14 +377,14 @@ function validateDeploymentManifest(
     value.tokenProgramId,
     "deployment.tokenProgramId",
     allowPlaceholders,
-    errors
+    errors,
   );
   if (
     !placeholderAllowed(value.tokenProgramId, allowPlaceholders) &&
     value.tokenProgramId !== LEGACY_SPL_TOKEN_PROGRAM_ID
   )
     errors.push(
-      "deployment.tokenProgramId must equal the canonical legacy SPL Token Program"
+      "deployment.tokenProgramId must equal the canonical legacy SPL Token Program",
     );
   if (
     !placeholderAllowed(value.sourceCommit, allowPlaceholders) &&
@@ -392,7 +392,7 @@ function validateDeploymentManifest(
       !COMMIT_SHA.test(value.sourceCommit))
   )
     errors.push(
-      "deployment.sourceCommit must be a lowercase 40-character commit SHA"
+      "deployment.sourceCommit must be a lowercase 40-character commit SHA",
     );
 
   if (
@@ -400,14 +400,14 @@ function validateDeploymentManifest(
       value.toolchain,
       ["anchor", "agave", "rust"],
       "deployment.toolchain",
-      errors
+      errors,
     )
   ) {
     for (const key of ["anchor", "agave", "rust"] as const)
       requiredString(
         value.toolchain[key],
         `deployment.toolchain.${key}`,
-        errors
+        errors,
       );
   }
 
@@ -421,7 +421,7 @@ function validateDeploymentManifest(
         "rolloutStageCapBaseUnits",
       ],
       "deployment.caps",
-      errors
+      errors,
     )
   ) {
     for (const key of [
@@ -436,7 +436,7 @@ function validateDeploymentManifest(
         !DECIMAL.test(cap)
       ) {
         errors.push(
-          `deployment.caps.${key} must be a positive base-unit integer string`
+          `deployment.caps.${key} must be a positive base-unit integer string`,
         );
       } else capValues.push(BigInt(cap));
     }
@@ -445,7 +445,7 @@ function validateDeploymentManifest(
       !(capValues[2] <= capValues[1] && capValues[1] <= capValues[0])
     ) {
       errors.push(
-        "deployment caps must satisfy rolloutStage <= perVault <= maximumTvl"
+        "deployment caps must satisfy rolloutStage <= perVault <= maximumTvl",
       );
     }
   }
@@ -455,7 +455,7 @@ function validateDeploymentManifest(
       value.artifacts,
       ["program", "idl", "releaseEvidence"],
       "deployment.artifacts",
-      errors
+      errors,
     )
   ) {
     for (const key of ["program", "idl", "releaseEvidence"] as const) {
@@ -465,19 +465,19 @@ function validateDeploymentManifest(
         relativeJsonOrArtifactPath(
           artifact.path,
           `${artifactLocation}.path`,
-          errors
+          errors,
         );
         if (
           !placeholderAllowed(artifact.sha256, allowPlaceholders) &&
           (!requiredString(
             artifact.sha256,
             `${artifactLocation}.sha256`,
-            errors
+            errors,
           ) ||
             !SHA256.test(artifact.sha256))
         )
           errors.push(
-            `${artifactLocation}.sha256 must be a lowercase SHA-256 digest`
+            `${artifactLocation}.sha256 must be a lowercase SHA-256 digest`,
           );
       }
     }
@@ -494,7 +494,7 @@ function validateDeploymentManifest(
     value.independentVerifiers,
     "deployment.independentVerifiers",
     2,
-    errors
+    errors,
   );
   stringArray(value.approvalEvidence, "deployment.approvalEvidence", 1, errors);
 }
@@ -513,7 +513,7 @@ const REQUIRED_MONITORS = [
 function validateOperationsManifest(
   value: unknown,
   allowPlaceholders: boolean,
-  errors: string[]
+  errors: string[],
 ): void {
   if (
     !exactKeys(
@@ -528,7 +528,7 @@ function validateOperationsManifest(
         "approvalEvidence",
       ],
       "operations",
-      errors
+      errors,
     )
   )
     return;
@@ -549,7 +549,7 @@ function validateOperationsManifest(
         !ENV_NAME.test(rpc.endpointEnv)
       )
         errors.push(
-          `${location}.endpointEnv must be an environment variable name`
+          `${location}.endpointEnv must be an environment variable name`,
         );
       if (typeof rpc.endpointEnv === "string")
         endpointVariables.push(rpc.endpointEnv);
@@ -562,7 +562,7 @@ function validateOperationsManifest(
     endpointVariables[0] === endpointVariables[1]
   )
     errors.push(
-      "operations RPC endpoint environment variables must be distinct"
+      "operations RPC endpoint environment variables must be distinct",
     );
 
   if (!Array.isArray(value.monitoring)) {
@@ -576,7 +576,7 @@ function validateOperationsManifest(
           monitor,
           ["id", "ownerRole", "alertDestinationEnv", "runbook", "enabled"],
           location,
-          errors
+          errors,
         )
       )
         return;
@@ -587,12 +587,12 @@ function validateOperationsManifest(
         requiredString(
           monitor.alertDestinationEnv,
           `${location}.alertDestinationEnv`,
-          errors
+          errors,
         ) &&
         !ENV_NAME.test(monitor.alertDestinationEnv)
       )
         errors.push(
-          `${location}.alertDestinationEnv must be an environment variable name`
+          `${location}.alertDestinationEnv must be an environment variable name`,
         );
       requiredString(monitor.runbook, `${location}.runbook`, errors);
       if (monitor.enabled !== true)
@@ -601,7 +601,7 @@ function validateOperationsManifest(
     for (const required of REQUIRED_MONITORS) {
       if (!ids.includes(required))
         errors.push(
-          `operations.monitoring is missing required monitor ${required}`
+          `operations.monitoring is missing required monitor ${required}`,
         );
     }
     if (new Set(ids).size !== ids.length)
@@ -618,7 +618,7 @@ function validateOperationsManifest(
         "rehearsalRecord",
       ],
       "operations.incidentResponse",
-      errors
+      errors,
     )
   ) {
     for (const key of [
@@ -630,18 +630,18 @@ function validateOperationsManifest(
       requiredString(
         value.incidentResponse[key],
         `operations.incidentResponse.${key}`,
-        errors
+        errors,
       );
     if (
       requiredString(
         value.incidentResponse.rehearsalRecord,
         "operations.incidentResponse.rehearsalRecord",
-        errors
+        errors,
       ) &&
       value.incidentResponse.rehearsalRecord !== "incident-rehearsal.json"
     )
       errors.push(
-        "operations.incidentResponse.rehearsalRecord must reference incident-rehearsal.json"
+        "operations.incidentResponse.rehearsalRecord must reference incident-rehearsal.json",
       );
   }
   stringArray(value.approvalEvidence, "operations.approvalEvidence", 1, errors);
@@ -651,7 +651,7 @@ function validateOperationsManifest(
 function validateIncidentRehearsal(
   value: unknown,
   allowPlaceholders: boolean,
-  errors: string[]
+  errors: string[],
 ): void {
   if (
     !exactKeys(
@@ -669,7 +669,7 @@ function validateIncidentRehearsal(
         "followUps",
       ],
       "rehearsal",
-      errors
+      errors,
     )
   )
     return;
@@ -682,7 +682,7 @@ function validateIncidentRehearsal(
       errors.push("rehearsal.status must equal planned or completed");
   } else if (value.status !== "completed") {
     errors.push(
-      "rehearsal.status must equal completed in production validation mode"
+      "rehearsal.status must equal completed in production validation mode",
     );
   }
   requiredString(value.scenario, "rehearsal.scenario", errors);
@@ -691,7 +691,7 @@ function validateIncidentRehearsal(
     value.completedAt,
     "rehearsal.completedAt",
     allowPlaceholders,
-    errors
+    errors,
   );
   if (
     !placeholderAllowed(value.startedAt, allowPlaceholders) &&
@@ -706,7 +706,7 @@ function validateIncidentRehearsal(
     value.evidenceReferences,
     "rehearsal.evidenceReferences",
     1,
-    errors
+    errors,
   );
   stringArray(value.findings, "rehearsal.findings", 1, errors);
   if (!Array.isArray(value.followUps)) {
@@ -730,7 +730,7 @@ function scanForUnsafeValues(
   value: unknown,
   location: string,
   allowPlaceholders: boolean,
-  errors: string[]
+  errors: string[],
 ): void {
   if (Array.isArray(value)) {
     value.forEach((entry, index) =>
@@ -738,8 +738,8 @@ function scanForUnsafeValues(
         entry,
         `${location}[${index}]`,
         allowPlaceholders,
-        errors
-      )
+        errors,
+      ),
     );
     return;
   }
@@ -751,7 +751,7 @@ function scanForUnsafeValues(
         entry,
         `${location}.${key}`,
         allowPlaceholders,
-        errors
+        errors,
       );
     }
     return;
@@ -765,7 +765,7 @@ function scanForUnsafeValues(
 
 export function validateManifestSet(
   manifests: Record<(typeof MANIFEST_FILES)[number], unknown>,
-  allowPlaceholders = false
+  allowPlaceholders = false,
 ): string[] {
   const errors: string[] = [];
   for (const [filename, value] of Object.entries(manifests))
@@ -773,34 +773,34 @@ export function validateManifestSet(
   validateAuthorityManifest(
     manifests["authority-manifest.json"],
     allowPlaceholders,
-    errors
+    errors,
   );
   validateDeploymentManifest(
     manifests["deployment-manifest.json"],
     allowPlaceholders,
-    errors
+    errors,
   );
   validateOperationsManifest(
     manifests["operations-manifest.json"],
     allowPlaceholders,
-    errors
+    errors,
   );
   validateIncidentRehearsal(
     manifests["incident-rehearsal.json"],
     allowPlaceholders,
-    errors
+    errors,
   );
   return errors;
 }
 
 export function loadManifestSet(
-  directory: string
+  directory: string,
 ): Record<(typeof MANIFEST_FILES)[number], unknown> {
   return Object.fromEntries(
     MANIFEST_FILES.map((filename) => {
       const fullPath = path.join(directory, filename);
       return [filename, JSON.parse(fs.readFileSync(fullPath, "utf8"))];
-    })
+    }),
   ) as Record<(typeof MANIFEST_FILES)[number], unknown>;
 }
 
@@ -810,22 +810,22 @@ function main(): void {
   const filtered = args.filter((arg) => arg !== "--allow-placeholders");
   if (filtered.length !== 1) {
     throw new Error(
-      "Usage: ts-node scripts/validate_production_manifests.ts <directory> [--allow-placeholders]"
+      "Usage: ts-node scripts/validate_production_manifests.ts <directory> [--allow-placeholders]",
     );
   }
   const errors = validateManifestSet(
     loadManifestSet(filtered[0]),
-    allowPlaceholders
+    allowPlaceholders,
   );
   if (errors.length > 0) {
     throw new Error(
-      `Production manifest validation failed:\n- ${errors.join("\n- ")}`
+      `Production manifest validation failed:\n- ${errors.join("\n- ")}`,
     );
   }
   process.stdout.write(
     `Validated ${MANIFEST_FILES.length} production manifest files${
       allowPlaceholders ? " in explicit template mode" : ""
-    }.\n`
+    }.\n`,
   );
 }
 

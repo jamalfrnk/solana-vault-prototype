@@ -16,7 +16,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-export type VaultStage = "closed" | "unlocking" | "opening" | "open" | "closing";
+export type VaultStage =
+  "closed" | "unlocking" | "opening" | "open" | "closing";
 
 /** Combination dial (2.3s: three turns right, two left, one right) + handle turn (0.6s). */
 export const UNLOCK_MS = 2900;
@@ -32,7 +33,9 @@ function prefersReducedMotion(): boolean {
   );
 }
 
-export function useVaultAnimation({ dwellMs = DWELL_MS }: { dwellMs?: number } = {}) {
+export function useVaultAnimation({
+  dwellMs = DWELL_MS,
+}: { dwellMs?: number } = {}) {
   const [stage, setStage] = useState<VaultStage>("closed");
   // Ref mirror so openVault's not-closed guard doesn't run side effects
   // (timer scheduling) inside a state updater — React StrictMode invokes

@@ -50,12 +50,12 @@ function vaultFixture(params: {
   new DataView(data.buffer, data.byteOffset, data.byteLength).setBigUint64(
     74,
     params.totalAssets ?? 0n,
-    true
+    true,
   );
   new DataView(data.buffer, data.byteOffset, data.byteLength).setBigUint64(
     82,
     params.totalShares ?? 0n,
-    true
+    true,
   );
   data[90] = params.operationalState ?? 0;
   if (params.length === VAULT_STATE_LEN) {
@@ -72,7 +72,7 @@ function positionFixture(
   vault: PublicKey,
   owner: PublicKey,
   shares: bigint,
-  programId: PublicKey = PROGRAM_ID
+  programId: PublicKey = PROGRAM_ID,
 ) {
   const position = deriveUserPositionPda(vault, owner, programId);
   const data = Buffer.alloc(USER_POSITION_LEN);
@@ -82,7 +82,7 @@ function positionFixture(
   new DataView(data.buffer, data.byteOffset, data.byteLength).setBigUint64(
     72,
     shares,
-    true
+    true,
   );
   data[80] = position.bump;
   return { position, data };
@@ -91,7 +91,7 @@ function positionFixture(
 function custodyFixture(
   mint: PublicKey,
   authority: PublicKey,
-  amount: bigint
+  amount: bigint,
 ): AccountInfo<Buffer> {
   const data = Buffer.alloc(165);
   mint.toBuffer().copy(data, 0);
@@ -99,7 +99,7 @@ function custodyFixture(
   new DataView(data.buffer, data.byteOffset, data.byteLength).setBigUint64(
     64,
     amount,
-    true
+    true,
   );
   data[108] = 1;
   return account(data, TOKEN_PROGRAM_ID);
@@ -107,7 +107,7 @@ function custodyFixture(
 
 function mockConnection(
   bySize: Map<number, { pubkey: PublicKey; account: AccountInfo<Buffer> }[]>,
-  custodyByAddress: Map<string, AccountInfo<Buffer>>
+  custodyByAddress: Map<string, AccountInfo<Buffer>>,
 ): Connection {
   return {
     getProgramAccounts: async (_programId: PublicKey, config: any) => {
@@ -116,7 +116,7 @@ function mockConnection(
     },
     getMultipleAccountsInfo: async (addresses: PublicKey[]) =>
       addresses.map(
-        (address) => custodyByAddress.get(address.toBase58()) ?? null
+        (address) => custodyByAddress.get(address.toBase58()) ?? null,
       ),
   } as unknown as Connection;
 }
@@ -151,7 +151,7 @@ describe("legacy account inventory", () => {
     const inventory = await buildInventory(
       connection,
       "mock://rpc",
-      LEGACY_DEVNET_PROGRAM_ID
+      LEGACY_DEVNET_PROGRAM_ID,
     );
 
     expect(inventory.programId).to.equal(LEGACY_DEVNET_PROGRAM_ID.toBase58());
@@ -226,7 +226,7 @@ describe("legacy account inventory", () => {
           v1.custody.toBase58(),
           custodyFixture(key(3), v1.authority.address, 20n),
         ],
-      ])
+      ]),
     );
 
     const inventory = await buildInventory(connection, "mock://rpc");
@@ -240,13 +240,13 @@ describe("legacy account inventory", () => {
       blockerCount: 2,
     });
     expect(
-      inventory.vaults.find((vault) => vault.layout === "legacy-113")!.blockers
+      inventory.vaults.find((vault) => vault.layout === "legacy-113")!.blockers,
     ).to.deep.equal(["legacy-113-retirement-required"]);
     expect(
-      inventory.vaults.find((vault) => vault.layout === "v0-145")!.blockers
+      inventory.vaults.find((vault) => vault.layout === "v0-145")!.blockers,
     ).to.deep.equal(["v0-migration-required"]);
     expect(
-      inventory.vaults.find((vault) => vault.layout === "v1-145")!.blockers
+      inventory.vaults.find((vault) => vault.layout === "v1-145")!.blockers,
     ).to.deep.equal([]);
   });
 
@@ -277,7 +277,7 @@ describe("legacy account inventory", () => {
           malformed.custody.toBase58(),
           custodyFixture(key(6), malformed.authority.address, 0n),
         ],
-      ])
+      ]),
     );
 
     const inventory = await buildInventory(connection, "mock://rpc");

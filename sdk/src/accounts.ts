@@ -63,7 +63,7 @@ export function operationalStateLabel(state: OperationalState): string {
 function checkDiscriminator(data: Buffer, expectedName: string): void {
   if (data.length < 8) {
     throw new Error(
-      `Account data too short for ${expectedName} discriminator: expected at least 8 bytes, got ${data.length}`
+      `Account data too short for ${expectedName} discriminator: expected at least 8 bytes, got ${data.length}`,
     );
   }
   const expected = accountDiscriminator(expectedName);
@@ -71,8 +71,8 @@ function checkDiscriminator(data: Buffer, expectedName: string): void {
   if (!actual.equals(expected)) {
     throw new Error(
       `Account discriminator mismatch: expected ${expectedName} (${expected.toString(
-        "hex"
-      )}), got ${actual.toString("hex")}`
+        "hex",
+      )}), got ${actual.toString("hex")}`,
     );
   }
 }
@@ -91,10 +91,7 @@ function commonVaultFields(data: Buffer) {
 }
 
 export type VaultStateLayout =
-  | "legacy-113"
-  | "v0-145"
-  | "v1-145"
-  | "unsupported-145";
+  "legacy-113" | "v0-145" | "v1-145" | "unsupported-145";
 
 /**
  * Read-only inspection used by migration inventory tooling. Unlike
@@ -116,14 +113,14 @@ export interface VaultStateAccountInspection {
 }
 
 export function inspectVaultStateAccount(
-  data: Buffer
+  data: Buffer,
 ): VaultStateAccountInspection {
   if (
     data.length !== LEGACY_VAULT_STATE_LEN &&
     data.length !== VAULT_STATE_LEN
   ) {
     throw new Error(
-      `Unsupported VaultState account length: expected ${LEGACY_VAULT_STATE_LEN} or ${VAULT_STATE_LEN} bytes, got ${data.length}`
+      `Unsupported VaultState account length: expected ${LEGACY_VAULT_STATE_LEN} or ${VAULT_STATE_LEN} bytes, got ${data.length}`,
     );
   }
   checkDiscriminator(data, "VaultState");
@@ -145,8 +142,8 @@ export function inspectVaultStateAccount(
       version === VAULT_STATE_VERSION_V0
         ? "v0-145"
         : version === VAULT_STATE_VERSION_V1
-        ? "v1-145"
-        : "unsupported-145",
+          ? "v1-145"
+          : "unsupported-145",
     ...common,
     pendingPauseAuthority: new PublicKey(data.subarray(91, 123)),
     version,
@@ -185,12 +182,12 @@ export function decodeVaultState(data: Buffer): VaultState {
   const inspected = inspectVaultStateAccount(data);
   if (inspected.layout === "legacy-113") {
     throw new Error(
-      "Legacy 113-byte VaultState must be inventoried, reconciled, and retired; it cannot migrate in place"
+      "Legacy 113-byte VaultState must be inventoried, reconciled, and retired; it cannot migrate in place",
     );
   }
   if (inspected.layout === "v0-145") {
     throw new Error(
-      "VaultState version 0 requires the migrate_v0_to_v1 instruction"
+      "VaultState version 0 requires the migrate_v0_to_v1 instruction",
     );
   }
   if (inspected.layout === "unsupported-145") {
@@ -201,7 +198,7 @@ export function decodeVaultState(data: Buffer): VaultState {
   }
   if (!isOperationalState(inspected.operationalStateValue)) {
     throw new Error(
-      `Unsupported VaultState operational state ${inspected.operationalStateValue}`
+      `Unsupported VaultState operational state ${inspected.operationalStateValue}`,
     );
   }
 
@@ -255,7 +252,7 @@ function readBool(data: Buffer, offset: number, field: string): boolean {
   const value = data.readUInt8(offset);
   if (value !== 0 && value !== 1) {
     throw new Error(
-      `MintConfig ${field} must be encoded as 0 or 1, got ${value}`
+      `MintConfig ${field} must be encoded as 0 or 1, got ${value}`,
     );
   }
   return value === 1;
@@ -264,7 +261,7 @@ function readBool(data: Buffer, offset: number, field: string): boolean {
 function readRolloutStage(
   data: Buffer,
   offset: number,
-  field: string
+  field: string,
 ): RolloutStage {
   const value = data.readUInt8(offset);
   if (value < RolloutStage.Devnet || value > RolloutStage.Expanded) {
@@ -276,11 +273,11 @@ function readRolloutStage(
 /** Strict decoder for the frozen 160-byte MintConfig v1 account. */
 export function decodeMintConfig(
   data: Buffer,
-  expectedMint: PublicKey
+  expectedMint: PublicKey,
 ): MintConfig {
   if (data.length !== MINT_CONFIG_LEN) {
     throw new Error(
-      `Unsupported MintConfig account length: expected exactly ${MINT_CONFIG_LEN} bytes, got ${data.length}`
+      `Unsupported MintConfig account length: expected exactly ${MINT_CONFIG_LEN} bytes, got ${data.length}`,
     );
   }
   checkDiscriminator(data, "MintConfig");
@@ -292,13 +289,13 @@ export function decodeMintConfig(
   const expectedBump = deriveMintConfigPda(expectedMint).bump;
   if (bump !== expectedBump) {
     throw new Error(
-      `MintConfig bump mismatch: expected ${expectedBump}, got ${bump}`
+      `MintConfig bump mismatch: expected ${expectedBump}, got ${bump}`,
     );
   }
   const mint = new PublicKey(data.subarray(10, 42));
   if (!mint.equals(expectedMint)) {
     throw new Error(
-      `MintConfig mint mismatch: expected ${expectedMint.toBase58()}, got ${mint.toBase58()}`
+      `MintConfig mint mismatch: expected ${expectedMint.toBase58()}, got ${mint.toBase58()}`,
     );
   }
   if (!data.subarray(87, 160).every((byte) => byte === 0)) {
@@ -320,7 +317,7 @@ export function decodeMintConfig(
   const pendingRolloutStage = readRolloutStage(
     data,
     78,
-    "pending rollout stage"
+    "pending rollout stage",
   );
   const pendingEffectiveUnixTimestamp = view.getBigInt64(79, true);
 
@@ -371,7 +368,7 @@ export function decodeMintConfig(
 export function decodeProtocolConfig(data: Buffer): ProtocolConfig {
   if (data.length !== PROTOCOL_CONFIG_LEN) {
     throw new Error(
-      `Unsupported ProtocolConfig account length: expected exactly ${PROTOCOL_CONFIG_LEN} bytes, got ${data.length}`
+      `Unsupported ProtocolConfig account length: expected exactly ${PROTOCOL_CONFIG_LEN} bytes, got ${data.length}`,
     );
   }
   checkDiscriminator(data, "ProtocolConfig");
@@ -383,7 +380,7 @@ export function decodeProtocolConfig(data: Buffer): ProtocolConfig {
   const expectedBump = deriveProtocolConfigPda().bump;
   if (bump !== expectedBump) {
     throw new Error(
-      `ProtocolConfig bump mismatch: expected ${expectedBump}, got ${bump}`
+      `ProtocolConfig bump mismatch: expected ${expectedBump}, got ${bump}`,
     );
   }
   if (!data.subarray(138, 200).every((byte) => byte === 0)) {
@@ -412,7 +409,7 @@ export function decodeProtocolConfig(data: Buffer): ProtocolConfig {
   }
   if (!tokenProgram.equals(TOKEN_PROGRAM_ID)) {
     throw new Error(
-      "ProtocolConfig token program must be the canonical legacy SPL Token Program"
+      "ProtocolConfig token program must be the canonical legacy SPL Token Program",
     );
   }
 
@@ -431,7 +428,7 @@ export function decodeUserPosition(data: Buffer): UserPosition {
   checkDiscriminator(data, "UserPosition");
   if (data.length !== USER_POSITION_LEN) {
     throw new Error(
-      `Unsupported UserPosition account length: expected exactly ${USER_POSITION_LEN} bytes, got ${data.length}`
+      `Unsupported UserPosition account length: expected exactly ${USER_POSITION_LEN} bytes, got ${data.length}`,
     );
   }
   const dv = new DataView(data.buffer, data.byteOffset, data.byteLength);
@@ -446,7 +443,7 @@ export function decodeUserPosition(data: Buffer): UserPosition {
 /** Fetches and decodes current VaultState v1, or null if uninitialized. */
 export async function fetchVaultState(
   connection: Connection,
-  mint: PublicKey
+  mint: PublicKey,
 ): Promise<VaultState | null> {
   const { address } = deriveVaultStatePda(mint);
   const account = await connection.getAccountInfo(address);
@@ -456,7 +453,7 @@ export async function fetchVaultState(
 
 /** Fetches and strictly decodes the singleton ProtocolConfig v1, or null if absent. */
 export async function fetchProtocolConfig(
-  connection: Connection
+  connection: Connection,
 ): Promise<ProtocolConfig | null> {
   const { address } = deriveProtocolConfigPda();
   const account = await connection.getAccountInfo(address);
@@ -467,7 +464,7 @@ export async function fetchProtocolConfig(
 /** Fetches and strictly decodes this mint's MintConfig v1, or null if absent. */
 export async function fetchMintConfig(
   connection: Connection,
-  mint: PublicKey
+  mint: PublicKey,
 ): Promise<MintConfig | null> {
   const { address } = deriveMintConfigPda(mint);
   const account = await connection.getAccountInfo(address);
@@ -479,7 +476,7 @@ export async function fetchMintConfig(
 export async function fetchUserPosition(
   connection: Connection,
   vaultState: PublicKey,
-  user: PublicKey
+  user: PublicKey,
 ): Promise<UserPosition | null> {
   const { address } = deriveUserPositionPda(vaultState, user);
   const account = await connection.getAccountInfo(address);

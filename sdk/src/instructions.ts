@@ -26,7 +26,7 @@ import { RolloutStage } from "./accounts";
 function meta(
   pubkey: PublicKey,
   isSigner: boolean,
-  isWritable: boolean
+  isWritable: boolean,
 ): AccountMeta {
   return { pubkey, isSigner, isWritable };
 }
@@ -40,7 +40,7 @@ function amountData(name: string, amount: bigint): Buffer {
   new DataView(data.buffer, data.byteOffset, data.byteLength).setBigUint64(
     8,
     amount,
-    true
+    true,
   );
   return data;
 }
@@ -54,7 +54,7 @@ export interface InitializeIxParams {
 
 /** Allocates VaultState + custody ATA bound to one mint. Accounts must not sign; payer/pauseAuthority do. */
 export function buildInitializeIx(
-  p: InitializeIxParams
+  p: InitializeIxParams,
 ): TransactionInstruction {
   const vaultState = deriveVaultStatePda(p.mint);
   const vaultAuthority = deriveVaultAuthorityPda(vaultState.address);
@@ -153,7 +153,7 @@ export interface PauseIxParams {
 
 function operationalStateChangeData(
   name: "pause" | "unpause" | "emergency_pause" | "emergency_resume",
-  reason: OperationalStateReason
+  reason: OperationalStateReason,
 ): Buffer {
   if (!Number.isInteger(reason) || reason < 0 || reason > 3) {
     throw new RangeError(`Unsupported operational-state reason code ${reason}`);
@@ -166,7 +166,7 @@ function operationalStateChangeData(
 
 function buildPauseLikeIx(
   name: "pause" | "unpause",
-  p: PauseIxParams
+  p: PauseIxParams,
 ): TransactionInstruction {
   const vaultState = deriveVaultStatePda(p.mint);
   return new TransactionInstruction({
@@ -197,7 +197,7 @@ export interface InitializeProtocolConfigIxParams {
 
 /** M23: one-time singleton bootstrap by the live program's upgrade authority. */
 export function buildInitializeProtocolConfigIx(
-  p: InitializeProtocolConfigIxParams
+  p: InitializeProtocolConfigIxParams,
 ): TransactionInstruction {
   const protocolConfig = deriveProtocolConfigPda();
   const programData = deriveProgramDataPda();
@@ -228,7 +228,7 @@ export interface EmergencyControlIxParams {
 
 function buildEmergencyControlIx(
   name: "emergency_pause" | "emergency_resume",
-  p: EmergencyControlIxParams
+  p: EmergencyControlIxParams,
 ): TransactionInstruction {
   const protocolConfig = deriveProtocolConfigPda();
   const vaultState = deriveVaultStatePda(p.mint);
@@ -244,13 +244,13 @@ function buildEmergencyControlIx(
 }
 
 export function buildEmergencyPauseIx(
-  p: EmergencyControlIxParams
+  p: EmergencyControlIxParams,
 ): TransactionInstruction {
   return buildEmergencyControlIx("emergency_pause", p);
 }
 
 export function buildEmergencyResumeIx(
-  p: EmergencyControlIxParams
+  p: EmergencyControlIxParams,
 ): TransactionInstruction {
   return buildEmergencyControlIx("emergency_resume", p);
 }
@@ -263,7 +263,7 @@ export interface ProposePauseAuthorityIxParams {
 
 /** M18: current authority proposes the next one (two-step rotation, step 1). */
 export function buildProposePauseAuthorityIx(
-  p: ProposePauseAuthorityIxParams
+  p: ProposePauseAuthorityIxParams,
 ): TransactionInstruction {
   const vaultState = deriveVaultStatePda(p.mint);
   const data = Buffer.alloc(40);
@@ -286,7 +286,7 @@ export interface AcceptPauseAuthorityIxParams {
 
 /** M18: the proposed authority accepts, completing the rotation (step 2). */
 export function buildAcceptPauseAuthorityIx(
-  p: AcceptPauseAuthorityIxParams
+  p: AcceptPauseAuthorityIxParams,
 ): TransactionInstruction {
   const vaultState = deriveVaultStatePda(p.mint);
   return new TransactionInstruction({
@@ -305,7 +305,7 @@ export interface MigrateV0ToV1IxParams {
 
 /** M21: permissionless, same-size migration; only VaultState is writable. */
 export function buildMigrateV0ToV1Ix(
-  p: MigrateV0ToV1IxParams
+  p: MigrateV0ToV1IxParams,
 ): TransactionInstruction {
   const vaultState = deriveVaultStatePda(p.mint);
   return new TransactionInstruction({
@@ -318,7 +318,7 @@ export function buildMigrateV0ToV1Ix(
 function mintCapsData(
   name: "lower_mint_caps",
   maxTotalAssets: bigint,
-  maxDepositAssetsPerTransaction: bigint
+  maxDepositAssetsPerTransaction: bigint,
 ): Buffer {
   const data = Buffer.alloc(24);
   instructionDiscriminator(name).copy(data, 0);
@@ -341,7 +341,7 @@ export interface InitializeMintConfigIxParams {
 }
 
 export function buildInitializeMintConfigIx(
-  p: InitializeMintConfigIxParams
+  p: InitializeMintConfigIxParams,
 ): TransactionInstruction {
   const protocolConfig = deriveProtocolConfigPda();
   const mintConfig = deriveMintConfigPda(p.mint);
@@ -369,7 +369,7 @@ export interface ProposeMintConfigUpdateIxParams {
 }
 
 export function buildProposeMintConfigUpdateIx(
-  p: ProposeMintConfigUpdateIxParams
+  p: ProposeMintConfigUpdateIxParams,
 ): TransactionInstruction {
   assertRolloutStage(p.rolloutStage);
   const data = Buffer.alloc(26);
@@ -383,7 +383,7 @@ export function buildProposeMintConfigUpdateIx(
     "propose_mint_config_update",
     p.protocolGovernanceAuthority,
     p.mint,
-    data
+    data,
   );
 }
 
@@ -391,7 +391,7 @@ function governedMintConfigInstruction(
   name: "propose_mint_config_update" | "disable_mint",
   protocolGovernanceAuthority: PublicKey,
   mint: PublicKey,
-  data: Buffer = instructionDiscriminator(name)
+  data: Buffer = instructionDiscriminator(name),
 ): TransactionInstruction {
   return new TransactionInstruction({
     programId: PROGRAM_ID,
@@ -410,17 +410,17 @@ export interface GovernMintConfigIxParams {
 }
 
 export function buildDisableMintIx(
-  p: GovernMintConfigIxParams
+  p: GovernMintConfigIxParams,
 ): TransactionInstruction {
   return governedMintConfigInstruction(
     "disable_mint",
     p.protocolGovernanceAuthority,
-    p.mint
+    p.mint,
   );
 }
 
 export function buildExecuteMintConfigUpdateIx(
-  mint: PublicKey
+  mint: PublicKey,
 ): TransactionInstruction {
   return new TransactionInstruction({
     programId: PROGRAM_ID,
@@ -440,7 +440,7 @@ export interface LowerMintCapsIxParams {
 }
 
 export function buildLowerMintCapsIx(
-  p: LowerMintCapsIxParams
+  p: LowerMintCapsIxParams,
 ): TransactionInstruction {
   return new TransactionInstruction({
     programId: PROGRAM_ID,
@@ -452,7 +452,7 @@ export function buildLowerMintCapsIx(
     data: mintCapsData(
       "lower_mint_caps",
       p.maxTotalAssets,
-      p.maxDepositAssetsPerTransaction
+      p.maxDepositAssetsPerTransaction,
     ),
   });
 }
@@ -469,7 +469,7 @@ export interface SweepExcessIxParams {
  * amount or caller-selected token-account destination.
  */
 export function buildSweepExcessIx(
-  p: SweepExcessIxParams
+  p: SweepExcessIxParams,
 ): TransactionInstruction {
   const protocolConfig = deriveProtocolConfigPda();
   const vaultState = deriveVaultStatePda(p.mint);

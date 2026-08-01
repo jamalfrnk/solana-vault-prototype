@@ -25,7 +25,7 @@ function productionManifests(): Record<(typeof MANIFEST_FILES)[number], any> {
     if (Array.isArray(value)) return value.map(resolve);
     if (typeof value === "object" && value !== null) {
       return Object.fromEntries(
-        Object.entries(value).map(([name, entry]) => [name, resolve(entry)])
+        Object.entries(value).map(([name, entry]) => [name, resolve(entry)]),
       );
     }
     if (typeof value !== "string" || !/^<[A-Z0-9_:-]+>$/.test(value))
@@ -35,7 +35,7 @@ function productionManifests(): Record<(typeof MANIFEST_FILES)[number], any> {
     if (value.includes("AT_UTC") || value.includes("DUE_AT"))
       return `2026-07-${String((sequence % 20) + 1).padStart(
         2,
-        "0"
+        "0",
       )}T12:00:00Z`;
     if (value.includes("SOURCE_COMMIT")) return "b".repeat(40);
     if (value.includes("SHA256"))
@@ -58,10 +58,10 @@ describe("production manifest validation", () => {
     expect(validateManifestSet(templates, true)).to.deep.equal([]);
     const productionErrors = validateManifestSet(templates, false);
     expect(
-      productionErrors.some((error) => error.includes("placeholder"))
+      productionErrors.some((error) => error.includes("placeholder")),
     ).to.equal(true);
     expect(productionErrors).to.include(
-      "rehearsal.status must equal completed in production validation mode"
+      "rehearsal.status must equal completed in production validation mode",
     );
   });
 
@@ -77,10 +77,10 @@ describe("production manifest validation", () => {
       "https://rpc.invalid";
     const errors = validateManifestSet(manifests);
     expect(
-      errors.some((error) => error.includes("forbidden secret-shaped field"))
+      errors.some((error) => error.includes("forbidden secret-shaped field")),
     ).to.equal(true);
     expect(errors.some((error) => error.includes("literal URL"))).to.equal(
-      true
+      true,
     );
   });
 
@@ -91,10 +91,10 @@ describe("production manifest validation", () => {
     deployment.artifacts.program.path = "../unreviewed.so";
     const errors = validateManifestSet(manifests);
     expect(errors).to.include(
-      "deployment.tokenProgramId must equal the canonical legacy SPL Token Program"
+      "deployment.tokenProgramId must equal the canonical legacy SPL Token Program",
     );
     expect(errors).to.include(
-      "deployment.artifacts.program.path must be a normalized repository-relative path"
+      "deployment.artifacts.program.path must be a normalized repository-relative path",
     );
   });
 
@@ -109,10 +109,10 @@ describe("production manifest validation", () => {
     const errors = validateManifestSet(manifests);
     expect(errors).to.include("authority.roles.pause.threshold must equal 2");
     expect(errors).to.include(
-      "authority role addresses must be pairwise distinct"
+      "authority role addresses must be pairwise distinct",
     );
     expect(errors).to.include(
-      "deployment caps must satisfy rolloutStage <= perVault <= maximumTvl"
+      "deployment caps must satisfy rolloutStage <= perVault <= maximumTvl",
     );
   });
 
@@ -124,13 +124,13 @@ describe("production manifest validation", () => {
     manifests["incident-rehearsal.json"].status = "planned";
     const errors = validateManifestSet(manifests);
     expect(errors).to.include(
-      "operations.monitoring is missing required monitor program-upgrade"
+      "operations.monitoring is missing required monitor program-upgrade",
     );
     expect(errors).to.include(
-      "rehearsal.status must equal completed in production validation mode"
+      "rehearsal.status must equal completed in production validation mode",
     );
     expect(errors).to.include(
-      "operations RPC endpoint environment variables must be distinct"
+      "operations RPC endpoint environment variables must be distinct",
     );
   });
 
@@ -138,11 +138,11 @@ describe("production manifest validation", () => {
     for (const filename of MANIFEST_FILES) {
       const schemaPath = path.resolve(
         "ops/schemas",
-        filename.replace(".json", ".schema.json")
+        filename.replace(".json", ".schema.json"),
       );
       const schema = JSON.parse(fs.readFileSync(schemaPath, "utf8"));
       expect(schema.$schema).to.equal(
-        "https://json-schema.org/draft/2020-12/schema"
+        "https://json-schema.org/draft/2020-12/schema",
       );
       expect(schema.type).to.equal("object");
       expect(schema.additionalProperties).to.equal(false);
