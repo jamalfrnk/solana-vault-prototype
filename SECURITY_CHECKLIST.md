@@ -362,6 +362,88 @@ that acceptance explicit rather than implicit.
       own `rand` requirement, or if this program ever calls `rand::rng()` with a custom
       logger installed.
 
+### Accepted risk: five unmaintained transitive crates (Rust, informational)
+
+`ansi_term` (`RUSTSEC-2021-0139`), `derivative` (`RUSTSEC-2024-0388`), `paste`
+(`RUSTSEC-2024-0436`), `bincode` 1.x (`RUSTSEC-2025-0141`), and `libsecp256k1`
+(`RUSTSEC-2025-0161`) are all "unmaintained" advisories, not vulnerabilities, on
+crates transitively pulled in by the pinned Agave v3.1.10 / Anchor 1.0.2 toolchain
+and its own dependencies (Solana CLI tooling, Solana/Anchor proc-macros, the Solana
+SDK's wire format, and `solana-secp256k1-recover`) — none is a crate this repository
+selects directly, and none can be removed or replaced without an upstream Solana SDK
+or Anchor change. `cargo audit` already treated all five as non-blocking "allowed
+warnings" by default; this was made explicit with `audit.toml` (added alongside PR
+#68). When `cargo deny check` was wired into CI in the same PR (`SUPPLY-002`), it
+initially had no matching ignore list — cargo-deny denies unmaintained advisories by
+default, unlike `cargo audit` — which broke `main`'s `cargo deny check` step
+immediately after merge (CI run 30697397734, 2026-08-01). Fixed by adding the same
+five IDs to `cargo-deny.toml`'s own `[advisories] ignore` list, on
+`fix/cargo-deny-license-policy`.
+
+- [ ] Revisit each entry if a future Agave/Anchor toolchain bump changes whether these
+      crates are still pulled in, or if any advisory is reclassified from
+      "unmaintained" to a vulnerability with a required fix.
+
+### Accepted risk: no `[licenses]` policy existed for `cargo-deny check` (Rust, build integrity)
+
+`cargo-deny.toml` (added PR #52) never had a `[licenses]` section. When `cargo deny
+check` was first wired into CI (`SUPPLY-002`, PR #68), cargo-deny's default posture —
+deny every license unless explicitly allowed — rejected all 213 license expressions
+across the full 406-crate dependency tree (every MIT/Apache-2.0/BSD/etc. crate in the
+graph), plus a separate `error[unlicensed]` on `solana-vault-prototype` itself, which
+has no `license` field. This broke `main` immediately after PR #68 merged (CI run
+30697397734), because the PR's own CI run hadn't finished before it was merged — the
+`ROADMAP.md` entry for `SUPPLY-002` had explicitly flagged this exact risk
+beforehand ("watch that first CI run rather than assume it passes").
+
+Fixed on `fix/cargo-deny-license-policy` by adding an `allow` list of the 9 SPDX
+identifiers actually present in the dependency tree (verified against the failing
+run's own output, not guessed), and by marking `solana-vault-prototype` private
+(`publish = false` in its `Cargo.toml`, `[licenses.private] ignore = true` in
+`cargo-deny.toml`) rather than assigning it a license as a side effect of a CI fix.
+
+This repository currently has **no `LICENSE` file and no recorded license decision**
+— `package.json`'s `"ISC"` looks like unreviewed `npm init` boilerplate (GitHub's own
+license detection reports none). `PROJECT_CONTEXT.md` names open-source Solana/Rust
+developers as part of this repository's intended audience, so the absence of a real
+license is a genuine gap for that audience, not just a formality — but it is a
+product/legal decision, not an engineering one, and is out of scope for this CI fix.
+Tracked in `docs/production-readiness/backlog.md`.
+
+- [ ] Malcolm to decide and add a `LICENSE` file (or explicitly confirm "all rights
+      reserved" is intended) if/when this repository's open-source-facing goal is
+      acted on.
+
+**Correction (same day, PR #69's own first CI run):** the `[licenses]`/`[advisories]`
+config above was necessary but not sufficient. The real, deeper defect: cargo-deny's
+own default config discovery only looks for `<cwd>/deny.toml`, never
+`cargo-deny.toml` — the name this repo uses, matching `cargo audit`'s `audit.toml`
+convention. The `cargo deny check` step never actually loaded this file, in either
+PR #68's original failure or PR #69's first (also-failing) run — both logged
+`unable to find a config path, falling back to default config` and failed against
+cargo-deny's hardcoded defaults, not this file's content. Fixed by adding
+`--config cargo-deny.toml` to the CI step's invocation
+(`.github/workflows/ci.yml`). Left the established `cargo-deny.toml` filename
+alone rather than renaming it to `deny.toml`, since 9 other files already reference
+it by that name. This was caught by actually reading what the CI log's own warning
+line meant, rather than assuming a second red run meant the same already-diagnosed
+cause — the exact discipline this whole incident is about.
+
+**Second correction (same day, PR #69's second CI run):** with `--config` now
+working, cargo-deny actually parsed `cargo-deny.toml` for the first time in this
+repository's history — and rejected it outright: `error[unexpected-keys]: found 2
+unexpected keys, expected: ["advisories", "bans", "licenses", "sources", "graph",
+"targets", "exclude", "features", "all-features", "no-default-features",
+"exclude-dev", "output", "feature-depth"]`, pointing at `[checks]` and `[policies]`
+— the two sections PR #52 originally added for "deny git dependencies" and "deny
+yanked crates." Neither key exists in the config schema of the cargo-deny version
+this CI installs; both sections had been syntactically present but functionally
+inert since PR #52, silently, because nothing had ever actually parsed this file
+before this PR's `--config` fix. Replaced with their current equivalents, verified
+against cargo-deny's own documentation: `[advisories] yanked = "deny"`
+(yanked-crate denial) and `[sources] unknown-git = "deny"` / `allow-git = []`
+(git-dependency denial). Same intent as the original two sections, current schema.
+
 ## Governance readiness (M16)
 
 `pause_authority`'s constraint surface is `Signer` + key equality only — no on-curve

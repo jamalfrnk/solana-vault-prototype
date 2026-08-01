@@ -128,8 +128,17 @@ jobs:
       # Cargo.lock today (verified: every `source =` line is crates.io), so this
       # should land green; the yanked-crate check can only be verified by the tool
       # itself, run here for the first time.
+      #
+      # --config is required: cargo-deny's own default config discovery only looks
+      # for `deny.toml` in cwd, never `cargo-deny.toml` (the name this repo uses,
+      # matching cargo-audit's `audit.toml` convention). Without this flag cargo-deny
+      # silently falls back to built-in defaults and ignores this file entirely --
+      # confirmed from two real CI failures (run 30697077334 and 30705769884) both
+      # logging "unable to find a config path, falling back to default config" right
+      # before failing on the *default* empty license allow-list, not this repo's
+      # configured one.
       - name: cargo deny check
-        run: cargo deny check
+        run: cargo deny --config cargo-deny.toml check
 
   sdk-test:
     name: SDK tests (Node, no Solana/Anchor toolchain)
