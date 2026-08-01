@@ -112,6 +112,25 @@ jobs:
       - name: cargo audit
         run: cargo audit
 
+      - name: Cache cargo-deny binary
+        id: cache-deny
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cargo/bin/cargo-deny
+          key: cargo-deny-${{ runner.os }}-v1
+
+      - name: Install cargo-deny
+        if: steps.cache-deny.outputs.cache-hit != 'true'
+        run: cargo install cargo-deny --locked
+
+      # cargo-deny.toml (PR #52) denies git dependencies and yanked crates, but was
+      # never actually invoked anywhere (SUPPLY-002). No git dependencies exist in
+      # Cargo.lock today (verified: every `source =` line is crates.io), so this
+      # should land green; the yanked-crate check can only be verified by the tool
+      # itself, run here for the first time.
+      - name: cargo deny check
+        run: cargo deny check
+
   sdk-test:
     name: SDK tests (Node, no Solana/Anchor toolchain)
     runs-on: ubuntu-latest

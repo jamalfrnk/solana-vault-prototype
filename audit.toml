@@ -1,0 +1,29 @@
+# audit.toml — cargo-audit configuration
+#
+# The advisories listed below are for unmaintained crates that are transitive
+# dependencies of the Solana / Anchor ecosystem.  They cannot be removed or
+# replaced without upstream changes, so they are explicitly ignored here.
+# Each entry is re-evaluated whenever dependencies are upgraded.
+
+[advisories]
+ignore = [
+    # ansi_term is unmaintained; pulled in by Solana tooling transitively
+    # https://rustsec.org/advisories/RUSTSEC-2021-0139
+    "RUSTSEC-2021-0139",
+
+    # bincode 1.x is unmaintained; used throughout the Solana SDK
+    # https://rustsec.org/advisories/RUSTSEC-2025-0141
+    "RUSTSEC-2025-0141",
+
+    # derivative is unmaintained; used by Solana/Anchor proc-macros
+    # https://rustsec.org/advisories/RUSTSEC-2024-0388
+    "RUSTSEC-2024-0388",
+
+    # libsecp256k1 is unmaintained; used by solana-secp256k1-recover
+    # https://rustsec.org/advisories/RUSTSEC-2025-0161
+    "RUSTSEC-2025-0161",
+
+    # paste is unmaintained; used by various Solana crates
+    # https://rustsec.org/advisories/RUSTSEC-2024-0436
+    "RUSTSEC-2024-0436",
+]
