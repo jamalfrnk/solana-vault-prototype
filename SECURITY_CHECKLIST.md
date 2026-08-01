@@ -414,6 +414,21 @@ Tracked in `docs/production-readiness/backlog.md`.
       reserved" is intended) if/when this repository's open-source-facing goal is
       acted on.
 
+**Correction (same day, PR #69's own first CI run):** the `[licenses]`/`[advisories]`
+config above was necessary but not sufficient. The real, deeper defect: cargo-deny's
+own default config discovery only looks for `<cwd>/deny.toml`, never
+`cargo-deny.toml` — the name this repo uses, matching `cargo audit`'s `audit.toml`
+convention. The `cargo deny check` step never actually loaded this file, in either
+PR #68's original failure or PR #69's first (also-failing) run — both logged
+`unable to find a config path, falling back to default config` and failed against
+cargo-deny's hardcoded defaults, not this file's content. Fixed by adding
+`--config cargo-deny.toml` to the CI step's invocation
+(`.github/workflows/ci.yml`). Left the established `cargo-deny.toml` filename
+alone rather than renaming it to `deny.toml`, since 9 other files already reference
+it by that name. This was caught by actually reading what the CI log's own warning
+line meant, rather than assuming a second red run meant the same already-diagnosed
+cause — the exact discipline this whole incident is about.
+
 ## Governance readiness (M16)
 
 `pause_authority`'s constraint surface is `Signer` + key equality only — no on-curve

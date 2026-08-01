@@ -1207,6 +1207,21 @@ repository has no `LICENSE` file and no recorded license decision at all — tra
 a separate, non-blocking product/legal item in
 `docs/production-readiness/backlog.md`, not fixed here.
 
+**Second failure, same PR:** the license/advisory config fix above was pushed as
+PR #69, and its own first CI run *also* failed the `cargo deny check` step — with the
+exact same errors as before, meaning the config changes had no effect at all. Cause:
+cargo-deny's default config discovery only looks for `<cwd>/deny.toml`, never
+`cargo-deny.toml`; the step invoked plain `cargo deny check`, so cargo-deny silently
+fell back to its hardcoded defaults every time, in both PR #68's failure and PR #69's
+first run — both runs logged `unable to find a config path, falling back to default
+config`, which had been read past without registering what it meant. Real fix: added
+`--config cargo-deny.toml` to the step's invocation in
+`.github/workflows/ci.yml`. Kept the established `cargo-deny.toml` name rather than
+renaming to `deny.toml`, since 9 other files already reference it. Recorded in
+`SECURITY_CHECKLIST.md` as a correction to the entry written minutes earlier, rather
+than silently rewritten, since a second red run on the PR meant to fix exactly this
+class of mistake is itself worth an honest record.
+
 ## Post-MVP Roadmap (candidate pool — implementation requires separate approval)
 
 Milestones 0–14 are the MVP `PROJECT_CONTEXT.md` scoped from day one: a hardened,
