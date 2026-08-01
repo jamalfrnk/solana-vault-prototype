@@ -44,6 +44,7 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 | — | Follow-up — legacy vault retirement | `[x]` complete — PR #46 |
 | — | Follow-up — verifiable-build determinism fix | `[x]` complete — PR #48, #49 |
 | CI-001 | Follow-up — CI lint gate | `[~]` in progress |
+| SUPPLY-002 | Follow-up — cargo-deny CI gate | `[~]` in progress |
 
 ## Milestone 0 — Repository bootstrap (complete)
 
@@ -1155,6 +1156,29 @@ Anchor/Solana CLI to run that suite locally regardless (same documented gap as
 `docs/engineering/baseline.md`), so CI remains the authoritative source for it. Not
 yet committed, pushed, or opened as a PR — per this project's permission boundaries,
 that remains Malcolm's step.
+
+## Follow-up — cargo-deny CI gate (SUPPLY-002) (in progress)
+
+Approved by Malcolm 2026-08-01 as the next step, on `feature/cargo-deny-gate`, the
+second finding from the same production-readiness audit that produced CI-001.
+`cargo-deny.toml` (added PR #52) denies git dependencies and yanked crates, but no CI
+job ever invoked `cargo deny check` — a policy file that looked like enforcement but
+wasn't. Added a `cargo deny check` step to the existing `audit` job in `ci.yml`,
+caching the `cargo-deny` binary the same way the job already caches `cargo-audit`.
+
+This native Windows host cannot run this check locally: `cargo-deny` isn't installed,
+building it from source needs a linker this host doesn't have (same gap
+`docs/engineering/baseline.md` documented for the rest of the Rust toolchain), and
+installing it globally is outside this project's permission boundaries regardless.
+What was verified instead: every `source = ` line in `Cargo.lock` (406 packages) is
+`registry+https://github.com/rust-lang/crates.io-index` — zero git or path
+dependencies — which directly satisfies the `deny = [{ type = "git" }]` rule with
+certainty, not a sample. The yanked-crate check has no manual equivalent; it needs a
+live query against the crates.io index that only `cargo-deny` itself can perform, so
+this PR's own CI run is the first real execution of that half of the policy. Not yet
+committed, pushed, or opened as a PR — that remains Malcolm's step, and per the
+backlog's own caution ("verify before wiring it in, so it doesn't land red"), the
+recommendation is to watch that first CI run rather than assume it passes.
 
 ## Post-MVP Roadmap (candidate pool — implementation requires separate approval)
 
