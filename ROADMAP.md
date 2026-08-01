@@ -1157,7 +1157,7 @@ Anchor/Solana CLI to run that suite locally regardless (same documented gap as
 yet committed, pushed, or opened as a PR — per this project's permission boundaries,
 that remains Malcolm's step.
 
-## Follow-up — cargo-deny CI gate (SUPPLY-002) (in progress)
+## Follow-up — cargo-deny CI gate (SUPPLY-002) (merged; required a same-day fix)
 
 Approved by Malcolm 2026-08-01 as the next step, on `feature/cargo-deny-gate`, the
 second finding from the same production-readiness audit that produced CI-001.
@@ -1179,6 +1179,33 @@ this PR's own CI run is the first real execution of that half of the policy. Not
 committed, pushed, or opened as a PR — that remains Malcolm's step, and per the
 backlog's own caution ("verify before wiring it in, so it doesn't land red"), the
 recommendation is to watch that first CI run rather than assume it passes.
+
+**Outcome:** merged as PR #68 (`0ead60f`) before that first CI run finished — the
+`cargo deny check` step failed on the exact commit merged to `main` (run
+[30697077334](https://github.com/jamalfrnk/solana-vault-prototype/actions/runs/30697077334)
+on the PR, and the equivalent push-triggered run
+[30697397734](https://github.com/jamalfrnk/solana-vault-prototype/actions/runs/30697397734)
+on `main` itself), exactly the outcome the caution above was written to avoid. Two
+distinct causes, both pre-existing gaps in `cargo-deny.toml` rather than anything
+introduced by wiring the check in: no `[licenses]` allow-list at all (cargo-deny
+denies every crate's license by default, so all 213 license expressions across the
+406-crate tree were rejected, plus a separate `error[unlicensed]` on
+`solana-vault-prototype` itself), and an empty `[advisories] ignore` list (cargo-deny
+denies "unmaintained" advisories by default, unlike `cargo audit`, so the same five
+transitive advisories `audit.toml` already accepted for `cargo audit` were denied
+again by `cargo-deny`). A same-PR follow-up commit (`audit.toml`, squashed into
+`0ead60f` by a Copilot cloud agent responding to review comment before merge) did not
+fix this — it only configures `cargo audit`, which was not the failing tool.
+
+Fixed same-day on `fix/cargo-deny-license-policy`: added a verified 9-identifier
+`[licenses] allow` list (read off the failing run's own output, not guessed), marked
+`solana-vault-prototype` private (`publish = false` + `[licenses.private] ignore =
+true`) rather than assigning it a license as a side effect, and added the same five
+RUSTSEC IDs to `cargo-deny.toml`'s own `[advisories] ignore` list. Full reasoning in
+`SECURITY_CHECKLIST.md`'s two new "Accepted risk" entries. This also surfaced that the
+repository has no `LICENSE` file and no recorded license decision at all — tracked as
+a separate, non-blocking product/legal item in
+`docs/production-readiness/backlog.md`, not fixed here.
 
 ## Post-MVP Roadmap (candidate pool — implementation requires separate approval)
 

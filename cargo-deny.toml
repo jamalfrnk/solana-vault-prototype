@@ -2,7 +2,66 @@
 
 [advisories]
 # Use the advisory DB and fail the check if any high/critical advisories are found.
-ignore = []
+#
+# The five entries below are transitive, unmaintained-crate advisories deep
+# inside the pinned Agave v3.1.10 / Anchor 1.0.2 toolchain's own dependency
+# graph, not crates this repository selects directly, and none has a safe
+# upgrade available without moving off the pinned toolchain. `cargo audit`
+# already treats these as non-blocking "allowed warnings" by default (see
+# `audit.toml`); cargo-deny denies unmaintained advisories by default, so it
+# needs its own explicit ignore list to match. See SECURITY_CHECKLIST.md's
+# "Accepted risk" entries for the full reasoning behind each one.
+ignore = [
+    # ansi_term is unmaintained; pulled in by Solana tooling transitively
+    # https://rustsec.org/advisories/RUSTSEC-2021-0139
+    "RUSTSEC-2021-0139",
+
+    # derivative is unmaintained; used by Solana/Anchor proc-macros
+    # https://rustsec.org/advisories/RUSTSEC-2024-0388
+    "RUSTSEC-2024-0388",
+
+    # paste is unmaintained; used by various Solana crates
+    # https://rustsec.org/advisories/RUSTSEC-2024-0436
+    "RUSTSEC-2024-0436",
+
+    # bincode 1.x is unmaintained; used throughout the Solana SDK
+    # https://rustsec.org/advisories/RUSTSEC-2025-0141
+    "RUSTSEC-2025-0141",
+
+    # libsecp256k1 is unmaintained; used by solana-secp256k1-recover
+    # https://rustsec.org/advisories/RUSTSEC-2025-0161
+    "RUSTSEC-2025-0161",
+]
+
+[licenses]
+# SPDX identifiers actually present across the full dependency tree, verified
+# against CI run 30697397734's cargo-deny output (406 crates, 213 license
+# rejections collapsing to these 9 atomic identifiers once OR/AND expressions
+# are broken down). Without this allow list, cargo-deny's default posture
+# denies every crate's license, which is what broke main after PR #68 wired
+# `cargo deny check` into CI without ever configuring a license policy.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-1-Clause",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "Unicode-3.0",
+    "Unlicense",
+    "Zlib",
+]
+
+[licenses.private]
+# solana-vault-prototype (programs/solana-vault-prototype) is an on-chain
+# program, never published to crates.io — see its Cargo.toml's `publish =
+# false`. Skip its own license-expression check rather than assign it a
+# license as a side effect of a CI fix: this repository currently has no
+# LICENSE file and no license decision on record (package.json's "ISC" looks
+# like unreviewed `npm init` boilerplate, not a deliberate choice). Choosing
+# a real project license is a separate product/legal decision for Malcolm,
+# tracked in docs/production-readiness/backlog.md, not implied here.
+ignore = true
 
 [checks]
 # Deny git dependencies (require crates.io/tarball releases)
