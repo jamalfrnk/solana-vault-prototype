@@ -1222,6 +1222,18 @@ renaming to `deny.toml`, since 9 other files already reference it. Recorded in
 than silently rewritten, since a second red run on the PR meant to fix exactly this
 class of mistake is itself worth an honest record.
 
+**Third failure, same PR:** with `--config` fixed, `cargo-deny.toml` was actually
+parsed for the first time in this repository's history — and rejected:
+`error[unexpected-keys]: found 2 unexpected keys, expected: ["advisories", "bans",
+"licenses", "sources", ...]`, on `[checks]` and `[policies]`, the two sections PR #52
+originally wrote for "deny git dependencies" and "deny yanked crates." Neither key
+exists in the current cargo-deny config schema — both sections were valid TOML but
+meaningless to the tool, and had been since PR #52, invisibly, because nothing had
+ever actually loaded this file before this PR's `--config` fix two commits earlier.
+Fixed by replacing them with their current schema equivalents (checked against
+cargo-deny's own docs, not guessed): `[advisories] yanked = "deny"` and `[sources]
+unknown-git = "deny"` / `allow-git = []`. Same intent, current keys.
+
 ## Post-MVP Roadmap (candidate pool — implementation requires separate approval)
 
 Milestones 0–14 are the MVP `PROJECT_CONTEXT.md` scoped from day one: a hardened,

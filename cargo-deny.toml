@@ -3,6 +3,12 @@
 [advisories]
 # Use the advisory DB and fail the check if any high/critical advisories are found.
 #
+# `yanked = "deny"` replaces this file's old `[policies] deny-yanked = true` — that
+# key doesn't exist in the current cargo-deny config schema (`[checks]`/`[policies]`
+# aren't recognized top-level sections at all; see the [sources] section below for
+# why this was never actually caught until now). Default is "warn", not "deny".
+yanked = "deny"
+#
 # The five entries below are transitive, unmaintained-crate advisories deep
 # inside the pinned Agave v3.1.10 / Anchor 1.0.2 toolchain's own dependency
 # graph, not crates this repository selects directly, and none has a safe
@@ -63,12 +69,14 @@ allow = [
 # tracked in docs/production-readiness/backlog.md, not implied here.
 ignore = true
 
-[checks]
-# Deny git dependencies (require crates.io/tarball releases)
-deny = [
-  { type = "git" }
-]
-
-[policies]
-# Deny yanked crates by default
-deny-yanked = true
+[sources]
+# Deny git dependencies (require crates.io/tarball releases). Replaces this file's
+# old `[checks] deny = [{ type = "git" }]`, which used a config schema the currently
+# installed cargo-deny doesn't recognize (see the `[advisories] yanked` comment
+# above). No git dependencies exist in Cargo.lock today (every `source =` line is
+# crates.io) — verified manually, not by this check having ever actually run before
+# this fix (its own CI run is the first execution of the whole file, since earlier
+# `cargo deny check` invocations didn't even load this file — see ROADMAP.md's
+# SUPPLY-002 entry for the full incident history).
+unknown-git = "deny"
+allow-git = []

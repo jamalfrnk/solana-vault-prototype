@@ -429,6 +429,21 @@ it by that name. This was caught by actually reading what the CI log's own warni
 line meant, rather than assuming a second red run meant the same already-diagnosed
 cause — the exact discipline this whole incident is about.
 
+**Second correction (same day, PR #69's second CI run):** with `--config` now
+working, cargo-deny actually parsed `cargo-deny.toml` for the first time in this
+repository's history — and rejected it outright: `error[unexpected-keys]: found 2
+unexpected keys, expected: ["advisories", "bans", "licenses", "sources", "graph",
+"targets", "exclude", "features", "all-features", "no-default-features",
+"exclude-dev", "output", "feature-depth"]`, pointing at `[checks]` and `[policies]`
+— the two sections PR #52 originally added for "deny git dependencies" and "deny
+yanked crates." Neither key exists in the config schema of the cargo-deny version
+this CI installs; both sections had been syntactically present but functionally
+inert since PR #52, silently, because nothing had ever actually parsed this file
+before this PR's `--config` fix. Replaced with their current equivalents, verified
+against cargo-deny's own documentation: `[advisories] yanked = "deny"`
+(yanked-crate denial) and `[sources] unknown-git = "deny"` / `allow-git = []`
+(git-dependency denial). Same intent as the original two sections, current schema.
+
 ## Governance readiness (M16)
 
 `pause_authority`'s constraint surface is `Signer` + key equality only — no on-curve
