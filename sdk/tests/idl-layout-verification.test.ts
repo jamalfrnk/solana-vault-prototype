@@ -315,10 +315,10 @@ describe("full IDL account-layout verification", () => {
   it("rejects a changed OperationalState enum definition", () => {
     const idl = validIdl() as any;
     idl.types.find(
-      (entry: any) => entry.name === "OperationalState"
+      (entry: any) => entry.name === "OperationalState",
     ).type.variants[1].name = "Paused";
     expect(verifyIdlDocument(idl).join("\n")).to.match(
-      /OperationalState.*variant.*1/i
+      /OperationalState.*variant.*1/i,
     );
   });
 
@@ -326,7 +326,7 @@ describe("full IDL account-layout verification", () => {
     const idl = validIdl() as any;
     idl.instructions.find((entry: any) => entry.name === "pause").args = [];
     expect(verifyIdlDocument(idl).join("\n")).to.match(
-      /instruction pause.*expected 1 args/i
+      /instruction pause.*expected 1 args/i,
     );
   });
 
@@ -335,24 +335,24 @@ describe("full IDL account-layout verification", () => {
     delete idl.instructions.find((entry: any) => entry.name === "initialize")
       .args;
     expect(verifyIdlDocument(idl).join("\n")).to.match(
-      /instruction initialize.*args missing/i
+      /instruction initialize.*args missing/i,
     );
   });
 
   it("rejects a changed OperationalStateReason enum definition", () => {
     const idl = validIdl() as any;
     idl.types.find(
-      (entry: any) => entry.name === "OperationalStateReason"
+      (entry: any) => entry.name === "OperationalStateReason",
     ).type.variants[2].name = "ManualOverride";
     expect(verifyIdlDocument(idl).join("\n")).to.match(
-      /OperationalStateReason.*variant.*2/i
+      /OperationalStateReason.*variant.*2/i,
     );
   });
 
   it("rejects a resized ProtocolConfig reserved region", () => {
     const idl = validIdl() as any;
     const fields = idl.types.find(
-      (entry: any) => entry.name === "ProtocolConfig"
+      (entry: any) => entry.name === "ProtocolConfig",
     ).type.fields;
     fields[6].type.array[1] = 61;
     const errors = verifyIdlDocument(idl).join("\n");
@@ -363,13 +363,13 @@ describe("full IDL account-layout verification", () => {
   it("rejects MintConfig layout, RolloutStage, and event drift", () => {
     const idl = validIdl() as any;
     idl.types.find(
-      (entry: any) => entry.name === "MintConfig"
+      (entry: any) => entry.name === "MintConfig",
     ).type.fields[13].type.array[1] = 72;
     idl.types.find(
-      (entry: any) => entry.name === "RolloutStage"
+      (entry: any) => entry.name === "RolloutStage",
     ).type.variants[1].name = "Pilot";
     idl.types.find(
-      (entry: any) => entry.name === "MintConfigChanged"
+      (entry: any) => entry.name === "MintConfigChanged",
     ).type.fields[13].name = "kind";
     const errors = verifyIdlDocument(idl).join("\n");
     expect(errors).to.match(/MintConfig.*reserved|field.*13|160|size/i);
@@ -382,7 +382,7 @@ describe("full IDL account-layout verification", () => {
     idl.instructions.find((entry: any) => entry.name === "sweep_excess").args =
       [{ name: "amount", type: "u64" }];
     idl.types.find(
-      (entry: any) => entry.name === "ExcessSwept"
+      (entry: any) => entry.name === "ExcessSwept",
     ).type.fields[4].name = "requested_amount";
     const errors = verifyIdlDocument(idl).join("\n");
     expect(errors).to.match(/instruction sweep_excess.*expected 0 args/i);

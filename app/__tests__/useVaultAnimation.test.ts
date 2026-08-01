@@ -74,10 +74,14 @@ describe("useVaultAnimation", () => {
   });
 
   it("cleans up timers on unmount (no state updates after unmount)", () => {
-    const { result, unmount } = renderHook(() => useVaultAnimation({ dwellMs: 1000 }));
+    const { result, unmount } = renderHook(() =>
+      useVaultAnimation({ dwellMs: 1000 }),
+    );
     act(() => result.current.openVault());
     unmount();
     // Advancing past every scheduled transition must not throw or warn.
-    act(() => vi.advanceTimersByTime(UNLOCK_MS + SWING_MS + 1000 + CLOSE_MS + 100));
+    act(() =>
+      vi.advanceTimersByTime(UNLOCK_MS + SWING_MS + 1000 + CLOSE_MS + 100),
+    );
   });
 });

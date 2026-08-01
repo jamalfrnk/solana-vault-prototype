@@ -15,7 +15,7 @@ function u64(data: Buffer, offset: number, value: bigint): void {
   new DataView(data.buffer, data.byteOffset, data.byteLength).setBigUint64(
     offset,
     value,
-    true
+    true,
   );
 }
 
@@ -23,14 +23,14 @@ function i64(data: Buffer, offset: number, value: bigint): void {
   new DataView(data.buffer, data.byteOffset, data.byteLength).setBigInt64(
     offset,
     value,
-    true
+    true,
   );
 }
 
 function validMintConfig(
   mint: PublicKey,
   pending = false,
-  enabled = false
+  enabled = false,
 ): Buffer {
   const data = Buffer.alloc(MINT_CONFIG_LEN);
   accountDiscriminator("MintConfig").copy(data, 0);
@@ -166,7 +166,7 @@ describe("MintConfig strict decoding", () => {
     expect(await fetchMintConfig(connection, mint)).to.equal(null);
     present = true;
     expect(
-      (await fetchMintConfig(connection, mint))?.mint.equals(mint)
+      (await fetchMintConfig(connection, mint))?.mint.equals(mint),
     ).to.equal(true);
   });
 });

@@ -36,10 +36,10 @@ import { PROGRAM_ID } from "../sdk/src/constants";
 const VAULT_SEED = Buffer.from("vault");
 const VAULT_AUTHORITY_SEED = Buffer.from("vault_authority");
 const TOKEN_PROGRAM_ID = new PublicKey(
-  "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+  "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
 );
 const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey(
-  "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+  "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
 );
 const SYSTEM_PROGRAM_ID = new PublicKey("11111111111111111111111111111111");
 const RPC_URL = "https://api.devnet.solana.com";
@@ -65,7 +65,7 @@ function requireKeypairPath(args: string[]): string {
   if (index === -1 || !args[index + 1]) {
     throw new Error(
       "Missing required --keypair <path> flag. This script never falls back " +
-        "to a default wallet; pass the path to a funded devnet keypair explicitly."
+        "to a default wallet; pass the path to a funded devnet keypair explicitly.",
     );
   }
   return args[index + 1];
@@ -74,14 +74,14 @@ function requireKeypairPath(args: string[]): string {
 async function getAta(owner: PublicKey, mint: PublicKey): Promise<PublicKey> {
   const [ata] = PublicKey.findProgramAddressSync(
     [owner.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(), mint.toBuffer()],
-    ASSOCIATED_TOKEN_PROGRAM_ID
+    ASSOCIATED_TOKEN_PROGRAM_ID,
   );
   return ata;
 }
 
 async function getTokenBalance(
   connection: Connection,
-  ata: PublicKey
+  ata: PublicKey,
 ): Promise<number> {
   try {
     const info = await connection.getTokenAccountBalance(ata);
@@ -105,7 +105,7 @@ async function main(): Promise<void> {
   console.log(
     `Balance: ${
       (await connection.getBalance(payer.publicKey)) / LAMPORTS_PER_SOL
-    } SOL`
+    } SOL`,
   );
 
   // Pause authority must be different from payer (enforced on-chain).
@@ -119,7 +119,7 @@ async function main(): Promise<void> {
         fromPubkey: payer.publicKey,
         toPubkey: pauseAuthority.publicKey,
         lamports: 0.01 * LAMPORTS_PER_SOL,
-      })
+      }),
     );
     const fundSig = await sendAndConfirmTransaction(connection, fundTx, [
       payer,
@@ -160,13 +160,13 @@ async function main(): Promise<void> {
         },
       ],
       data: INITIALIZE_MINT_IX_DATA,
-    }
+    },
   );
 
   const mintSetupSig = await sendAndConfirmTransaction(
     connection,
     createMintTx,
-    [payer, mintKp]
+    [payer, mintKp],
   );
   const mintPk = mintKp.publicKey;
   console.log(`\nMint created: ${mintPk.toBase58()}`);
@@ -191,7 +191,7 @@ async function main(): Promise<void> {
   const createAtaSig = await sendAndConfirmTransaction(
     connection,
     createAtaTx,
-    [payer]
+    [payer],
   );
   console.log(`\nUser ATA created: ${userAta.toBase58()}`);
   console.log(`  ${explorerUrl(createAtaSig)}`);
@@ -231,19 +231,19 @@ async function main(): Promise<void> {
   const idl = JSON.parse(
     fs.readFileSync(
       path.join(__dirname, "../target/idl/solana_vault_prototype.json"),
-      "utf-8"
-    )
+      "utf-8",
+    ),
   );
   const program = new anchor.Program(idl, provider);
 
   // Derive PDAs.
   const [vaultStatePda] = PublicKey.findProgramAddressSync(
     [VAULT_SEED, mintPk.toBuffer()],
-    PROGRAM_ID
+    PROGRAM_ID,
   );
   const [vaultAuthorityPda] = PublicKey.findProgramAddressSync(
     [VAULT_AUTHORITY_SEED, vaultStatePda.toBuffer()],
-    PROGRAM_ID
+    PROGRAM_ID,
   );
   const custodyAta = await getAta(vaultAuthorityPda, mintPk);
 
@@ -286,7 +286,7 @@ async function main(): Promise<void> {
       vaultStatePda.toBuffer(),
       payer.publicKey.toBuffer(),
     ],
-    PROGRAM_ID
+    PROGRAM_ID,
   );
 
   const depositSig: string = await (program.methods as any)

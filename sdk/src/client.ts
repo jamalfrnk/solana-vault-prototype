@@ -52,7 +52,7 @@ import { parseVaultError } from "./errors";
 export class VaultClient {
   constructor(
     private readonly connection: Connection,
-    private readonly mint: PublicKey
+    private readonly mint: PublicKey,
   ) {}
 
   get vaultStatePda(): PdaResult {
@@ -66,7 +66,7 @@ export class VaultClient {
   buildInitializeIx(
     payer: PublicKey,
     pauseAuthority: PublicKey,
-    protocolGovernanceAuthority: PublicKey = pauseAuthority
+    protocolGovernanceAuthority: PublicKey = pauseAuthority,
   ): TransactionInstruction {
     return buildInitializeIx({
       payer,
@@ -86,14 +86,14 @@ export class VaultClient {
 
   buildPauseIx(
     pauseAuthority: PublicKey,
-    reason: OperationalStateReason
+    reason: OperationalStateReason,
   ): TransactionInstruction {
     return buildPauseIx({ pauseAuthority, mint: this.mint, reason });
   }
 
   buildUnpauseIx(
     pauseAuthority: PublicKey,
-    reason: OperationalStateReason
+    reason: OperationalStateReason,
   ): TransactionInstruction {
     return buildUnpauseIx({ pauseAuthority, mint: this.mint, reason });
   }
@@ -103,7 +103,7 @@ export class VaultClient {
     upgradeAuthority: PublicKey,
     protocolGovernanceAuthority: PublicKey,
     emergencyAuthority: PublicKey,
-    treasury: PublicKey
+    treasury: PublicKey,
   ): TransactionInstruction {
     return buildInitializeProtocolConfigIx({
       payer,
@@ -116,7 +116,7 @@ export class VaultClient {
 
   buildEmergencyPauseIx(
     emergencyAuthority: PublicKey,
-    reason: OperationalStateReason
+    reason: OperationalStateReason,
   ): TransactionInstruction {
     return buildEmergencyPauseIx({
       emergencyAuthority,
@@ -127,7 +127,7 @@ export class VaultClient {
 
   buildEmergencyResumeIx(
     emergencyAuthority: PublicKey,
-    reason: OperationalStateReason
+    reason: OperationalStateReason,
   ): TransactionInstruction {
     return buildEmergencyResumeIx({
       emergencyAuthority,
@@ -139,7 +139,7 @@ export class VaultClient {
   /** M18: current authority proposes the next one (two-step rotation, step 1). */
   buildProposePauseAuthorityIx(
     pauseAuthority: PublicKey,
-    newAuthority: PublicKey
+    newAuthority: PublicKey,
   ): TransactionInstruction {
     return buildProposePauseAuthorityIx({
       pauseAuthority,
@@ -150,7 +150,7 @@ export class VaultClient {
 
   /** M18: the proposed authority accepts, completing the rotation (step 2). */
   buildAcceptPauseAuthorityIx(
-    newPauseAuthority: PublicKey
+    newPauseAuthority: PublicKey,
   ): TransactionInstruction {
     return buildAcceptPauseAuthorityIx({ newPauseAuthority, mint: this.mint });
   }
@@ -162,7 +162,7 @@ export class VaultClient {
 
   buildInitializeMintConfigIx(
     payer: PublicKey,
-    protocolGovernanceAuthority: PublicKey
+    protocolGovernanceAuthority: PublicKey,
   ): TransactionInstruction {
     return buildInitializeMintConfigIx({
       payer,
@@ -176,7 +176,7 @@ export class VaultClient {
     enabled: boolean,
     maxTotalAssets: bigint,
     maxDepositAssetsPerTransaction: bigint,
-    rolloutStage: RolloutStage
+    rolloutStage: RolloutStage,
   ): TransactionInstruction {
     return buildProposeMintConfigUpdateIx({
       protocolGovernanceAuthority,
@@ -193,7 +193,7 @@ export class VaultClient {
   }
 
   buildDisableMintIx(
-    protocolGovernanceAuthority: PublicKey
+    protocolGovernanceAuthority: PublicKey,
   ): TransactionInstruction {
     return buildDisableMintIx({
       protocolGovernanceAuthority,
@@ -204,7 +204,7 @@ export class VaultClient {
   buildLowerMintCapsIx(
     pauseAuthority: PublicKey,
     maxTotalAssets: bigint,
-    maxDepositAssetsPerTransaction: bigint
+    maxDepositAssetsPerTransaction: bigint,
   ): TransactionInstruction {
     return buildLowerMintCapsIx({
       pauseAuthority,
@@ -216,7 +216,7 @@ export class VaultClient {
 
   buildSweepExcessIx(
     protocolGovernanceAuthority: PublicKey,
-    treasury: PublicKey
+    treasury: PublicKey,
   ): TransactionInstruction {
     return buildSweepExcessIx({
       protocolGovernanceAuthority,
@@ -244,7 +244,7 @@ export class VaultClient {
   /** Sends and confirms a transaction; on failure, rethrows a ParsedVaultError-augmented Error. */
   async sendAndConfirm(
     ixs: TransactionInstruction[],
-    signers: Signer[]
+    signers: Signer[],
   ): Promise<string> {
     const tx = new Transaction().add(...ixs);
     try {

@@ -3,9 +3,10 @@ import { Keypair, PublicKey } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID } from "../../../sdk/src";
 
 vi.mock("@vault-sdk", async () => {
-  const actual = await vi.importActual<typeof import("../../../sdk/src")>(
-    "../../../sdk/src"
-  );
+  const actual =
+    await vi.importActual<typeof import("../../../sdk/src")>(
+      "../../../sdk/src",
+    );
   return {
     ...actual,
     // PDA derivation has its own SDK tests. Keep this suite focused on the
@@ -23,7 +24,7 @@ import {
 function tokenAccountData(
   mint: PublicKey,
   owner: PublicKey,
-  amount: bigint
+  amount: bigint,
 ): Uint8Array {
   const data = new Uint8Array(165);
   data.set(mint.toBytes(), 0);
@@ -43,12 +44,12 @@ describe("fetchWalletAssetBalance", () => {
       fetchWalletAssetBalance(
         connection as never,
         Keypair.generate().publicKey,
-        Keypair.generate().publicKey
-      )
+        Keypair.generate().publicKey,
+      ),
     ).resolves.to.equal(0n);
     expect(connection.getAccountInfo).toHaveBeenCalledWith(
       new PublicKey("11111111111111111111111111111111"),
-      "confirmed"
+      "confirmed",
     );
   });
 
@@ -64,7 +65,7 @@ describe("fetchWalletAssetBalance", () => {
     };
 
     await expect(
-      fetchWalletAssetBalance(connection as never, owner, mint)
+      fetchWalletAssetBalance(connection as never, owner, mint),
     ).resolves.to.equal(9_007_199_254_740_993n);
   });
 
@@ -98,7 +99,7 @@ describe("fetchWalletAssetBalance", () => {
     for (const account of cases) {
       const connection = { getAccountInfo: vi.fn().mockResolvedValue(account) };
       await expect(
-        fetchWalletAssetBalance(connection as never, owner, mint)
+        fetchWalletAssetBalance(connection as never, owner, mint),
       ).rejects.toThrow(/invalid canonical token account/i);
     }
   });
@@ -111,8 +112,8 @@ describe("estimateRedeemableAssets", () => {
       estimateRedeemableAssets(
         9_007_199_254_740_993n,
         18_014_398_509_481_986n,
-        9_007_199_254_740_993n
-      )
+        9_007_199_254_740_993n,
+      ),
     ).to.equal(18_014_398_509_481_986n);
   });
 

@@ -18,7 +18,11 @@ import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { Transaction, TransactionInstruction } from "@solana/web3.js";
 
 import { IDLE, TxState, isBusy } from "../lib/transaction-state";
-import { classifyError, errorMessage, isWalletRejection } from "../lib/transaction-messages";
+import {
+  classifyError,
+  errorMessage,
+  isWalletRejection,
+} from "../lib/transaction-messages";
 
 export interface RunOptions {
   /** Returns a human-readable problem, or null when the input is valid. */
@@ -57,14 +61,19 @@ export function useTransactionLifecycle() {
         setState({ phase: "validating" });
         const problem = opts.validate();
         if (problem) {
-          setState({ phase: "error", kind: "invalid_amount", message: problem });
+          setState({
+            phase: "error",
+            kind: "invalid_amount",
+            message: problem,
+          });
           return;
         }
 
         const tx = new Transaction().add(opts.buildIx());
         // Pin the confirmation window before submitting so confirmTransaction
         // can detect blockhash expiry instead of hanging forever.
-        const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+        const { blockhash, lastValidBlockHeight } =
+          await connection.getLatestBlockhash();
 
         setState({ phase: "awaiting_wallet" });
         signature = await sendTransaction(tx, connection);

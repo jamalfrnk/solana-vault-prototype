@@ -4,7 +4,10 @@ import { parseTokenAmount, formatTokenAmount } from "../../lib/solana/amounts";
 
 describe("parseTokenAmount", () => {
   it("scales whole tokens by decimals", () => {
-    expect(parseTokenAmount("100", 6)).to.deep.equal({ baseUnits: 100_000_000n, problem: null });
+    expect(parseTokenAmount("100", 6)).to.deep.equal({
+      baseUnits: 100_000_000n,
+      problem: null,
+    });
   });
 
   it("scales fractional tokens by decimals", () => {
@@ -27,13 +30,19 @@ describe("parseTokenAmount", () => {
   });
 
   it("rejects more fractional digits than the mint supports", () => {
-    expect(parseTokenAmount("1.1234567", 6).problem).to.match(/too many decimal places/i);
-    expect(parseTokenAmount("1.5", 0).problem).to.match(/too many decimal places/i);
+    expect(parseTokenAmount("1.1234567", 6).problem).to.match(
+      /too many decimal places/i,
+    );
+    expect(parseTokenAmount("1.5", 0).problem).to.match(
+      /too many decimal places/i,
+    );
   });
 
   it("rejects zero", () => {
     expect(parseTokenAmount("0", 6).problem).to.match(/greater than zero/i);
-    expect(parseTokenAmount("0.000000", 6).problem).to.match(/greater than zero/i);
+    expect(parseTokenAmount("0.000000", 6).problem).to.match(
+      /greater than zero/i,
+    );
   });
 });
 

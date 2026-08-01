@@ -44,7 +44,7 @@ const GOLDEN_EVENT_DISCRIMINATORS: Record<string, string> = {
 describe("discriminator", () => {
   describe("instructionDiscriminator", () => {
     for (const [name, hex] of Object.entries(
-      GOLDEN_INSTRUCTION_DISCRIMINATORS
+      GOLDEN_INSTRUCTION_DISCRIMINATORS,
     )) {
       it(`matches the golden value for "${name}"`, () => {
         expect(instructionDiscriminator(name).toString("hex")).to.equal(hex);
@@ -57,13 +57,13 @@ describe("discriminator", () => {
 
     it("is deterministic", () => {
       expect(instructionDiscriminator("deposit").toString("hex")).to.equal(
-        instructionDiscriminator("deposit").toString("hex")
+        instructionDiscriminator("deposit").toString("hex"),
       );
     });
 
     it("is pairwise distinct across all pinned vault instructions", () => {
       const values = Object.keys(GOLDEN_INSTRUCTION_DISCRIMINATORS).map(
-        (name) => instructionDiscriminator(name).toString("hex")
+        (name) => instructionDiscriminator(name).toString("hex"),
       );
       expect(new Set(values).size).to.equal(values.length);
     });

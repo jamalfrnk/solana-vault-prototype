@@ -46,10 +46,10 @@ const GOVERNANCE_PATH = path.join(KEYS_DIR, "devnet-governance-v1.json");
 const EMERGENCY_PATH = path.join(KEYS_DIR, "devnet-emergency-v1.json");
 const TREASURY_PATH = path.join(KEYS_DIR, "devnet-treasury-v1.json");
 const ATA_PROGRAM = new PublicKey(
-  "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+  "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
 );
 const RENT_SYSVAR = new PublicKey(
-  "SysvarRent111111111111111111111111111111111"
+  "SysvarRent111111111111111111111111111111111",
 );
 
 function explorerUrl(signature: string): string {
@@ -62,7 +62,7 @@ function saveKeypair(filePath: string, keypair: Keypair): void {
 
 function loadKeypair(filePath: string): Keypair {
   return Keypair.fromSecretKey(
-    Uint8Array.from(JSON.parse(fs.readFileSync(filePath, "utf-8")))
+    Uint8Array.from(JSON.parse(fs.readFileSync(filePath, "utf-8"))),
   );
 }
 
@@ -84,7 +84,7 @@ async function assertCurrentProgram(connection: Connection): Promise<void> {
   const account = await connection.getAccountInfo(PROGRAM_ID, COMMITMENT);
   if (!account?.executable) {
     throw new Error(
-      `Current devnet program ${PROGRAM_ID.toBase58()} is not deployed and executable`
+      `Current devnet program ${PROGRAM_ID.toBase58()} is not deployed and executable`,
     );
   }
 }
@@ -95,7 +95,7 @@ async function gen(connection: Connection): Promise<void> {
   console.log(
     generated.length === 0
       ? "All devnet keypairs already exist; reusing gitignored files."
-      : `Generated ${generated.length} gitignored devnet-only keypair(s).`
+      : `Generated ${generated.length} gitignored devnet-only keypair(s).`,
   );
 
   const payer = loadKeypair(PAYER_PATH);
@@ -109,22 +109,22 @@ async function gen(connection: Connection): Promise<void> {
     try {
       const signature = await connection.requestAirdrop(
         payer.publicKey,
-        2 * LAMPORTS_PER_SOL
+        2 * LAMPORTS_PER_SOL,
       );
       const blockhash = await connection.getLatestBlockhash(COMMITMENT);
       await connection.confirmTransaction(
         { signature, ...blockhash },
-        COMMITMENT
+        COMMITMENT,
       );
       console.log(`Airdrop confirmed: ${explorerUrl(signature)}`);
     } catch (error) {
       console.log(
         `Airdrop failed (devnet rate limits are common): ${
           (error as Error).message
-        }`
+        }`,
       );
       console.log(
-        `Fund ${payer.publicKey.toBase58()} at https://faucet.solana.com and rerun 'gen'.`
+        `Fund ${payer.publicKey.toBase58()} at https://faucet.solana.com and rerun 'gen'.`,
       );
     }
     balance = await connection.getBalance(payer.publicKey, COMMITMENT);
@@ -136,18 +136,18 @@ async function gen(connection: Connection): Promise<void> {
 async function genRoles(): Promise<void> {
   fs.mkdirSync(KEYS_DIR, { recursive: true });
   const generated = [GOVERNANCE_PATH, EMERGENCY_PATH, TREASURY_PATH].filter(
-    ensureKeypair
+    ensureKeypair,
   );
   console.log(
     generated.length === 0
       ? "All devnet role keypairs already exist; reusing gitignored files."
-      : `Generated ${generated.length} gitignored devnet-only role keypair(s).`
+      : `Generated ${generated.length} gitignored devnet-only role keypair(s).`,
   );
   console.log(
-    `Governance: ${loadKeypair(GOVERNANCE_PATH).publicKey.toBase58()}`
+    `Governance: ${loadKeypair(GOVERNANCE_PATH).publicKey.toBase58()}`,
   );
   console.log(
-    `Emergency:  ${loadKeypair(EMERGENCY_PATH).publicKey.toBase58()}`
+    `Emergency:  ${loadKeypair(EMERGENCY_PATH).publicKey.toBase58()}`,
   );
   console.log(`Treasury:   ${loadKeypair(TREASURY_PATH).publicKey.toBase58()}`);
   console.log("Private keys were not printed.");
@@ -168,11 +168,11 @@ async function bootstrap(connection: Connection): Promise<void> {
       !existing.treasury.equals(treasury.publicKey)
     ) {
       throw new Error(
-        "Existing ProtocolConfig roles do not match the local devnet manifest"
+        "Existing ProtocolConfig roles do not match the local devnet manifest",
       );
     }
     console.log(
-      "ProtocolConfig already exists and matches the local devnet manifest."
+      "ProtocolConfig already exists and matches the local devnet manifest.",
     );
     return;
   }
@@ -186,9 +186,9 @@ async function bootstrap(connection: Connection): Promise<void> {
         protocolGovernanceAuthority: governance.publicKey,
         emergencyAuthority: emergency.publicKey,
         treasury: treasury.publicKey,
-      })
+      }),
     ),
-    [payer]
+    [payer],
   );
   const config = await fetchProtocolConfig(connection);
   if (!config) {
@@ -208,13 +208,13 @@ async function init(connection: Connection): Promise<void> {
   const balance = await connection.getBalance(payer.publicKey, COMMITMENT);
   if (balance < 0.5 * LAMPORTS_PER_SOL) {
     throw new Error(
-      `Payer needs at least 0.5 SOL; fund ${payer.publicKey.toBase58()} at https://faucet.solana.com`
+      `Payer needs at least 0.5 SOL; fund ${payer.publicKey.toBase58()} at https://faucet.solana.com`,
     );
   }
 
   const walletBalance = await connection.getBalance(
     wallet.publicKey,
-    COMMITMENT
+    COMMITMENT,
   );
   const targetWalletBalance = 0.05 * LAMPORTS_PER_SOL;
   if (walletBalance < targetWalletBalance) {
@@ -225,9 +225,9 @@ async function init(connection: Connection): Promise<void> {
           fromPubkey: payer.publicKey,
           toPubkey: wallet.publicKey,
           lamports: targetWalletBalance - walletBalance,
-        })
+        }),
       ),
-      [payer]
+      [payer],
     );
   }
   console.log("Wallet has at least 0.05 SOL for UI transaction fees.");
@@ -257,9 +257,9 @@ async function init(connection: Connection): Promise<void> {
           { pubkey: RENT_SYSVAR, isSigner: false, isWritable: false },
         ],
         data: initializeMintData,
-      }
+      },
     ),
-    [payer, mintKeypair]
+    [payer, mintKeypair],
   );
   const mint = mintKeypair.publicKey;
   console.log(`\nMint created: ${mint.toBase58()}`);
@@ -279,7 +279,7 @@ async function init(connection: Connection): Promise<void> {
       ],
       data: Buffer.alloc(0),
     }),
-    [payer]
+    [payer],
   );
   const mintToData = Buffer.alloc(9);
   mintToData.writeUInt8(7, 0);
@@ -295,7 +295,7 @@ async function init(connection: Connection): Promise<void> {
       ],
       data: mintToData,
     }),
-    [payer]
+    [payer],
   );
   console.log(`Minted 10,000 tokens to wallet ATA: ${walletAta.toBase58()}`);
 
@@ -303,7 +303,7 @@ async function init(connection: Connection): Promise<void> {
   try {
     const signature = await client.sendAndConfirm(
       [client.buildInitializeIx(payer.publicKey, wallet.publicKey)],
-      [payer, wallet]
+      [payer, wallet],
     );
     console.log(`\nVault initialized: ${explorerUrl(signature)}`);
   } catch (error) {
@@ -317,13 +317,13 @@ async function init(connection: Connection): Promise<void> {
   const vaultAddress = client.vaultStatePda.address;
   const vaultAccount = await connection.getAccountInfo(
     vaultAddress,
-    COMMITMENT
+    COMMITMENT,
   );
   if (vaultAccount?.data.length !== VAULT_STATE_LEN) {
     throw new Error(
       `Fresh VaultState has ${
         vaultAccount?.data.length ?? 0
-      } bytes; expected ${VAULT_STATE_LEN}`
+      } bytes; expected ${VAULT_STATE_LEN}`,
     );
   }
   const state = await client.fetchVaultState();
@@ -333,7 +333,7 @@ async function init(connection: Connection): Promise<void> {
     state.operationalState !== OperationalState.Active
   ) {
     throw new Error(
-      "Fresh VaultState did not strictly decode as active version 1"
+      "Fresh VaultState did not strictly decode as active version 1",
     );
   }
 
@@ -343,12 +343,12 @@ async function init(connection: Connection): Promise<void> {
   console.log("EVERYTHING READY — dApp UI test");
   console.log(`${"=".repeat(72)}`);
   console.log(
-    "\n1. Use the RUNBOOK command to copy the burner private key locally;"
+    "\n1. Use the RUNBOOK command to copy the burner private key locally;",
   );
   console.log("   it is intentionally absent from logs and this output.");
   console.log(`   Expected wallet: ${wallet.publicKey.toBase58()}`);
   console.log(
-    "2. Phantom -> Settings -> Developer Settings -> Testnet Mode ON -> Solana Devnet."
+    "2. Phantom -> Settings -> Developer Settings -> Testnet Mode ON -> Solana Devnet.",
   );
   console.log("3. cd app; npm run dev  ->  http://localhost:3000");
   console.log("4. Connect the imported wallet and enter this mint address:");
@@ -369,7 +369,7 @@ async function main(): Promise<void> {
     await init(connection);
   } else {
     console.log(
-      "Usage: npx ts-node scripts/ui_test_vault_setup.ts <gen|gen-roles|bootstrap|init>"
+      "Usage: npx ts-node scripts/ui_test_vault_setup.ts <gen|gen-roles|bootstrap|init>",
     );
     process.exitCode = 1;
   }

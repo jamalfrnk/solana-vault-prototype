@@ -62,7 +62,7 @@ function isKnownVaultErrorCode(n: number): n is VaultErrorCode {
 
 /** Parses raw transaction logs for an AnchorError, reusing @anchor-lang/core's own log parser. */
 export function parseVaultErrorFromLogs(
-  logs: string[] | undefined
+  logs: string[] | undefined,
 ): ParsedVaultError {
   const anchorError = logs ? AnchorError.parse(logs) : null;
   if (!anchorError) {

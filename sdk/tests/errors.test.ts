@@ -10,7 +10,7 @@ import {
 function anchorErrorLogs(
   errorCode: string,
   errorNumber: number,
-  message: string
+  message: string,
 ): string[] {
   return [
     "Program FYqCCoAnM9tUYRcSRbeLbUE9LBPv8bN2uyuhcz46pSgq invoke [1]",
@@ -24,7 +24,7 @@ describe("errors", () => {
   describe("parseVaultErrorFromLogs", () => {
     it("parses VaultPaused (6000)", () => {
       const result = parseVaultErrorFromLogs(
-        anchorErrorLogs("VaultPaused", 6000, "Vault is paused")
+        anchorErrorLogs("VaultPaused", 6000, "Vault is paused"),
       );
       expect(result.code).to.equal(VaultErrorCode.VaultPaused);
       expect(result.message).to.include("Vault is paused");
@@ -35,8 +35,8 @@ describe("errors", () => {
         anchorErrorLogs(
           "InsufficientShares",
           6001,
-          "Insufficient shares for withdrawal"
-        )
+          "Insufficient shares for withdrawal",
+        ),
       );
       expect(result.code).to.equal(VaultErrorCode.InsufficientShares);
     });
@@ -46,8 +46,8 @@ describe("errors", () => {
         anchorErrorLogs(
           "InvalidVaultAuthorityOwner",
           6007,
-          "vault_authority PDA is not owned by the System Program"
-        )
+          "vault_authority PDA is not owned by the System Program",
+        ),
       );
       expect(result.code).to.equal(VaultErrorCode.InvalidVaultAuthorityOwner);
       expect(result.message).to.include("System Program");
@@ -96,8 +96,8 @@ describe("errors", () => {
           anchorErrorLogs(
             VaultErrorCode[number],
             number,
-            "M21 migration failure"
-          )
+            "M21 migration failure",
+          ),
         );
         expect(result.code).to.equal(number);
       }
@@ -116,8 +116,8 @@ describe("errors", () => {
         anchorErrorLogs(
           "ConstraintSeeds",
           2006,
-          "A seeds constraint was violated"
-        )
+          "A seeds constraint was violated",
+        ),
       );
       expect(result.code).to.equal(undefined);
       expect(result.message).to.include("seeds constraint");
@@ -138,7 +138,7 @@ describe("errors", () => {
         logs: anchorErrorLogs(
           "ZeroAmount",
           6002,
-          "Amount must be greater than zero"
+          "Amount must be greater than zero",
         ),
       });
       const result = parseVaultError(err);

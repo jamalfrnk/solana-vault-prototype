@@ -46,7 +46,7 @@ function hasDiscriminator(data: Buffer, name: string): boolean {
 async function getProgramAccountsBySize(
   connection: Connection,
   size: number,
-  programId: PublicKey
+  programId: PublicKey,
 ): Promise<ProgramAccount[]> {
   return [
     ...(await connection.getProgramAccounts(programId, {
@@ -58,7 +58,7 @@ async function getProgramAccountsBySize(
 
 async function getMultipleAccounts(
   connection: Connection,
-  addresses: PublicKey[]
+  addresses: PublicKey[],
 ): Promise<(AccountInfo<Buffer> | null)[]> {
   const result: (AccountInfo<Buffer> | null)[] = [];
   for (let start = 0; start < addresses.length; start += 100) {
@@ -67,8 +67,8 @@ async function getMultipleAccounts(
         addresses.slice(start, start + 100),
         {
           commitment: COMMITMENT,
-        }
-      ))
+        },
+      )),
     );
   }
   return result;
@@ -110,7 +110,7 @@ function parseCli(argv: string[]): {
 function custodyFacts(
   account: AccountInfo<Buffer> | null,
   expectedMint: PublicKey,
-  expectedAuthority: PublicKey
+  expectedAuthority: PublicKey,
 ) {
   if (!account) {
     return {
@@ -147,7 +147,7 @@ function custodyFacts(
 export async function buildInventory(
   connection: Connection,
   rpcLabel: string,
-  programId: PublicKey = PROGRAM_ID
+  programId: PublicKey = PROGRAM_ID,
 ) {
   const [legacyCandidates, currentCandidates, positionCandidates] =
     await Promise.all([
@@ -157,7 +157,7 @@ export async function buildInventory(
     ]);
 
   const vaultAccounts = [...legacyCandidates, ...currentCandidates].filter(
-    ({ account }) => hasDiscriminator(account.data, "VaultState")
+    ({ account }) => hasDiscriminator(account.data, "VaultState"),
   );
   const positions = positionCandidates
     .filter(({ account }) => hasDiscriminator(account.data, "UserPosition"))
@@ -166,7 +166,7 @@ export async function buildInventory(
       const expected = deriveUserPositionPda(
         decoded.vault,
         decoded.owner,
-        programId
+        programId,
       );
       return {
         address: pubkey.toBase58(),
@@ -191,7 +191,7 @@ export async function buildInventory(
   });
   const custodyAccounts = await getMultipleAccounts(
     connection,
-    custodyAddresses
+    custodyAddresses,
   );
 
   const vaults = inspectedVaults.map(
@@ -199,16 +199,16 @@ export async function buildInventory(
       const expectedVault = deriveVaultStatePda(inspection.mint, programId);
       const expectedAuthority = deriveVaultAuthorityPda(pubkey, programId);
       const linkedPositions = positions.filter(
-        (position) => position.vault === pubkey.toBase58()
+        (position) => position.vault === pubkey.toBase58(),
       );
       const positionShares = linkedPositions.reduce(
         (total, position) => total + BigInt(position.shares),
-        0n
+        0n,
       );
       const custody = custodyFacts(
         custodyAccounts[index],
         inspection.mint,
-        expectedAuthority.address
+        expectedAuthority.address,
       );
       const blockers: string[] = [];
       if (inspection.layout === "legacy-113")
@@ -282,12 +282,12 @@ export async function buildInventory(
         },
         blockers,
       };
-    }
+    },
   );
 
   const knownVaultAddresses = new Set(vaults.map((vault) => vault.address));
   const orphanPositions = positions.filter(
-    (position) => !knownVaultAddresses.has(position.vault)
+    (position) => !knownVaultAddresses.has(position.vault),
   );
   const blockerCount =
     vaults.reduce((count, vault) => count + vault.blockers.length, 0) +
@@ -304,7 +304,7 @@ export async function buildInventory(
       version0: vaults.filter((vault) => vault.layout === "v0-145").length,
       version1: vaults.filter((vault) => vault.layout === "v1-145").length,
       unsupported145: vaults.filter(
-        (vault) => vault.layout === "unsupported-145"
+        (vault) => vault.layout === "unsupported-145",
       ).length,
       userPositions: positions.length,
       orphanPositions: orphanPositions.length,
@@ -317,13 +317,13 @@ export async function buildInventory(
 
 async function main(): Promise<void> {
   const { endpoint, failOnBlockers, programId } = parseCli(
-    process.argv.slice(2)
+    process.argv.slice(2),
   );
   const connection = new Connection(endpoint, COMMITMENT);
   const inventory = await buildInventory(
     connection,
     publicRpcLabel(endpoint),
-    programId
+    programId,
   );
   process.stdout.write(`${JSON.stringify(inventory, null, 2)}\n`);
   if (failOnBlockers && inventory.summary.blockerCount > 0)
@@ -334,7 +334,7 @@ if (require.main === module) {
   main().catch((error: unknown) => {
     const kind = error instanceof Error ? error.name : "UnknownError";
     console.error(
-      `Legacy account inventory failed (${kind}). Verify RPC reachability and arguments; no transaction was sent.`
+      `Legacy account inventory failed (${kind}). Verify RPC reachability and arguments; no transaction was sent.`,
     );
     process.exitCode = 1;
   });

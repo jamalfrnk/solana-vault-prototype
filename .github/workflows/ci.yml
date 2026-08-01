@@ -132,6 +132,9 @@ jobs:
       - name: typecheck
         run: corepack yarn typecheck
 
+      - name: lint (prettier --check)
+        run: corepack yarn lint
+
       - name: SDK tests
         run: corepack yarn test:sdk
 

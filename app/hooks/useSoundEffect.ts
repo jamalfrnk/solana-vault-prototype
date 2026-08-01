@@ -42,7 +42,10 @@ function bellStrike(
     osc.frequency.value = fundamental * ratio;
     gain.gain.setValueAtTime(0, at);
     gain.gain.linearRampToValueAtTime(peak * level, at + 0.006);
-    gain.gain.exponentialRampToValueAtTime(0.0001, at + duration / ratio ** 0.5);
+    gain.gain.exponentialRampToValueAtTime(
+      0.0001,
+      at + duration / ratio ** 0.5,
+    );
     osc.connect(gain).connect(ctx.destination);
     osc.start(at);
     osc.stop(at + duration + 0.05);
@@ -119,7 +122,8 @@ export function useSoundEffect() {
     try {
       const Ctor =
         window.AudioContext ??
-        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+        (window as unknown as { webkitAudioContext?: typeof AudioContext })
+          .webkitAudioContext;
       if (!Ctor) return;
       ctxRef.current ??= new Ctor();
       const ctx = ctxRef.current;

@@ -25,9 +25,7 @@ import {
 } from "../sdk/src/discriminator";
 
 type IdlType =
-  | string
-  | { array: [IdlType, number] }
-  | { defined: { name: string } };
+  string | { array: [IdlType, number] } | { defined: { name: string } };
 
 interface IdlField {
   name: string;
@@ -270,7 +268,7 @@ function snakeToCamel(name: string): string {
 
 function findNamed<T extends { name: string }>(
   entries: T[],
-  name: string
+  name: string,
 ): T | undefined {
   return (
     entries.find((entry) => entry.name === name) ??
@@ -294,7 +292,7 @@ function fixedSerializedSize(
   definitions: IdlTypeDefinition[],
   errors: string[],
   context: string,
-  seen = new Set<string>()
+  seen = new Set<string>(),
 ): number | null {
   if (typeof type === "string") {
     const sizes: Record<string, number> = {
@@ -316,7 +314,7 @@ function fixedSerializedSize(
       definitions,
       errors,
       `${context}[]`,
-      seen
+      seen,
     );
     return memberSize === null ? null : memberSize * length;
   }
@@ -324,7 +322,7 @@ function fixedSerializedSize(
     const name = type.defined.name;
     if (seen.has(name)) {
       errors.push(
-        `${context}: recursive defined type ${name} has no fixed size`
+        `${context}: recursive defined type ${name} has no fixed size`,
       );
       return null;
     }
@@ -337,7 +335,7 @@ function fixedSerializedSize(
       const variants = definition.type.variants ?? [];
       if (variants.some((variant) => variant.fields !== undefined)) {
         errors.push(
-          `${context}: enum ${name} has payload variants and is not one fixed byte`
+          `${context}: enum ${name} has payload variants and is not one fixed byte`,
         );
         return null;
       }
@@ -352,7 +350,7 @@ function fixedSerializedSize(
           definitions,
           errors,
           `${context}.${field.name}`,
-          nextSeen
+          nextSeen,
         );
         if (size === null) return null;
         total += size;
@@ -360,7 +358,7 @@ function fixedSerializedSize(
       return total;
     }
     errors.push(
-      `${context}: defined type ${name} has unsupported kind ${definition.type.kind}`
+      `${context}: defined type ${name} has unsupported kind ${definition.type.kind}`,
     );
     return null;
   }
@@ -391,7 +389,7 @@ export function verifyIdlDocument(value: unknown): string[] {
       errors.push(
         `instruction ${name}: IDL discriminator [${
           entry.discriminator
-        }] != SDK [${Array.from(expected)}]`
+        }] != SDK [${Array.from(expected)}]`,
       );
     }
 
@@ -401,7 +399,7 @@ export function verifyIdlDocument(value: unknown): string[] {
     const actualArgs = entry.args ?? [];
     if (actualArgs.length !== expectedArgs.length) {
       errors.push(
-        `instruction ${name}: expected ${expectedArgs.length} args, got ${actualArgs.length}`
+        `instruction ${name}: expected ${expectedArgs.length} args, got ${actualArgs.length}`,
       );
     }
     const argCount = Math.max(actualArgs.length, expectedArgs.length);
@@ -411,7 +409,7 @@ export function verifyIdlDocument(value: unknown): string[] {
       if (!actual || !expectedArg) continue;
       if (actual.name !== expectedArg.name) {
         errors.push(
-          `instruction ${name} arg ${i}: expected name ${expectedArg.name}, got ${actual.name}`
+          `instruction ${name} arg ${i}: expected name ${expectedArg.name}, got ${actual.name}`,
         );
       }
       if (typeText(actual.type) !== typeText(expectedArg.type)) {
@@ -419,8 +417,8 @@ export function verifyIdlDocument(value: unknown): string[] {
           `instruction ${name} arg ${i} (${
             expectedArg.name
           }): expected type ${typeText(expectedArg.type)}, got ${typeText(
-            actual.type
-          )}`
+            actual.type,
+          )}`,
         );
       }
     }
@@ -438,7 +436,7 @@ export function verifyIdlDocument(value: unknown): string[] {
         errors.push(
           `account ${name}: IDL discriminator [${
             account.discriminator
-          }] != SDK [${Array.from(expected)}]`
+          }] != SDK [${Array.from(expected)}]`,
         );
       }
     }
@@ -446,19 +444,19 @@ export function verifyIdlDocument(value: unknown): string[] {
     const definition = findNamed(definitions, name);
     if (!definition || definition.type.kind !== "struct") {
       errors.push(
-        `account ${name}: matching struct definition missing from IDL types`
+        `account ${name}: matching struct definition missing from IDL types`,
       );
       continue;
     }
     const actualFields = definition.type.fields ?? [];
     if (actualFields.length !== expectedLayout.fields.length) {
       errors.push(
-        `account ${name}: expected ${expectedLayout.fields.length} fields, got ${actualFields.length}`
+        `account ${name}: expected ${expectedLayout.fields.length} fields, got ${actualFields.length}`,
       );
     }
     const fieldCount = Math.max(
       actualFields.length,
-      expectedLayout.fields.length
+      expectedLayout.fields.length,
     );
     for (let i = 0; i < fieldCount; i += 1) {
       const actual = actualFields[i];
@@ -466,7 +464,7 @@ export function verifyIdlDocument(value: unknown): string[] {
       if (!actual || !expected) continue;
       if (actual.name !== expected.name) {
         errors.push(
-          `account ${name} field ${i}: expected name ${expected.name}, got ${actual.name}`
+          `account ${name} field ${i}: expected name ${expected.name}, got ${actual.name}`,
         );
       }
       if (typeText(actual.type) !== typeText(expected.type)) {
@@ -474,8 +472,8 @@ export function verifyIdlDocument(value: unknown): string[] {
           `account ${name} field ${i} (${
             expected.name
           }): expected type ${typeText(expected.type)}, got ${typeText(
-            actual.type
-          )}`
+            actual.type,
+          )}`,
         );
       }
     }
@@ -487,7 +485,7 @@ export function verifyIdlDocument(value: unknown): string[] {
         field.type,
         definitions,
         errors,
-        `account ${name}.${field.name}`
+        `account ${name}.${field.name}`,
       );
       if (size === null) fixed = false;
       else bodySize += size;
@@ -496,7 +494,7 @@ export function verifyIdlDocument(value: unknown): string[] {
       errors.push(
         `account ${name}: serialized size is ${bodySize + 8}, expected ${
           expectedLayout.accountSize
-        }`
+        }`,
       );
     }
   }
@@ -513,7 +511,7 @@ export function verifyIdlDocument(value: unknown): string[] {
         errors.push(
           `event ${name}: IDL discriminator [${
             event.discriminator
-          }] != SDK [${Array.from(expected)}]`
+          }] != SDK [${Array.from(expected)}]`,
         );
       }
     }
@@ -521,7 +519,7 @@ export function verifyIdlDocument(value: unknown): string[] {
     const definition = findNamed(definitions, name);
     if (!definition || definition.type.kind !== "struct") {
       errors.push(
-        `event ${name}: matching struct definition missing from IDL types`
+        `event ${name}: matching struct definition missing from IDL types`,
       );
       continue;
     }
@@ -532,7 +530,7 @@ export function verifyIdlDocument(value: unknown): string[] {
     }));
     if (typeText(actualWireFields) !== typeText(expectedLayout.fields)) {
       errors.push(
-        `event ${name}: field order/types do not match the frozen layout`
+        `event ${name}: field order/types do not match the frozen layout`,
       );
     }
     let bodySize = 0;
@@ -542,7 +540,7 @@ export function verifyIdlDocument(value: unknown): string[] {
         field.type,
         definitions,
         errors,
-        `event ${name}.${field.name}`
+        `event ${name}.${field.name}`,
       );
       if (size === null) fixed = false;
       else bodySize += size;
@@ -551,7 +549,7 @@ export function verifyIdlDocument(value: unknown): string[] {
       errors.push(
         `event ${name}: serialized size is ${bodySize + 8}, expected ${
           expectedLayout.eventSize
-        }`
+        }`,
       );
     }
   }
@@ -563,19 +561,19 @@ export function verifyIdlDocument(value: unknown): string[] {
     const variants = operationalState.type.variants ?? [];
     if (variants.length !== OPERATIONAL_STATE_VARIANTS.length) {
       errors.push(
-        `OperationalState: expected ${OPERATIONAL_STATE_VARIANTS.length} variants, got ${variants.length}`
+        `OperationalState: expected ${OPERATIONAL_STATE_VARIANTS.length} variants, got ${variants.length}`,
       );
     }
     for (let i = 0; i < OPERATIONAL_STATE_VARIANTS.length; i += 1) {
       if (!variants[i]) continue;
       if (variants[i].name !== OPERATIONAL_STATE_VARIANTS[i]) {
         errors.push(
-          `OperationalState variant ${i}: expected ${OPERATIONAL_STATE_VARIANTS[i]}, got ${variants[i].name}`
+          `OperationalState variant ${i}: expected ${OPERATIONAL_STATE_VARIANTS[i]}, got ${variants[i].name}`,
         );
       }
       if (variants[i].fields !== undefined) {
         errors.push(
-          `OperationalState variant ${i}: payload fields are not allowed`
+          `OperationalState variant ${i}: payload fields are not allowed`,
         );
       }
     }
@@ -583,29 +581,29 @@ export function verifyIdlDocument(value: unknown): string[] {
 
   const operationalStateReason = findNamed(
     definitions,
-    "OperationalStateReason"
+    "OperationalStateReason",
   );
   if (!operationalStateReason || operationalStateReason.type.kind !== "enum") {
     errors.push(
-      "OperationalStateReason enum definition missing from IDL types"
+      "OperationalStateReason enum definition missing from IDL types",
     );
   } else {
     const variants = operationalStateReason.type.variants ?? [];
     if (variants.length !== OPERATIONAL_STATE_REASON_VARIANTS.length) {
       errors.push(
-        `OperationalStateReason: expected ${OPERATIONAL_STATE_REASON_VARIANTS.length} variants, got ${variants.length}`
+        `OperationalStateReason: expected ${OPERATIONAL_STATE_REASON_VARIANTS.length} variants, got ${variants.length}`,
       );
     }
     for (let i = 0; i < OPERATIONAL_STATE_REASON_VARIANTS.length; i += 1) {
       if (!variants[i]) continue;
       if (variants[i].name !== OPERATIONAL_STATE_REASON_VARIANTS[i]) {
         errors.push(
-          `OperationalStateReason variant ${i}: expected ${OPERATIONAL_STATE_REASON_VARIANTS[i]}, got ${variants[i].name}`
+          `OperationalStateReason variant ${i}: expected ${OPERATIONAL_STATE_REASON_VARIANTS[i]}, got ${variants[i].name}`,
         );
       }
       if (variants[i].fields !== undefined) {
         errors.push(
-          `OperationalStateReason variant ${i}: payload fields are not allowed`
+          `OperationalStateReason variant ${i}: payload fields are not allowed`,
         );
       }
     }
@@ -620,7 +618,7 @@ export function verifyIdlDocument(value: unknown): string[] {
     typeText(rolloutStageVariants.map((name) => ({ name })))
   ) {
     errors.push(
-      "RolloutStage variants do not match Devnet/Canary/Limited/Expanded"
+      "RolloutStage variants do not match Devnet/Canary/Limited/Expanded",
     );
   }
 
@@ -640,14 +638,14 @@ function main(): void {
   if (errors.length > 0) {
     for (const error of errors) console.error(`x ${error}`);
     console.error(
-      "\nIDL discriminator and account-layout verification FAILED."
+      "\nIDL discriminator and account-layout verification FAILED.",
     );
     process.exit(1);
   }
   console.log(
     `All ${
       Object.keys(INSTRUCTION_LAYOUTS).length
-    } instruction interfaces, 4 account discriminators, exact 145/81/200/160-byte account layouts, M24/M25 events, and bounded enums match the generated IDL.`
+    } instruction interfaces, 4 account discriminators, exact 145/81/200/160-byte account layouts, M24/M25 events, and bounded enums match the generated IDL.`,
   );
 }
 

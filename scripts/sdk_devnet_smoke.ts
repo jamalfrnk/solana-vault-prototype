@@ -60,7 +60,7 @@ function requireKeypairPath(args: string[]): string {
   if (index === -1 || !args[index + 1]) {
     throw new Error(
       "Missing required --keypair <path> flag. This script never falls back " +
-        "to a default wallet; pass the path to a funded devnet keypair explicitly."
+        "to a default wallet; pass the path to a funded devnet keypair explicitly.",
     );
   }
   return args[index + 1];
@@ -74,14 +74,14 @@ async function main(): Promise<void> {
   console.log(
     `Balance: ${
       (await connection.getBalance(payer.publicKey)) / LAMPORTS_PER_SOL
-    } SOL`
+    } SOL`,
   );
 
   const pauseAuthority = Keypair.generate();
   const newPauseAuthority = Keypair.generate();
   console.log(`Pause authority: ${pauseAuthority.publicKey.toBase58()}`);
   console.log(
-    `New pause authority (rotation target): ${newPauseAuthority.publicKey.toBase58()}`
+    `New pause authority (rotation target): ${newPauseAuthority.publicKey.toBase58()}`,
   );
 
   const fundTx = new Transaction().add(
@@ -94,11 +94,11 @@ async function main(): Promise<void> {
       fromPubkey: payer.publicKey,
       toPubkey: newPauseAuthority.publicKey,
       lamports: 0.01 * LAMPORTS_PER_SOL,
-    })
+    }),
   );
   await sendAndConfirmTransaction(connection, fundTx, [payer]);
   console.log(
-    `Funded pause authority + new pause authority (0.01 SOL each from payer)`
+    `Funded pause authority + new pause authority (0.01 SOL each from payer)`,
   );
 
   // Create a fresh SPL mint (same manual InitializeMint pattern as devnet_demo.ts).
@@ -129,7 +129,7 @@ async function main(): Promise<void> {
         },
       ],
       data: initMintData,
-    }
+    },
   );
   await sendAndConfirmTransaction(connection, createMintTx, [payer, mintKp]);
   const mintPk = mintKp.publicKey;
@@ -173,28 +173,28 @@ async function main(): Promise<void> {
 
   const client = new VaultClient(connection, mintPk);
   console.log(
-    `\nVault state PDA:     ${client.vaultStatePda.address.toBase58()}`
+    `\nVault state PDA:     ${client.vaultStatePda.address.toBase58()}`,
   );
   console.log(
-    `Vault authority PDA: ${client.vaultAuthorityPda.address.toBase58()}`
+    `Vault authority PDA: ${client.vaultAuthorityPda.address.toBase58()}`,
   );
 
   try {
     const initSig = await client.sendAndConfirm(
       [client.buildInitializeIx(payer.publicKey, pauseAuthority.publicKey)],
-      [payer, pauseAuthority]
+      [payer, pauseAuthority],
     );
     console.log(`\n[1/7] initialize\n  ${explorerUrl(initSig)}`);
 
     const depositSig = await client.sendAndConfirm(
       [client.buildDepositIx(payer.publicKey, 1_000_000_000n)],
-      [payer]
+      [payer],
     );
     console.log(`\n[2/7] deposit 1 000 tokens\n  ${explorerUrl(depositSig)}`);
 
     const withdrawSig = await client.sendAndConfirm(
       [client.buildWithdrawIx(payer.publicKey, 500_000_000n)],
-      [payer]
+      [payer],
     );
     console.log(`\n[3/7] withdraw 500 shares\n  ${explorerUrl(withdrawSig)}`);
 
@@ -202,10 +202,10 @@ async function main(): Promise<void> {
       [
         client.buildPauseIx(
           pauseAuthority.publicKey,
-          OperationalStateReason.IncidentResponse
+          OperationalStateReason.IncidentResponse,
         ),
       ],
-      [pauseAuthority]
+      [pauseAuthority],
     );
     console.log(`\n[4/7] pause\n  ${explorerUrl(pauseSig)}`);
 
@@ -218,20 +218,20 @@ async function main(): Promise<void> {
       [
         client.buildProposePauseAuthorityIx(
           pauseAuthority.publicKey,
-          newPauseAuthority.publicKey
+          newPauseAuthority.publicKey,
         ),
       ],
-      [pauseAuthority]
+      [pauseAuthority],
     );
     console.log(
       `\n[5/7] propose_pause_authority -> ${newPauseAuthority.publicKey.toBase58()}\n  ${explorerUrl(
-        proposeSig
-      )}`
+        proposeSig,
+      )}`,
     );
 
     const acceptSig = await client.sendAndConfirm(
       [client.buildAcceptPauseAuthorityIx(newPauseAuthority.publicKey)],
-      [newPauseAuthority]
+      [newPauseAuthority],
     );
     console.log(`\n[6/7] accept_pause_authority\n  ${explorerUrl(acceptSig)}`);
 
@@ -239,13 +239,13 @@ async function main(): Promise<void> {
       [
         client.buildUnpauseIx(
           newPauseAuthority.publicKey,
-          OperationalStateReason.IncidentResolved
+          OperationalStateReason.IncidentResolved,
         ),
       ],
-      [newPauseAuthority]
+      [newPauseAuthority],
     );
     console.log(
-      `\n[7/7] unpause (with the NEW authority)\n  ${explorerUrl(unpauseSig)}`
+      `\n[7/7] unpause (with the NEW authority)\n  ${explorerUrl(unpauseSig)}`,
     );
 
     const vaultState = await client.fetchVaultState();
@@ -253,7 +253,7 @@ async function main(): Promise<void> {
     console.log(
       `\nRotation confirmed: vaultState.pauseAuthority is now the new authority ` +
         `(${vaultState?.pauseAuthority.toBase58()}), pendingPauseAuthority cleared ` +
-        `(${vaultState?.pendingPauseAuthority.toBase58()}).`
+        `(${vaultState?.pendingPauseAuthority.toBase58()}).`,
     );
 
     console.log(`\n✓ All seven instructions confirmed on devnet via the SDK.`);

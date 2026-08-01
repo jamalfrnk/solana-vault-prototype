@@ -2,11 +2,7 @@ import { Connection, PublicKey } from "@solana/web3.js";
 import { deriveAssociatedTokenAddress, TOKEN_PROGRAM_ID } from "@vault-sdk";
 
 export type BalanceStatus =
-  | "disconnected"
-  | "loading"
-  | "ready"
-  | "refreshing"
-  | "error";
+  "disconnected" | "loading" | "ready" | "refreshing" | "error";
 
 export interface UserBalanceSnapshot {
   walletAssets: bigint;
@@ -39,7 +35,7 @@ function readU64Le(data: Uint8Array, offset: number): bigint {
 export async function fetchWalletAssetBalance(
   connection: Connection,
   owner: PublicKey,
-  mint: PublicKey
+  mint: PublicKey,
 ): Promise<bigint> {
   const ata = deriveAssociatedTokenAddress(owner, mint);
   const account = await connection.getAccountInfo(ata, "confirmed");
@@ -64,7 +60,7 @@ export async function fetchWalletAssetBalance(
 export function estimateRedeemableAssets(
   shares: bigint,
   totalAssets: bigint,
-  totalShares: bigint
+  totalShares: bigint,
 ): bigint {
   if (shares === 0n || totalAssets === 0n || totalShares === 0n) return 0n;
   return (shares * totalAssets) / totalShares;

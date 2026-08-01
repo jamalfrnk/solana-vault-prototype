@@ -21,7 +21,10 @@ const OPERATION_LABEL: Record<TxOperation, string> = {
 };
 
 /** Progress line for the phases that render one. */
-export function progressMessage(op: TxOperation, state: TxState): string | null {
+export function progressMessage(
+  op: TxOperation,
+  state: TxState,
+): string | null {
   const label = OPERATION_LABEL[op];
   switch (state.phase) {
     case "validating":
@@ -43,7 +46,8 @@ const ERROR_PREAMBLE: Record<TxErrorKind, string> = {
   invalid_amount: "Invalid amount",
   insufficient_funds: "Insufficient balance",
   program_error: "The vault program rejected the transaction",
-  simulation_failure: "Transaction simulation failed — check that your wallet is on Devnet",
+  simulation_failure:
+    "Transaction simulation failed — check that your wallet is on Devnet",
   rpc_failure: "Could not reach the Solana RPC endpoint",
   blockhash_expired: "The transaction expired before it could be processed",
   confirmation_timeout:
@@ -61,7 +65,9 @@ export function errorMessage(kind: TxErrorKind, detail?: string): string {
  *  not an error. Phantom/Solflare both surface "User rejected the request". */
 export function isWalletRejection(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
-  return /user rejected|rejected the request|approval denied|user declined/i.test(msg);
+  return /user rejected|rejected the request|approval denied|user declined/i.test(
+    msg,
+  );
 }
 
 export interface ClassifiedError {
@@ -76,23 +82,45 @@ export function classifyError(err: unknown): ClassifiedError {
   // Program errors carry the most specific, already-humanized message.
   const parsed = parseVaultError(err);
   if (parsed.code !== undefined) {
-    return { kind: "program_error", message: errorMessage("program_error", parsed.message) };
+    return {
+      kind: "program_error",
+      message: errorMessage("program_error", parsed.message),
+    };
   }
 
   if (/insufficient (funds|lamports)|custom program error: 0x1\b/i.test(msg)) {
-    return { kind: "insufficient_funds", message: errorMessage("insufficient_funds") };
+    return {
+      kind: "insufficient_funds",
+      message: errorMessage("insufficient_funds"),
+    };
   }
-  if (/blockhash|block height exceeded|TransactionExpiredBlockheight/i.test(msg)) {
-    return { kind: "blockhash_expired", message: errorMessage("blockhash_expired") };
+  if (
+    /blockhash|block height exceeded|TransactionExpiredBlockheight/i.test(msg)
+  ) {
+    return {
+      kind: "blockhash_expired",
+      message: errorMessage("blockhash_expired"),
+    };
   }
   if (/timed? ?out|TransactionExpiredTimeout/i.test(msg)) {
-    return { kind: "confirmation_timeout", message: errorMessage("confirmation_timeout") };
+    return {
+      kind: "confirmation_timeout",
+      message: errorMessage("confirmation_timeout"),
+    };
   }
   if (/simulation failed|failed to simulate/i.test(msg)) {
-    return { kind: "simulation_failure", message: errorMessage("simulation_failure") };
+    return {
+      kind: "simulation_failure",
+      message: errorMessage("simulation_failure"),
+    };
   }
-  if (/failed to fetch|fetch failed|network ?error|ECONNREFUSED|50[23]/i.test(msg)) {
+  if (
+    /failed to fetch|fetch failed|network ?error|ECONNREFUSED|50[23]/i.test(msg)
+  ) {
     return { kind: "rpc_failure", message: errorMessage("rpc_failure") };
   }
-  return { kind: "unknown", message: errorMessage("unknown", msg || undefined) };
+  return {
+    kind: "unknown",
+    message: errorMessage("unknown", msg || undefined),
+  };
 }

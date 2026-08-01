@@ -54,11 +54,11 @@ import {
 
 const RPC_URL = "https://api.devnet.solana.com";
 const EXPECTED_OWNER = new PublicKey(
-  "2bGnA3bzDTkXbD84foGReaVzu5Bs2CBD7aRae6VWGbKe"
+  "2bGnA3bzDTkXbD84foGReaVzu5Bs2CBD7aRae6VWGbKe",
 );
 const MINT = new PublicKey("HqeVsaqQhydA94Kvfb2KRmGJe5RqsCPPuCmBiHEhXjD5");
 const EXPECTED_VAULT_STATE = new PublicKey(
-  "3c94CfFZrgJoSzh9BjTdNyuGeZe2JCiErokbSVjfBnCL"
+  "3c94CfFZrgJoSzh9BjTdNyuGeZe2JCiErokbSVjfBnCL",
 );
 
 function explorerUrl(sig: string): string {
@@ -78,14 +78,14 @@ function parseArgs(argv: string[]): { keypairPath: string; dryRun: boolean } {
   if (keypairIndex === -1 || !argv[keypairIndex + 1]) {
     throw new Error(
       "Missing required --keypair <path> flag. This script never falls back " +
-        "to a default wallet; pass the path to the recorded owner's keypair explicitly."
+        "to a default wallet; pass the path to the recorded owner's keypair explicitly.",
     );
   }
   const dryRun = argv.includes("--dry-run");
   const confirm = argv.includes("--confirm");
   if (dryRun === confirm) {
     throw new Error(
-      "Pass exactly one of --dry-run (simulate only) or --confirm (send for real)."
+      "Pass exactly one of --dry-run (simulate only) or --confirm (send for real).",
     );
   }
   return { keypairPath: argv[keypairIndex + 1], dryRun };
@@ -94,7 +94,7 @@ function parseArgs(argv: string[]): { keypairPath: string; dryRun: boolean } {
 function meta(
   pubkey: PublicKey,
   isSigner: boolean,
-  isWritable: boolean
+  isWritable: boolean,
 ): AccountMeta {
   return { pubkey, isSigner, isWritable };
 }
@@ -105,7 +105,7 @@ function withdrawData(sharesIn: bigint): Buffer {
   new DataView(data.buffer, data.byteOffset, data.byteLength).setBigUint64(
     8,
     sharesIn,
-    true
+    true,
   );
   return data;
 }
@@ -117,7 +117,7 @@ async function main(): Promise<void> {
   if (!owner.publicKey.equals(EXPECTED_OWNER)) {
     throw new Error(
       `Loaded keypair is ${owner.publicKey.toBase58()}, but this vault's recorded ` +
-        `pause authority / position owner is ${EXPECTED_OWNER.toBase58()}. Refusing to proceed.`
+        `pause authority / position owner is ${EXPECTED_OWNER.toBase58()}. Refusing to proceed.`,
     );
   }
 
@@ -127,19 +127,19 @@ async function main(): Promise<void> {
   if (!vaultState.address.equals(EXPECTED_VAULT_STATE)) {
     throw new Error(
       `Derived vault_state ${vaultState.address.toBase58()} does not match the ` +
-        `expected ${EXPECTED_VAULT_STATE.toBase58()}. Refusing to proceed.`
+        `expected ${EXPECTED_VAULT_STATE.toBase58()}. Refusing to proceed.`,
     );
   }
   const vaultAuthority = deriveVaultAuthorityPda(
     vaultState.address,
-    LEGACY_DEVNET_PROGRAM_ID
+    LEGACY_DEVNET_PROGRAM_ID,
   );
   const custody = deriveAssociatedTokenAddress(vaultAuthority.address, MINT);
   const userTokenAccount = deriveAssociatedTokenAddress(owner.publicKey, MINT);
   const userPosition = deriveUserPositionPda(
     vaultState.address,
     owner.publicKey,
-    LEGACY_DEVNET_PROGRAM_ID
+    LEGACY_DEVNET_PROGRAM_ID,
   );
 
   console.log(`\nOwner:          ${owner.publicKey.toBase58()}`);
@@ -156,13 +156,13 @@ async function main(): Promise<void> {
   if (inspected.layout !== "legacy-113") {
     throw new Error(
       `Expected legacy-113 layout, found ${inspected.layout}. Refusing to proceed ` +
-        "— this script must never run against a migrated or unexpected account."
+        "— this script must never run against a migrated or unexpected account.",
     );
   }
   if (inspected.operationalStateValue !== 0) {
     throw new Error(
       `Vault operational state byte is ${inspected.operationalStateValue}, expected 0 (active). ` +
-        "This script does not send an unpause instruction."
+        "This script does not send an unpause instruction.",
     );
   }
 
@@ -171,14 +171,14 @@ async function main(): Promise<void> {
   const position = decodeUserPosition(positionInfo.data);
   if (!position.owner.equals(owner.publicKey)) {
     throw new Error(
-      `Position owner ${position.owner.toBase58()} does not match loaded keypair.`
+      `Position owner ${position.owner.toBase58()} does not match loaded keypair.`,
     );
   }
   if (position.shares !== inspected.totalShares) {
     throw new Error(
       `Position shares (${position.shares}) do not equal vault total_shares ` +
         `(${inspected.totalShares}). This script only performs a full withdrawal; a ` +
-        "partial/multi-position vault needs a different procedure."
+        "partial/multi-position vault needs a different procedure.",
     );
   }
 
@@ -187,23 +187,22 @@ async function main(): Promise<void> {
     ? new DataView(
         custodyInfo.data.buffer,
         custodyInfo.data.byteOffset,
-        custodyInfo.data.byteLength
+        custodyInfo.data.byteLength,
       ).getBigUint64(64, true)
     : 0n;
   if (custodyAmount !== inspected.totalAssets) {
     throw new Error(
       `Custody balance (${custodyAmount}) does not equal vault total_assets ` +
-        `(${inspected.totalAssets}). Refusing to proceed on an unreconciled vault.`
+        `(${inspected.totalAssets}). Refusing to proceed on an unreconciled vault.`,
     );
   }
 
-  const userAtaBefore = await connection.getTokenAccountBalance(
-    userTokenAccount
-  );
+  const userAtaBefore =
+    await connection.getTokenAccountBalance(userTokenAccount);
   const sharesIn = position.shares;
 
   console.log(
-    `\ntotal_assets / total_shares: ${inspected.totalAssets} / ${inspected.totalShares}`
+    `\ntotal_assets / total_shares: ${inspected.totalAssets} / ${inspected.totalShares}`,
   );
   console.log(`custody balance:             ${custodyAmount}`);
   console.log(`position shares:              ${sharesIn}`);
@@ -239,7 +238,7 @@ async function main(): Promise<void> {
       throw new Error("Simulation reported an error; see output above.");
     }
     console.log(
-      "\nSimulation succeeded with no error. Rerun with --confirm to send for real."
+      "\nSimulation succeeded with no error. Rerun with --confirm to send for real.",
     );
     return;
   }
@@ -263,11 +262,11 @@ async function main(): Promise<void> {
   const postCustodyAmount = new DataView(
     postCustodyInfo!.data.buffer,
     postCustodyInfo!.data.byteOffset,
-    postCustodyInfo!.data.byteLength
+    postCustodyInfo!.data.byteLength,
   ).getBigUint64(64, true);
 
   console.log(
-    "\n--- Post-withdrawal evidence (paste into docs/LEGACY_ACCOUNT_INVENTORY.md) ---"
+    "\n--- Post-withdrawal evidence (paste into docs/LEGACY_ACCOUNT_INVENTORY.md) ---",
   );
   console.log(`transaction:                  ${sig}`);
   console.log(`explorer:                     ${explorerUrl(sig)}`);
@@ -285,12 +284,12 @@ async function main(): Promise<void> {
   ) {
     throw new Error(
       "Post-withdrawal state is not fully zeroed. Do not mark this vault retired " +
-        "until this is investigated — print the values above and stop."
+        "until this is investigated — print the values above and stop.",
     );
   }
   console.log(
     "\nAll post-withdrawal balances are zero. Vault is ready to be marked retired " +
-      "in docs/LEGACY_ACCOUNT_INVENTORY.md with the evidence above."
+      "in docs/LEGACY_ACCOUNT_INVENTORY.md with the evidence above.",
   );
 }
 

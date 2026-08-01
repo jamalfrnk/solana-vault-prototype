@@ -29,11 +29,17 @@ export interface ParsedAmount {
 }
 
 /** Parses a token-denominated decimal string into base units. */
-export function parseTokenAmount(input: string, decimals: number): ParsedAmount {
+export function parseTokenAmount(
+  input: string,
+  decimals: number,
+): ParsedAmount {
   const trimmed = input.trim();
   if (trimmed === "") return { baseUnits: 0n, problem: "Enter an amount." };
   if (!/^\d+(\.\d+)?$/.test(trimmed)) {
-    return { baseUnits: 0n, problem: "Enter a positive number, digits and one decimal point only." };
+    return {
+      baseUnits: 0n,
+      problem: "Enter a positive number, digits and one decimal point only.",
+    };
   }
   const [whole, frac = ""] = trimmed.split(".");
   if (frac.length > decimals) {
@@ -43,7 +49,8 @@ export function parseTokenAmount(input: string, decimals: number): ParsedAmount 
     };
   }
   const baseUnits = BigInt(whole + frac.padEnd(decimals, "0"));
-  if (baseUnits === 0n) return { baseUnits: 0n, problem: "Amount must be greater than zero." };
+  if (baseUnits === 0n)
+    return { baseUnits: 0n, problem: "Amount must be greater than zero." };
   return { baseUnits, problem: null };
 }
 
@@ -53,7 +60,10 @@ export function formatTokenAmount(baseUnits: bigint, decimals: number): string {
   const abs = negative ? -baseUnits : baseUnits;
   const scale = 10n ** BigInt(decimals);
   const whole = abs / scale;
-  const frac = (abs % scale).toString().padStart(decimals, "0").replace(/0+$/, "");
+  const frac = (abs % scale)
+    .toString()
+    .padStart(decimals, "0")
+    .replace(/0+$/, "");
   const body = frac.length > 0 ? `${whole}.${frac}` : whole.toString();
   return negative ? `-${body}` : body;
 }

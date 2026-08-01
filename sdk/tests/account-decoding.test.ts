@@ -91,12 +91,12 @@ function buildProtocolConfigBuffer(
     tokenProgram?: PublicKey;
     reservedByte?: number;
     discriminator?: Buffer;
-  } = {}
+  } = {},
 ): Buffer {
   const buf = Buffer.alloc(PROTOCOL_CONFIG_LEN);
   (overrides.discriminator ?? accountDiscriminator("ProtocolConfig")).copy(
     buf,
-    0
+    0,
   );
   buf[8] = overrides.version ?? 1;
   buf[9] = overrides.bump ?? deriveProtocolConfigPda().bump;
@@ -123,12 +123,12 @@ describe("accounts", () => {
           protocolGovernanceAuthority: governance,
           emergencyAuthority: emergency,
           treasury,
-        })
+        }),
       );
       expect(decoded.version).to.equal(1);
       expect(decoded.bump).to.equal(deriveProtocolConfigPda().bump);
       expect(decoded.protocolGovernanceAuthority.equals(governance)).to.equal(
-        true
+        true,
       );
       expect(decoded.emergencyAuthority.equals(emergency)).to.equal(true);
       expect(decoded.treasury.equals(treasury)).to.equal(true);
@@ -141,21 +141,21 @@ describe("accounts", () => {
         decodeProtocolConfig(
           buildProtocolConfigBuffer({
             discriminator: accountDiscriminator("VaultState"),
-          })
-        )
+          }),
+        ),
       ).to.throw(/discriminator/i);
       expect(() =>
-        decodeProtocolConfig(buildProtocolConfigBuffer({ version: 2 }))
+        decodeProtocolConfig(buildProtocolConfigBuffer({ version: 2 })),
       ).to.throw(/version/i);
       expect(() =>
         decodeProtocolConfig(
           buildProtocolConfigBuffer({
             bump: (deriveProtocolConfigPda().bump + 1) & 0xff,
-          })
-        )
+          }),
+        ),
       ).to.throw(/bump/i);
       expect(() =>
-        decodeProtocolConfig(buildProtocolConfigBuffer({ reservedByte: 1 }))
+        decodeProtocolConfig(buildProtocolConfigBuffer({ reservedByte: 1 })),
       ).to.throw(/reserved/i);
     });
 
@@ -165,21 +165,21 @@ describe("accounts", () => {
         decodeProtocolConfig(
           buildProtocolConfigBuffer({
             protocolGovernanceAuthority: PublicKey.default,
-          })
-        )
+          }),
+        ),
       ).to.throw(/default/i);
       expect(() =>
         decodeProtocolConfig(
           buildProtocolConfigBuffer({
             protocolGovernanceAuthority: duplicate,
             emergencyAuthority: duplicate,
-          })
-        )
+          }),
+        ),
       ).to.throw(/distinct/i);
       expect(() =>
         decodeProtocolConfig(
-          buildProtocolConfigBuffer({ tokenProgram: randomPubkey() })
-        )
+          buildProtocolConfigBuffer({ tokenProgram: randomPubkey() }),
+        ),
       ).to.throw(/token program/i);
     });
   });
@@ -194,10 +194,10 @@ describe("accounts", () => {
       expect(canWithdraw(OperationalState.FullyPaused)).to.equal(false);
       expect(operationalStateLabel(OperationalState.Active)).to.equal("Active");
       expect(operationalStateLabel(OperationalState.ExitOnly)).to.equal(
-        "Exit only"
+        "Exit only",
       );
       expect(operationalStateLabel(OperationalState.FullyPaused)).to.equal(
-        "Fully paused"
+        "Fully paused",
       );
     });
   });
@@ -218,7 +218,7 @@ describe("accounts", () => {
 
       const decoded = decodeVaultState(buf);
       expect(decoded.pauseAuthority.toBase58()).to.equal(
-        pauseAuthority.toBase58()
+        pauseAuthority.toBase58(),
       );
       expect(decoded.mint.toBase58()).to.equal(mint.toBase58());
       expect(decoded.vaultBump).to.equal(254);
@@ -229,7 +229,7 @@ describe("accounts", () => {
       expect(decoded.operationalState).to.equal(OperationalState.Active);
       expect(decoded.isPaused).to.equal(false);
       expect(decoded.pendingPauseAuthority.equals(PublicKey.default)).to.equal(
-        true
+        true,
       );
     });
 
@@ -246,7 +246,7 @@ describe("accounts", () => {
         pendingPauseAuthority,
       });
       expect(decodeVaultState(buf).pendingPauseAuthority.toBase58()).to.equal(
-        pendingPauseAuthority.toBase58()
+        pendingPauseAuthority.toBase58(),
       );
     });
 
@@ -298,7 +298,7 @@ describe("accounts", () => {
 
     it("throws cleanly on a too-short buffer", () => {
       expect(() => decodeVaultState(Buffer.alloc(10))).to.throw(
-        /length|short|size/i
+        /length|short|size/i,
       );
     });
 
@@ -323,7 +323,7 @@ describe("accounts", () => {
         version: 0,
       });
       expect(() => decodeVaultState(buf)).to.throw(
-        /version 0.*migrat|migrat.*version 0/i
+        /version 0.*migrat|migrat.*version 0/i,
       );
     });
 
@@ -338,15 +338,15 @@ describe("accounts", () => {
         operationalState: OperationalState.Active,
       };
       expect(() =>
-        decodeVaultState(buildVaultStateBuffer({ ...base, version: 2 }))
+        decodeVaultState(buildVaultStateBuffer({ ...base, version: 2 })),
       ).to.throw(/unsupported.*version|version.*unsupported/i);
       expect(() =>
         decodeVaultState(
-          buildVaultStateBuffer({ ...base, operationalState: 3 })
-        )
+          buildVaultStateBuffer({ ...base, operationalState: 3 }),
+        ),
       ).to.throw(/operational.*state/i);
       expect(() =>
-        decodeVaultState(buildVaultStateBuffer({ ...base, reservedByte: 9 }))
+        decodeVaultState(buildVaultStateBuffer({ ...base, reservedByte: 9 })),
       ).to.throw(/reserved/i);
     });
 
@@ -361,7 +361,7 @@ describe("accounts", () => {
         operationalState: OperationalState.Active,
       });
       expect(() =>
-        decodeVaultState(Buffer.concat([buf, Buffer.from([0])]))
+        decodeVaultState(Buffer.concat([buf, Buffer.from([0])])),
       ).to.throw(/length|size/i);
     });
 
@@ -424,7 +424,7 @@ describe("accounts", () => {
 
     it("throws cleanly on a too-short buffer", () => {
       expect(() => decodeUserPosition(Buffer.alloc(5))).to.throw(
-        /length|short|size/i
+        /length|short|size/i,
       );
     });
 
@@ -436,7 +436,7 @@ describe("accounts", () => {
         bump: 1,
       });
       expect(() =>
-        decodeUserPosition(Buffer.concat([buf, Buffer.from([0])]))
+        decodeUserPosition(Buffer.concat([buf, Buffer.from([0])])),
       ).to.throw(/length|size/i);
     });
   });
