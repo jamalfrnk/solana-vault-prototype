@@ -3,6 +3,10 @@ name = "solana-vault-prototype"
 version = "0.1.0"
 description = "Created with Anchor"
 edition = "2021"
+# Never published to crates.io — this is an on-chain program, deployed as a
+# compiled .so, not a Rust library for downstream consumption. Declared so
+# cargo-deny's [licenses.private] check can skip it (see cargo-deny.toml).
+publish = false
 
 [lib]
 crate-type = ["cdylib", "lib"]
