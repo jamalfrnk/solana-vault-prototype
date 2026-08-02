@@ -1,33 +1,6 @@
 # cargo-deny.toml
 
 [advisories]
-# Unmaintained-crate advisories that are transitive dependencies of the
-# Solana / Anchor ecosystem and cannot be removed without upstream changes.
-# These are kept in sync with audit.toml.
-ignore = [
-    # ansi_term is unmaintained; pulled in by Solana tooling transitively
-    # https://rustsec.org/advisories/RUSTSEC-2021-0139
-    { id = "RUSTSEC-2021-0139" },
-
-    # bincode 1.x is unmaintained; used throughout the Solana SDK
-    # https://rustsec.org/advisories/RUSTSEC-2025-0141
-    { id = "RUSTSEC-2025-0141" },
-
-    # derivative is unmaintained; used by Solana/Anchor proc-macros
-    # https://rustsec.org/advisories/RUSTSEC-2024-0388
-    { id = "RUSTSEC-2024-0388" },
-
-    # libsecp256k1 is unmaintained; used by solana-secp256k1-recover
-    # https://rustsec.org/advisories/RUSTSEC-2025-0161
-    { id = "RUSTSEC-2025-0161" },
-
-    # paste is unmaintained; used by various Solana crates
-    # https://rustsec.org/advisories/RUSTSEC-2024-0436
-    { id = "RUSTSEC-2024-0436" },
-]
-
-[licenses]
-# Allow common open-source licenses used throughout the Rust/Solana ecosystem.
 # Use the advisory DB and fail the check if any high/critical advisories are found.
 #
 # `yanked = "deny"` replaces this file's old `[policies] deny-yanked = true` — that
@@ -77,24 +50,6 @@ allow = [
     "MIT",
     "Apache-2.0",
     "Apache-2.0 WITH LLVM-exception",
-    "ISC",
-    "BSD-2-Clause",
-    "BSD-3-Clause",
-    "MPL-2.0",
-    "Unicode-3.0",
-    "Unicode-DFS-2016",
-    "Zlib",
-    "CC0-1.0",
-    "0BSD",
-]
-
-[bans]
-# Deny git-sourced dependencies; all dependencies must come from crates.io.
-deny = []
-
-[sources]
-unknown-registry = "deny"
-unknown-git = "deny"
     "BSD-1-Clause",
     "BSD-2-Clause",
     "BSD-3-Clause",
