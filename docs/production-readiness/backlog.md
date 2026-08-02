@@ -127,7 +127,7 @@ are the concrete, evidence-backed additions this audit contributes.
 - **Size:** XS, but blocked on Malcolm's admin access — not implementable by any
   agent.
 
-### TEST-001 — dApp test suite has a noisy but non-fatal jsdom warning
+### TEST-001 — dApp test suite has a noisy but non-fatal jsdom warning — **in PR #71**
 
 - **Priority:** P3
 - **Type:** Test hygiene
@@ -142,6 +142,15 @@ are the concrete, evidence-backed additions this audit contributes.
 - **Scope:** Either finish and merge `add/jest-canvas-mock`, or delete it if
   abandoned intentionally.
 - **Size:** XS.
+- **2026-08-02:** `add/jest-canvas-mock` had fallen 30+ commits behind `main` and
+  wasn't safely mergeable as-is. Reapplied its actual two-line intent fresh on
+  current `main` on `test/jest-canvas-mock` (PR #71) instead — and verifying it
+  before committing (rather than trusting the dangling branch) turned up a real bug
+  it never caught: `jest-canvas-mock` v2 references the `jest` global directly and
+  breaks all 19 test files under Vitest without a `globalThis.jest = vi` shim ahead
+  of a *dynamic* import. Fixed; 122/122 pass, warning confirmed gone. The original
+  `add/jest-canvas-mock` branch is now superseded — safe to delete once #71 merges
+  (see `DX-001`).
 
 ### DX-001 — Stale branches after squash-merges
 
