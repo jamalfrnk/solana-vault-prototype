@@ -107,23 +107,32 @@ are the concrete, evidence-backed additions this audit contributes.
   now."
 - **Size:** XS engineering effort once decided; the decision itself has no size.
 
-### GOV-001 — Repository/org GitHub settings are unverified
+### GOV-001 — Repository/org GitHub settings are unverified — **now confirmed, not just unverified**
 
-- **Priority:** P1
+- **Priority:** P1 → **effectively P0**: this is no longer a documentation gap, it's a
+  confirmed live gap.
 - **Type:** Governance (admin-only, cannot be automated)
 - **Evidence:** `GITHUB_SECURITY_SETTINGS_CHECKLIST.md` (PR #52) lists 14 items —
   branch protection, required status checks, CODEOWNERS enforcement, 2FA, fork-PR
   secret isolation, etc. — all unchecked. It's explicit that "the automation in this
   PR cannot modify these settings."
 - **Risk:** Everything else in CI (secret scanning, required checks, dependency
-  audit) is only as strong as whether it's actually *required* to merge. Right now
-  that's unverified — `main` could theoretically be pushed to directly or merged
-  without green CI.
+  audit) is only as strong as whether it's actually *required* to merge.
+- **2026-08-02 confirmation** (`docs/architecture/trust-boundaries.md` §2, full
+  detail): `gh api repos/jamalfrnk/solana-vault-prototype/branches/main/protection`
+  returns `404 Branch not protected` — zero required checks, zero required reviews,
+  direct pushes and force-pushes to `main` are currently unrestricted. `.github/CODEOWNERS`
+  still has the literal unfilled `REPO_OWNERS_PLACEHOLDER` on every path. Secret-scanning
+  push protection is off (`secret_scanning_push_protection: disabled`). This is the
+  literal, current state — not a theoretical "could be" anymore.
 - **Scope:** Malcolm reviews and applies the 14 items via the GitHub UI (repo/org
-  Settings). No code change.
+  Settings), and fills in real owners in `.github/CODEOWNERS`. No code change beyond
+  the CODEOWNERS file itself (which an agent could edit once Malcolm names owners,
+  but the settings themselves are GitHub UI/API admin actions).
 - **Definition of done:** Each checklist item is checked off with the actual
   setting confirmed (e.g., a screenshot or `gh api repos/.../branches/main/protection`
-  output recorded in the file).
+  output recorded in the file) — a passing, non-404 response with required status
+  checks listed is the concrete signal this is actually done.
 - **Size:** XS, but blocked on Malcolm's admin access — not implementable by any
   agent.
 
@@ -162,6 +171,52 @@ are the concrete, evidence-backed additions this audit contributes.
   `add/jest-canvas-mock` (see `TEST-001`) is genuinely unmerged and 8 days old.
 - **Scope:** Delete the two squash-merged branches; decide on `add/jest-canvas-mock`.
 - **Size:** XS. Not a security or correctness issue, just clutter.
+- **2026-08-03:** `add/jest-canvas-mock` resolved — superseded by PR #71 (`TEST-001`),
+  safe to delete. `test/jest-canvas-mock`, `fix/cargo-deny-license-policy`,
+  `docs/production-readiness-audit-2026-08-01`, and `docs/backlog-test-001-update`
+  are now also merged and safe to delete once confirmed. Root cause of why this
+  keeps recurring, confirmed in `docs/architecture/trust-boundaries.md` §2:
+  `delete_branch_on_merge` is `false` at the repository-settings level — every merge
+  inherits this, not a per-PR oversight. Fixing the setting (Malcolm, GitHub UI)
+  would prevent recurrence; deleting individual branches only clears the backlog.
+
+### TEST-002 — `disable_mint` has no dedicated authority-rejection test
+
+- **Priority:** P3
+- **Type:** Test coverage
+- **Evidence:** `docs/architecture/behavior-contract.md` §3. Every other privileged
+  mint-config instruction (`propose_mint_config_update`, `lower_mint_caps`, etc.) has
+  an explicit wrong-authority/wrong-signer negative test. `disable_mint`'s access
+  control (`GovernMintConfig` context) is only exercised indirectly, via
+  `propose_mint_config_update`'s wrong-governance test sharing the same
+  account-validation code path — no `disable_mint`-specific negative test exists.
+- **Risk:** Low — the shared validation code is independently tested via the sibling
+  instruction — but a future refactor that accidentally scoped `disable_mint`
+  differently from the rest of `GovernMintConfig` would not be caught by any test
+  named for `disable_mint` itself.
+- **Scope:** Add one negative test to `test_mint_config.rs`: wrong-authority signer
+  attempting `disable_mint` fails with the expected error.
+- **Definition of done:** New test exists, fails on a deliberately-reintroduced bug
+  (e.g. temporarily removing the authority check), passes on current code.
+- **Size:** XS.
+
+### TEST-003 — `emergency_pause`/`emergency_resume` and mint-config proposal instructions lack isolated happy-path tests
+
+- **Priority:** P3
+- **Type:** Test coverage
+- **Evidence:** `docs/architecture/behavior-contract.md` §3. Both instruction groups
+  are covered only by combined table-driven tests that assert happy-path and
+  negative-path behavior in the same function, unlike most other instructions which
+  split happy-path and negative tests into separate functions.
+- **Risk:** Low functionally (coverage exists), but a happy-path regression is harder
+  to isolate from a failing combined test than from a dedicated happy-path test.
+- **Scope:** Optional refactor — split `test_protocol.rs`'s and `test_mint_config.rs`'s
+  combined tests into separate happy/negative functions, matching the rest of the
+  suite's pattern. Test-structure-only; no coverage gap to close, purely diagnostic
+  clarity.
+- **Definition of done:** Existing assertions preserved, split across more, smaller
+  test functions; no behavior change.
+- **Size:** S.
 
 ## Existing tracked work this audit deliberately did not duplicate
 
